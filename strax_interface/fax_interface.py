@@ -264,8 +264,8 @@ class PeaksFromFax(strax.Plugin):
                             's2_light_map': InterpolatingMap(get_resource(self.config['s2_light_yield_map'],fmt='json')),
                             's1_pattern_map': InterpolatingMap(get_resource(self.config['s1_pattern_map'],fmt='json.gz')),
                             's2_pattern_map': InterpolatingMap(get_resource(self.config['s2_pattern_map'],fmt='json.gz')),
-                            'uniform_to_pmt_ap': np.load(self.config['ele_afterpulse_file'],allow_pickle=True).item(),
-                            'uniform_to_ele_ap': np.load(self.config['pmt_afterpulse_file'],allow_pickle=True).item(),
+                            'uniform_to_pmt_ap': np.load(self.config['pmt_afterpulse_file'],allow_pickle=True).item(),
+                            'uniform_to_ele_ap': np.load(self.config['ele_afterpulse_file'],allow_pickle=True).item(),
                             'uniform_to_pe_arr': spe_dist,
                                })
 
@@ -327,9 +327,9 @@ class RawRecordsFromFax(strax.Plugin):
                                                                             fmt='json.gz')),
                             's2_pattern_map': InterpolatingMap(get_resource(self.config['s2_pattern_map'],
                                                                             fmt='json.gz')),
-                            'uniform_to_pmt_ap': np.load(self.config['ele_afterpulse_file'],
+                            'uniform_to_pmt_ap': np.load(self.config['pmt_afterpulse_file'],
                                                          allow_pickle=True).item(),
-                            'uniform_to_ele_ap': np.load(self.config['pmt_afterpulse_file'],
+                            'uniform_to_ele_ap': np.load(self.config['ele_afterpulse_file'],
                                                          allow_pickle=True).item(),
                             'uniform_to_pe_arr': spe_dist,
                             'noise_data': noise_data,
