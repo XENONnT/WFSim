@@ -16,7 +16,7 @@ Alternatively you can just disable both, afterpulses are currently not working a
 
 Additionally you need to download one more config files. In strax_auxilliary_files/fax_config you need to download  'ele_after_pulse.npy', due to formatting strax cannot read these directly so you need to have it on disk.
 
-Then you need to add the following to the sum_waveform function in strax.peak_building:
+Then you need to add the following to the sum_waveform function in strax.peak_building around line 180, before the assert:
 ```python
 if r_start ==r_end == 0:
         continue
