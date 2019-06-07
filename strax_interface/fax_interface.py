@@ -126,7 +126,6 @@ class RawRecordsSimulator(object):
                 self.t = ie['t']
 
             if self.event != ie['event_number']:
-                print(self.event,ie['event_number'])
                 yield self.store_buffer(self.pulse_buffer,self.t)
 
                 self.t = ie['t']
