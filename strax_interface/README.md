@@ -60,7 +60,8 @@ register = [straxen.plugins.fax_interface.PeaksFromFax]
 ```
 
 ## Instructions
-By default fax will generate some random large signals. If you want to change this look at the rand_instructions function in fax_interface. The time is such to avoid overlapping events 
+By default fax will generate some random large signals. If you want to change this look at the rand_instructions function in fax_interface. The time is such to avoid overlapping events.
+When simulating fax will print the instructions used for the events.
 
 
 ## Known issues
