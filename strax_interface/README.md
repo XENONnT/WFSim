@@ -51,7 +51,7 @@ p = st.get_array('1','peaks')
 ```
 
 And then enjoy your newly made data :)
-
+What you should keep in mind, raw_records is massive. 200 events correspond to about 5 GB. This might not be practical for everybody.
 If you want to get the data straight to peaks change the register value in the Context declaration to:
 ```python
 register = [straxen.plugins.fax_interface.PeaksFromFax]
