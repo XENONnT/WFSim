@@ -41,6 +41,8 @@ st = strax.Context(
 ```
 Nevents is an option telling fax how many events to simulate. The default value is 10, but maybe you want a different amount
 
+Normally when we want to get some strax data we need to give the right run_id. Since we're making new data it doesn't really matter what run_id you specify. Giving an actual real run_id might be better due to you then getting the real value for the electron lifetime. For a fake run_id it might crash when you want to get the corrections plugin.
+
 To get some data do:
 ```python
 rr = st.get_array('1','raw_records')
