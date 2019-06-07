@@ -46,6 +46,11 @@ So go to your straxen/common.py and add import json and add (for me on line 96):
 
 Finally there is one challenge remaining. The default interpolating map of strax doesn't like what we need it to do. So you need to grab the one from here (WFSim/itp_map.py) and overwrite the default one in straxen.
 
+
+So after asking other people I missed one thing. You need one more file which is also on tianyu's midway, for now I'm not sure where but it should be more or less at the same place and it is called: [b]Kr83m_Ddriven_per_pmt_params_dataframe.pkl[/b]
+
+And in fax.py you need to change the hard coded path on line 415.
+
 ## Usage
 You can choose the simulate too two different data types. If you want a quick and dirty simulation and are not really interested in low level stuff you can simulate directly to Peaks. This is done by PeaksFromFax.
 If you want to go deeper and get raw_records, normally created by the DAQ reader, you can use RawRecordsFromFax. Depending on what you want your strax contex will look a bit different.
