@@ -6,7 +6,7 @@ Here are the files needed to run the waveform simulator fax and give output in t
 
 Copy the fax.py and fax_interface to your straxen/plugins folder. Then add "import fax_interface, fax" to the __init__.py file
 
-Since github has a limit on the maximum allowed file size not all configuration files can be hosted here. So you still need to get your hands on the files needed for pmt_after_pulse and noise. These guys are located on dali at:
+Since github has a limit on the maximum allowed file size not all configuration files can be hosted here. So you still need to get your hands on the files needed for pmt_after_pulse and noise. These guys are located on midway at:
 ```python
 '/project2/lgrandi/zhut/sim/WFSimDev/real_noise_sample/170203_0850_00.npz'
 '/project2/lgrandi/zhut/sim/WFSimDev/pmt_after_pulse.npy'
