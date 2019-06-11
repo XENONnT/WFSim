@@ -10,6 +10,7 @@ Since github has a limit on the maximum allowed file size not all configuration 
 ```python
 '/project2/lgrandi/zhut/sim/WFSimDev/real_noise_sample/170203_0850_00.npz'
 '/project2/lgrandi/zhut/sim/WFSimDev/pmt_after_pulse.npy'
+'/project2/lgrandi/zhut/sim/Kr83m_Ddriven_per_pmt_params_dataframe.pkl'
 ```
 
 Alternatively you can just disable both, afterpulses are currently not working and commenting line 152 in fax_interface.py will disable noise data.
