@@ -1,11 +1,120 @@
+import io
+import socket
+import sys
+import tarfile
+import os.path as osp
+import os
+import inspect
+import urllib.request
+
 import logging
-import gzip
-import json
 import re
 
-import numpy as np
 from scipy.spatial import cKDTree
 
+import numpy as np
+import json, gzip
+
+cache_dict = dict()
+
+def get_resource(x, fmt='text'):
+    """Return contents of file or URL x
+    :param binary: Resource is binary. Return bytes instead of a string.
+    """
+    is_binary = fmt != 'text'
+
+    # Try to retrieve from in-memory cache
+    if x in cache_dict:
+        return cache_dict[x]
+
+    if '://' in x:
+        # Web resource; look first in on-disk cache
+        # to prevent repeated downloads.
+        cache_fn = strax.utils.deterministic_hash(x)
+        cache_folders = ['./resource_cache',
+                         '/dali/lgrandi/strax/resource_cache']
+        for cache_folder in cache_folders:
+            try:
+                os.makedirs(cache_folder, exist_ok=True)
+            except (PermissionError, OSError):
+                continue
+            cf = osp.join(cache_folder, cache_fn)
+            if osp.exists(cf):
+                return get_resource(cf, fmt=fmt)
+
+        # Not found in any cache; download
+        result = urllib.request.urlopen(x).read()
+        if not is_binary:
+            result = result.decode()
+
+        # Store in as many caches as possible
+        m = 'wb' if is_binary else 'w'
+        available_cf = None
+        for cache_folder in cache_folders:
+            if not osp.exists(cache_folder):
+                continue
+            cf = osp.join(cache_folder, cache_fn)
+            try:
+                with open(cf, mode=m) as f:
+                    f.write(result)
+            except Exception:
+                pass
+            else:
+                available_cf = cf
+        if available_cf is None:
+            raise RuntimeError(
+                f"Could not load {x},"
+                "none of the on-disk caches are writeable??")
+
+        # Retrieve result from file-cache
+        # (so we only need one format-parsing logic)
+        return get_resource(available_cf, fmt=fmt)
+
+    # File resource
+    if fmt == 'npy':
+        result = np.load(x)
+    elif fmt == 'binary':
+        with open(x, mode='rb') as f:
+            result = f.read()
+    elif fmt == 'text':
+        with open(x, mode='r') as f:
+            result = f.read()
+    elif fmt == 'json':
+        with open(x, mode='r') as f:
+            result = json.load(f)
+    elif fmt == 'json.gz':
+        with gzip.open(x, 'rb') as f:
+            result = json.load(f)
+
+    # Store in in-memory cache
+    cache_dict[x] = result
+
+    return result
+
+import pandas as pd
+from scipy.interpolate import interp1d
+
+def init_spe_scaling_factor_distributions(file):
+    # Extract the spe pdf from a csv file into a pandas dataframe
+    spe_shapes = pd.read_csv(file)
+
+    # Create a converter array from uniform random numbers to SPE gains (one interpolator per channel)
+    # Scale the distributions so that they have an SPE mean of 1 and then calculate the cdf
+    uniform_to_pe_arr = []
+    for ch in spe_shapes.columns[1:]:  # skip the first element which is the 'charge' header
+        if spe_shapes[ch].sum() > 0:
+            mean_spe = (spe_shapes['charge'] * spe_shapes[ch]).sum() / spe_shapes[ch].sum()
+            scaled_bins = spe_shapes['charge'] / mean_spe
+            cdf = np.cumsum(spe_shapes[ch]) / np.sum(spe_shapes[ch])
+        else:
+            # if sum is 0, just make some dummy axes to pass to interpolator
+            cdf = np.linspace(0, 1, 10)
+            scaled_bins = np.zeros_like(cdf)
+
+        uniform_to_pe_arr.append(interp1d(cdf, scaled_bins))
+    if uniform_to_pe_arr != []:
+        return uniform_to_pe_arr
+    
 
 class InterpolateAndExtrapolate(object):
     """Linearly interpolate- and extrapolate using inverse-distance
