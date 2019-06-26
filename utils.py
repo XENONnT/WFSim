@@ -63,7 +63,7 @@ def get_resource(x, fmt='text'):
                 available_cf = cf
         if available_cf is None:
             raise RuntimeError(
-                f"Could not load {x},"
+                "Could not load {x},"
                 "none of the on-disk caches are writeable??")
 
         # Retrieve result from file-cache

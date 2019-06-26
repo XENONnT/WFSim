@@ -7,8 +7,8 @@ import pandas as pd
 from scipy.interpolate import interp1d
 from scipy.stats import norm, poisson
 
-from numba import int64, float64, guvectorize, jit
-from itp_map import InterpolatingMap
+from numba import jit
+from utils import InterpolatingMap
 
 from pax import units, utils, datastructure
 import logging
@@ -37,6 +37,7 @@ class Pulse(object):
 
     def __init__(self, config):
         self.config = config
+        print('here, here')
 
         self.init_pmt_current_templates()  # PMT + digitizer response to incident photon
         self.init_spe_scaling_factor_distributions()
@@ -58,8 +59,10 @@ class Pulse(object):
                                                  self.config['pmt_transit_time_spread'],
                                                  len(self._photon_timings))
 
-        for channel in np.unique(self._photon_channels):
-            _channel_photon_timings = self._photon_timings[self._photon_channels == channel]
+        counts_start = 0
+        for channel, counts in zip(*np.unique(self._photon_channels, return_counts=True)):
+            _channel_photon_timings = self._photon_timings[counts_start:counts_start+counts]
+            counts_start += counts
 
             # Compute sample index（quotient）and reminder
             # Determined by division between photon timing and sample duraiton.
@@ -91,7 +94,8 @@ class Pulse(object):
             pulse_right = max_timing + int(self.config['samples_after_pulse_center'])
             pulse_current = np.zeros(pulse_right - pulse_left + 1)
 
-            Pulse.add_current(_channel_photon_timings - min_timing,
+            Pulse.add_current(self._pmt_current_templates, self._template_length,
+                              _channel_photon_timings - min_timing,
                               _channel_photon_reminders, _channel_photon_gains, pulse_current)
 
             # For single event, data of pulse level is small enough to store in dataframe
@@ -107,11 +111,6 @@ class Pulse(object):
         _pmt_current_templates[i] : photon timing fall between [10*m+i, 10*m+i+1)
         (i, m are integers)
         """
-        # 'Hidden' global variables to avoid passing class instance into guvectorized function
-        global _pmt_current_templates, _template_length
-        _pmt_current_templates = []
-        _template_length = 0
-
         # Interpolate on cdf ensures that each spe pulse would sum up to 1 pe*sample duration^-1
         pe_pulse_function = interp1d(
             self.config.get('pe_pulse_ts'),
@@ -127,13 +126,15 @@ class Pulse(object):
         samples = np.linspace(-samples_before * sample_duration,
                               + samples_after * sample_duration,
                               1 + samples_before + samples_after)
-        _template_length = len(samples) - 1
+        self._template_length = len(samples) - 1
+        self._pmt_current_templates = np.zeros([int(sample_duration/pmt_pulse_time_rounding)+1,
+            self._template_length])
 
-        for r in np.arange(0, sample_duration, pmt_pulse_time_rounding):
+        for ix, r in enumerate(np.arange(0, sample_duration, pmt_pulse_time_rounding)):
             pmt_current = np.diff(pe_pulse_function(samples - r)) / sample_duration  # pe / 10 ns
             # Normalize here to counter tiny rounding error from interpolation
             pmt_current *= (1 / sample_duration) / np.sum(pmt_current)  # pe / 10 ns
-            _pmt_current_templates.append(pmt_current)
+            self._pmt_current_templates[ix] = pmt_current
 
         log.debug('Create spe waveform templates with %s ns resolution' % pmt_pulse_time_rounding)
 
@@ -164,8 +165,8 @@ class Pulse(object):
         self._pulses = []
 
     @staticmethod  # Staticmethod decorator doesn't seem to do anything
-    @guvectorize([(int64, int64, float64, float64[:])], '(), (), (), (n)')
-    def add_current(_photon_timing_start, _reminder, _photon_gain, pulse):
+    @jit(nopython=True)
+    def add_current(_pmt_current_templates, _template_length, _photon_timing_start, _reminder, _photon_gain, pulse):
         """
         Simulate single channel waveform given the photon timings
         _photon_timing_start   - dim-1 integer array of photon timings in unit of samples
@@ -175,8 +176,9 @@ class Pulse(object):
         _pmt_current_templates - list of spe templates of different reminders
         The self argument is intentionally left out of this function.
         """
-        pulse[_photon_timing_start:_photon_timing_start+_template_length] += \
-            _pmt_current_templates[_reminder] * _photon_gain
+        for start, reminder, gain in zip(_photon_timing_start, _reminder, _photon_gain):
+            pulse[start:start+_template_length] += \
+                _pmt_current_templates[reminder] * gain
 
     def singlet_triplet_delays(self, size, singlet_ratio):
         """
@@ -238,7 +240,7 @@ class S1(Pulse):
             channels,
             size=len(self._photon_timings),
             p=p_per_channel,
-            replace=True)
+            replace=True).astype(int)
 
     def photon_timings(self, t, n_photons, recoil_type):
         if n_photons == 0:
@@ -449,7 +451,7 @@ class S2(Pulse):
     def s2_pattern_map_pp(self, pos):
         if 'params' not in self.__dict__:
             all_map_params = pd.read_pickle(
-                '/project2/lgrandi/zhut/Kr83m_Ddriven_per_pmt_params_dataframe.pkl')
+                '/project2/lgrandi/zhut/sim/Kr83m_Ddriven_per_pmt_params_dataframe.pkl')
             self.params = all_map_params.loc[all_map_params.kr_run_id == 10,
                                              ['amp0', 'amp1', 'tao0', 'tao1', 'pmtx', 'pmty']].values.T
 
@@ -609,9 +611,9 @@ class Event(object):
 
         self.pulses = dict(
             s1=S1(config),
-            s2=S2(config),
-            ele_ap=Afterpulse_Electron(config),
-            pmt_ap=Afterpulse_PMT(config))
+            s2=S2(config),)
+            #ele_ap=Afterpulse_Electron(config),
+            #pmt_ap=Afterpulse_PMT(config))
 
         self.ptypes = self.pulses.keys()
 
@@ -625,10 +627,10 @@ class Event(object):
             # [0, 's1', 1000000.0, 0, 0, 0, 10000, 'ER']
             ptype = instruction[1]
             self.pulses[ptype](instruction)
-            self.pulses['ele_ap'](self.pulses[ptype])
+            #self.pulses['ele_ap'](self.pulses[ptype])
 
-            self.pulses['pmt_ap'](self.pulses[ptype])
-            self.pulses['pmt_ap'](self.pulses['ele_ap'])
+            #self.pulses['pmt_ap'](self.pulses[ptype])
+            #self.pulses['pmt_ap'](self.pulses['ele_ap'])
 
         self._pulses = []
         for ptype in self.ptypes:
@@ -648,16 +650,18 @@ class Event(object):
             # Use noise array to pave the fundation of the pulses
             #self._raw_data = self.get_real_noise(np.array([0]), np.array([event_duration]))[0]
             self._raw_data = np.zeros((event_duration, len(
-                self.config['channels_in_detector']['tpc'])))*1.0
+                self.config['channels_in_detector']['tpc'])), dtype=('<i8'))
 
             for ix, _pulse in self._pulses.iterrows():
                 # Could round instead of trunc... no one cares!
-                adc_wave = - np.trunc(_pulse.current * self.current_2_adc)
+                adc_wave = - np.trunc(_pulse.current * self.current_2_adc).astype(int)
                 self._raw_data[_pulse.left:_pulse.right+1, _pulse.channel] += adc_wave
 
             # Digitizers have finite number of bits per channel, so clip the signal.
             self._raw_data += self.config['digitizer_reference_baseline']
-            self._raw_data = np.clip(self._raw_data, 0, 2 ** (self.config['digitizer_bits']))
+            self._raw_data[self._raw_data < 0] = 0
+            # Hopefully (peak downward) waveform won't exceed upper limit
+            # self._raw_data = np.clip(self._raw_data, 0, 2 ** (self.config['digitizer_bits']))
 
     def get_real_noise(self, lefts, durations):
         """
@@ -698,16 +702,12 @@ class Simulator(object):
         self.event = Event(config)
 
     def __call__(self, master_instruction):
-        if not isinstance(master_instruction, pd.DataFrame):
-            print('Reqire a dataframe see:')
-
         m_inst = master_instruction
 
-        for event_number in m_inst.event_number.unique():
+        for event_number in np.unique(m_inst['event_number']):
             # Build event ingradients
-            e_inst = m_inst[m_inst.event_number == event_number]
-            e_inst = e_inst.loc[:, ['event_number', 'type',
-                                    't', 'x', 'y', 'z', 'amp', 'recoil']].values
+            e_inst = m_inst[m_inst['event_number'] == event_number]
+            e_inst = e_inst[['event_number', 'type', 't', 'x', 'y', 'z', 'amp', 'recoil']]
             # print(e_inst)
             self.event(e_inst)
 
