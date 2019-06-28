@@ -183,7 +183,8 @@ class RawRecordsSimulator(object):
                     else:
                         n_store = p_length - o_p
                     rr[s_r + rec_i]['length'] = n_store
-                    rr[s_r + rec_i]['data'][o_r: o_r + n_store] = p['pulse'][0][o_p: o_p + n_store]
+                    rr[s_r + rec_i]['data'][o_r: o_r + n_store] = self.sum_pulses(rr[s_r + rec_i]['data'][o_r: o_r + n_store],
+                                                                             p['pulse'][0][o_p: o_p + n_store])
 
 
             self.results.append(rr)
@@ -200,6 +201,11 @@ class RawRecordsSimulator(object):
         print("Returning %d records" % len(records))
         self.results = []
         return records
+    
+    @guvectorize([(int64[:], int64[:], int64[:])], '(n),(n)->(n)')
+    def sum_pulses(x, y, res):
+        for i in range(x.shape[0]):
+            res[i] = x[i] + y[i]
 
     def get_real_noise(self, records):
         """
