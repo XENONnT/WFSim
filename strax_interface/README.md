@@ -24,27 +24,6 @@ if r_start ==r_end == 0:
 ```
 It likes to loop over records which only contain noise and then crashes cause there is only noise.
 
-As if that wasn't bad enought you need to update your get_resource function to get it to read json.
-So go to your straxen/common.py and add import json and add (for me on line 96):
-```python
-   # File resource
-    if fmt == 'npy':
-        result = np.load(x)
-
-    elif fmt == 'json.gz':
-        with gzip.open(x, 'rb') as f:
-            result = json.load(f)
-    elif fmt == 'json':
-        with open(x, mode='rb') as f:
-            result = json.loads(f.read())
-    elif fmt == 'binary':
-        with open(x, mode='rb') as f:
-            result = f.read()
-    elif fmt == 'text':
-        with open(x, mode='r') as f:
-            result = f.read()
-```
-
 Finally there is one challenge remaining. The default interpolating map of strax doesn't like what we need it to do. So you need to grab the one from here (WFSim/itp_map.py) and overwrite the default one in straxen.
 
 
