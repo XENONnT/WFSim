@@ -36,8 +36,8 @@ def data_file_path(filename):
 class Pulse(object):
 
     def __init__(self, config):
+        print('Initiating %s pulse simulator'% self.__class__.__name__)
         self.config = config
-        print('here, here')
 
         self.init_pmt_current_templates()  # PMT + digitizer response to incident photon
         self.init_spe_scaling_factor_distributions()
@@ -309,7 +309,7 @@ class S2(Pulse):
         _, _, t, x, y, z, n_electron, recoil_type = [
             np.array(v).reshape(-1) for v in zip(*instruction)]
 
-        poistions = np.array([x, y]).T  # For map interpolation
+        self.poistions = poistions = np.array([x, y]).T  # For map interpolation
         sc_gain = self.s2_light_yield_map(poistions) * self.config['s2_secondary_sc_gain']
 
         # Average drift time of the electrons
@@ -358,8 +358,8 @@ class S2(Pulse):
         uniform_to_emission_time = interp1d(np.cumsum(dy), np.cumsum(dt),
                                             bounds_error=False, fill_value=(0, sum(dt)))
 
-        probabilities = 1 - np.random.uniform(0, 1, size=shape)
-        return uniform_to_emission_time(probabilities)
+        reshape_Y = np.linspace(0, 1, 1001); reshape_X = uniform_to_emission_time(reshape_Y)
+        return reshape_X[np.around(1 - np.random.uniform(0, 1, size=shape)/1000).astype(int)]
 
     def electron_timings(self, t, n_electron, z, sc_gain):
 
@@ -432,9 +432,13 @@ class S2(Pulse):
         # Randomly assign to channel given probability of each channel
         # Sum probabilities over channels should be 1
         self._photon_channels = np.array([])
+        channels = np.array(self.config['channels_in_detector']['tpc']).astype(int)
+
+        self._photon_channels = np.zeros(len(self._photon_timings), dtype='<i8')
+        count_start = 0
+
         for u, n in zip(*np.unique(self._instruction, return_counts=True)):
             p_per_channel_top = p_pattern[u] / np.sum(p_pattern[u]) * p_top * (1 - p_random)
-            channels = np.array(self.config['channels_in_detector']['tpc'])
             p_per_channel = np.concatenate([p_per_channel_top, p_per_channel_bottom])
             # p_per_channel[np.in1d(channels, self.turned_off_pmts)] = 0
 
@@ -444,9 +448,7 @@ class S2(Pulse):
                 p=p_per_channel/np.sum(p_per_channel),
                 replace=True)
 
-            self._photon_channels = np.append(self._photon_channels, _photon_channels)
-
-        self._photon_channels = self._photon_channels.astype(int)
+            self._photon_channels[count_start:count_start+n] = _photon_channels
 
     def s2_pattern_map_pp(self, pos):
         if 'params' not in self.__dict__:
@@ -475,7 +477,7 @@ class Afterpulse_Electron(S2):
     def __init__(self, config):
         super().__init__(config)
         self.uniform_to_ele_ap = np.load(
-            '/project2/lgrandi/zhut/sim/WFSimDev/ele_after_pulse.npy').item()
+            '/project2/lgrandi/zhut/sim/WFSimDev/ele_after_pulse.npy', allow_pickle=True).item()
         self.element_list = ['liquid']
         self._photon_timings = []
 
@@ -498,7 +500,7 @@ class Afterpulse_Electron(S2):
 
         delaytime_cdf = self.uniform_to_ele_ap['liquid']['delaytime_cdf']
 
-        # To save calculation we first find out how many photon will give rise ap
+        # To save calculation we first find out how many photon will make ap
         n_electron = np.random.poisson(delaytime_cdf[-1] * len(signal_pulse._photon_timings))
 
         # Assign each electron a random uniform number rU0 (0, delaytime_cdf[-1]]
@@ -508,7 +510,7 @@ class Afterpulse_Electron(S2):
         # ap_delay = np.argmin(
         #    np.abs(delaytime_cdf - rU0[:, None]), axis=-1)
 
-        # 80,0000 is bit too slow, so we lower it to 800 + 1000
+        # 80,0000 loops are a bit too slow, so we break it to 800 + 1000
         ap_delay = np.argmin(
             np.abs(delaytime_cdf[500::1000] - rU0[:, None]), axis=-1)
         ap_delay = ap_delay * 1000 + \
@@ -549,8 +551,8 @@ class Afterpulse_PMT(Pulse):
     def __init__(self, config):
         super().__init__(config)
         self.uniform_to_pmt_ap = np.load(
-            '/project2/lgrandi/zhut/sim/WFSimDev/pmt_after_pulse.npy').item()
-        self.element_list = ['Uniform', 'Ar', 'CH4', 'He', 'N2', 'Ne', 'Xe', 'Xe2+']
+            '/project2/lgrandi/zhut/sim/WFSimDev/pmt_after_pulse_v2.npy', allow_pickle=True).item()
+        self.element_list = self.uniform_to_pmt_ap.keys()
 
     def __call__(self, signal_pulse):
         if len(signal_pulse._photon_timings) == 0:
@@ -569,29 +571,32 @@ class Afterpulse_PMT(Pulse):
         """
         for element in self.element_list:
             delaytime_cdf = self.uniform_to_pmt_ap[element]['delaytime_cdf']
-            amplitude_cdf = self.uniform_to_pmt_ap[element]['delaytime_cdf']
+            amplitude_cdf = self.uniform_to_pmt_ap[element]['amplitude_cdf']
 
-            # Assign each photon two random uniform number rU0, rU1 from (0, 1]
+            # Assign each photon FRIST random uniform number rU0 from (0, 1] for timing
             rU0 = 1 - np.random.uniform(size=len(signal_pulse._photon_timings))
-            rU1 = 1 - np.random.uniform(size=len(signal_pulse._photon_timings))
 
             # Select those photons with U <= max of cdf of specific channel
             sel_photon_id = np.where(rU0 <= delaytime_cdf[signal_pulse._photon_channels, -1])[0]
             sel_photon_channel = signal_pulse._photon_channels[sel_photon_id]
 
-            # The map is made so that the indices are delay time in unit of ns
-            ap_delay = np.argmin(
-                np.abs(
-                    delaytime_cdf[sel_photon_channel]
-                    - rU0[sel_photon_id][:, None]), axis=-1)
+            # Assign selected photon SECOND random uniform number rU1 from (0, 1] for amplitude
+            rU1 = 1 - np.random.uniform(size=len(sel_photon_id))
 
-            if element == 'Uniform':
+            # The map is made so that the indices are delay time in unit of ns
+            if 'Uniform' in element:
+                ap_delay = np.random.uniform(delaytime_cdf[sel_photon_channel, 0], 
+                    delaytime_cdf[sel_photon_channel, 1])                
                 ap_amplitude = np.ones_like(ap_delay)
             else:
+                ap_delay = np.argmin(
+                    np.abs(
+                        delaytime_cdf[sel_photon_channel]
+                        - rU0[sel_photon_id][:, None]), axis=-1)
                 ap_amplitude = np.argmin(
                     np.abs(
                         amplitude_cdf[sel_photon_channel]
-                        - rU1[sel_photon_id][:, None]), axis=-1)/100.
+                        - rU1[:, None]), axis=-1)/100.
 
             self._photon_timings += list(signal_pulse._photon_timings[sel_photon_id] + ap_delay)
             self._photon_channels += list(signal_pulse._photon_channels[sel_photon_id])
@@ -611,9 +616,9 @@ class Event(object):
 
         self.pulses = dict(
             s1=S1(config),
-            s2=S2(config),)
-            #ele_ap=Afterpulse_Electron(config),
-            #pmt_ap=Afterpulse_PMT(config))
+            s2=S2(config),
+            ele_ap=Afterpulse_Electron(config),
+            pmt_ap=Afterpulse_PMT(config))
 
         self.ptypes = self.pulses.keys()
 
@@ -627,10 +632,10 @@ class Event(object):
             # [0, 's1', 1000000.0, 0, 0, 0, 10000, 'ER']
             ptype = instruction[1]
             self.pulses[ptype](instruction)
-            #self.pulses['ele_ap'](self.pulses[ptype])
+            self.pulses['ele_ap'](self.pulses[ptype])
 
-            #self.pulses['pmt_ap'](self.pulses[ptype])
-            #self.pulses['pmt_ap'](self.pulses['ele_ap'])
+            self.pulses['pmt_ap'](self.pulses[ptype])
+            self.pulses['pmt_ap'](self.pulses['ele_ap'])
 
         self._pulses = []
         for ptype in self.ptypes:
@@ -725,7 +730,7 @@ class Simulator(object):
                 event.pulses.append(datastructure.Pulse(
                     channel=channel,
                     left=start_index,
-                    raw_data=self.event._raw_data[:, channel].astype(np.int16)))
+                    raw_data=self.event._raw_data[:, channel]))
 
             event.event_number = event_number
             yield event
