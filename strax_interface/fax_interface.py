@@ -27,7 +27,7 @@ def rand_instructions(n=10):
     instructions['y'] = np.repeat(r * np.sin(t), 2)
     instructions['z'] = np.repeat(np.random.uniform(-100, 0, n), 2)
     instructions['amp'] = np.vstack(
-        [np.random.uniform(3000, 3001, n), nelectrons]).T.flatten().astype(int)
+        [np.random.uniform(300, 301, n), nelectrons]).T.flatten().astype(int)
     instructions['recoil'] = ['er' for i in range(n * 2)]
 
     return instructions
@@ -136,58 +136,46 @@ class RawRecordsSimulator(object):
             self.record(ie)
 
             self.pulse_buffer[ie['type']] = self.record._raw_data
-
             if ix == len(m_inst)-1:
                 yield self.store_buffer(self.pulse_buffer, ie['t'])
 
     def store_buffer(self, p_b, t):
         samples_per_record = strax.DEFAULT_RECORD_LENGTH
-        event_seperation = int(2e6)
 
-        r_l = self.config['sample_duration'] * samples_per_record
+        records_needed = np.sum([np.sum(p_b[key]['rec_needed']) for key in p_b.keys()])
+        rr = np.zeros(int(records_needed),dtype = strax.record_dtype())
+        output_record_index = 0
 
-        for ch in np.arange(len(self.config['to_pe'])):
-            rr = np.zeros(int(np.floor(event_seperation / r_l)), dtype=strax.record_dtype())
-            rr['data'] = self.get_real_noise(rr)
-
-            rr['dt'] = self.config['sample_duration']
-            rr['channel'] = ch
-            rr['time'] = np.arange(len(rr)) * r_l + t
-
-            for s in p_b.keys():
-                p_ = p_b[s]
-                p = p_[p_['channel'] == ch]
-                if np.sum(p['pulse']) >= 0:
-                    continue
-                s_r, o_r = int(np.floor(p['left'][0] / samples_per_record)), np.mod(p['left'][0], samples_per_record)
-                p_length = p['right'][0] - p['left'][0] + 1
-                n_records = int(np.ceil((o_r + p_length) / samples_per_record))
-
-                o_p = 0
-                n_store = 0
+        for type in p_b.keys():
+            for p in p_b[type]:
+                p_length = p['right'] - p['left'] + 101
+                n_records = int(np.ceil(p_length /  samples_per_record))
                 for rec_i in range(n_records):
-                    # Since for some reason indexing doesn't work
-                    # So get the time and channel indexes to find the index of the right
-                    # record in the array
-                    rr[s_r + rec_i]['pulse_length'] = p_length
-                    rr[s_r + rec_i]['record_i'] = rec_i
-                    if rec_i >= 1:
-                        o_r = 0
+                    if output_record_index == records_needed: #TODO this cannot be the right way to fix this.
+                        continue                                #Why is output_record_index, sometimes, larger then records needed?
+                    r = rr[output_record_index]
+                    r['channel'] = p['channel']
+                    r['dt'] = self.config['sample_duration']
+                    r['pulse_length'] = p_length
+                    r['record_i'] = rec_i
+                    r['time'] = t + (p['left']-50) * r['dt'] + rec_i * samples_per_record * r['dt']
 
-                    o_p += n_store
-                    if rec_i != n_records - 1:
-                        # More stuff comming
+                    if rec_i != n_records  -  1:
+                        #The pulse doesn't fit on one record, so store a full chunk
                         n_store = samples_per_record
-                        if rec_i == 0:
-                            n_store = samples_per_record - o_r
+                        assert p_length > samples_per_record * (rec_i + 1)
+
                     else:
-                        n_store = p_length - o_p
-                    rr[s_r + rec_i]['length'] = n_store
-                    rr[s_r + rec_i]['data'][o_r: o_r + n_store] = self.sum_pulses(rr[s_r + rec_i]['data'][o_r: o_r + n_store],
-                                                                             p['pulse'][0][o_p: o_p + n_store])
+                        n_store = p_length - samples_per_record * rec_i
 
+                    assert 0 <= n_store <= samples_per_record
+                    r['length'] = n_store
+                    offset = rec_i  * samples_per_record
 
-            self.results.append(rr)
+                    r['data'][:n_store] = p['pulse'][offset: offset + n_store]
+                    output_record_index +=1
+
+        self.results.append(rr)
         y = self.finish_results()
         return y
 
@@ -201,25 +189,7 @@ class RawRecordsSimulator(object):
         print("Returning %d records" % len(records))
         self.results = []
         return records
-    
-    @guvectorize([(int64[:], int64[:], int64[:])], '(n),(n)->(n)')
-    def sum_pulses(x, y, res):
-        for i in range(x.shape[0]):
-            res[i] = x[i] + y[i]
 
-    def get_real_noise(self, records):
-        """
-        Get chunk(s) of noise sample from real noise data
-        """
-        duration = strax.DEFAULT_RECORD_LENGTH * len(records)
-
-        # Randomly choose where in to start copying
-        real_data_sample_size = len(self.config['noise_data'])
-        id_t = np.random.randint(0, real_data_sample_size - duration)
-        data = self.config['noise_data']
-        result = data[id_t:id_t + duration].reshape(len(records),strax.DEFAULT_RECORD_LENGTH)
-
-        return result
 
 @export
 @strax.takes_config(
@@ -243,8 +213,7 @@ class RawRecordsSimulator(object):
     strax.Option('fax_config', default='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/master'
                                        '/fax_files/fax_config.json'),
     strax.Option('phase', default='liquid'),
-    strax.Option('ele_afterpulse_file',default = 'https://github.com/XENONnT/strax_auxiliary_files/blob/master/'
-                                                 'fax_files/ele_after_pulse.npy?raw=true'),
+    strax.Option('ele_afterpulse_file',default = '/Users/petergaemers/Desktop/python/strax_auxiliary_files/fax_files/ele_after_pulse.npy'),
     strax.Option('pmt_afterpulse_file',default = '/Users/petergaemers/Desktop/python/WFSimDev/pmt_after_pulse.npy'),
     strax.Option('spe_file',default = 'https://github.com/XENONnT/strax_auxiliary_files/blob/master/'
                                       'fax_files/XENON1T_spe_distributions.csv?raw=true'),
@@ -302,13 +271,12 @@ class PeaksFromFax(strax.Plugin):
     strax.Option('fax_config', default='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/master'
                                        '/fax_files/fax_config.json'),
     strax.Option('phase', default='liquid'),
-    strax.Option('ele_afterpulse_file',default = 'https://github.com/XENONnT/strax_auxiliary_files/blob/master/'
-                                                 'fax_files/ele_after_pulse.npy?raw=true'),
+    strax.Option('ele_afterpulse_file',default = '/Users/petergaemers/Desktop/python/strax_auxiliary_files/fax_files/ele_after_pulse.npy'),
     strax.Option('pmt_afterpulse_file',default = '/Users/petergaemers/Desktop/python/WFSimDev/pmt_after_pulse.npy'),
     strax.Option('spe_file',default = 'https://github.com/XENONnT/strax_auxiliary_files/blob/master/'
                                       'fax_files/XENON1T_spe_distributions.csv?raw=true'),
     strax.Option('noise_file',default = '/Users/petergaemers/Desktop/python/WFSimDev/real_noise_sample/'
-                                        'real_noise_sample/170203_0850_00.npz')
+                                        'real_noise_sample/170203_0850_00.npz'),
 )
 class RawRecordsFromFax(strax.Plugin):
     provides = 'raw_records'
@@ -343,4 +311,5 @@ class RawRecordsFromFax(strax.Plugin):
     def iter(self, *args, **kwargs):
         sim = RawRecordsSimulator(self.config)
         instructions = rand_instructions(self.config['nevents'])
+        np.save('./fax_truth_file.npy',instructions)
         yield from sim(instructions)

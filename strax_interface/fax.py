@@ -7,6 +7,7 @@ from scipy.interpolate import interp1d
 
 from numba import int64, float64, guvectorize
 from straxen import units
+import strax
 
 import logging
 
@@ -659,22 +660,35 @@ class RawRecord(object):
 
     def raw_data(self):
         if len(self._pulses):
-            self.start = np.min(self._pulses['left'])
-            self.end = np.max(self._pulses['right'])
-            self.event_duration =  self.end - self.start + 1
+            pulses = self._pulses[np.where(np.sum(self._pulses['current'],axis=1)!=0)]
+            self.start = np.min(pulses['left'])
+            self.end = np.max(pulses['right'])
+            self.event_duration =  self.end - self.start + 101
 
-            self._raw_data = np.empty((len(self.config['to_pe'])),
-                                      dtype=[('pulse', np.int64, self.event_duration),('left',np.int),('right',np.int) ,('channel', np.int)])
+            self._raw_data = np.zeros((len(pulses)),        #TODO Maybe call raw data for different pulse types seperatly to avoid very long empty pulses
+                                      dtype=[('pulse', np.int64, self.event_duration),('left',np.int),('right',np.int) ,('channel', np.int),('rec_needed',np.int)])
 
             self.current_2_adc = self.config['pmt_circuit_load_resistor'] \
                                  * self.config['external_amplification'] \
                                  / (self.config['digitizer_voltage_range'] / 2 ** (self.config['digitizer_bits']))
 
-            self._pulses['current'] =  -np.trunc(self._pulses['current'] * self.current_2_adc)
-            # self._pulses['current']+= self.config['digitizer_reference_baseline']
-            self._raw_data[['pulse', 'channel','left','right']] = self._pulses[
-                ['current', 'channel','left','right']]
-            # self._raw_data['pulse'] = np.clip(self._raw_data['pulse'], 0, 2 ** (self.config['digitizer_bits']))
+            pulses['current'] =  -np.trunc(pulses['current'] * self.current_2_adc)
+            self._raw_data['channel'] = pulses['channel']
+            self._raw_data['left'] = pulses['left']
+            self._raw_data['right'] = pulses['right']
+
+            trigger_window = 50
+            for ix, pulse in enumerate(pulses):
+                if np.sum(pulse['current'])==0:
+                    continue
+                p_length = pulse['right'] - pulse['left']
+                self._raw_data[ix]['pulse'][0:2*trigger_window+p_length] = self.get_real_noise(self._raw_data[ix]['pulse'][0:2*trigger_window+p_length])
+                self._raw_data[ix]['pulse'][trigger_window:trigger_window+p_length] = self.sum_pulses(self._raw_data[ix]['pulse'][trigger_window:trigger_window+p_length],
+                                                              pulse['current'][:p_length])
+
+            self._raw_data['pulse']+= self.config['digitizer_reference_baseline']
+            self._raw_data['rec_needed'] = np.ceil((self._raw_data['right']-self._raw_data['left']+2*trigger_window) / strax.DEFAULT_RECORD_LENGTH)
+
         else:
             #For some reason the pulse is zero?
             self._raw_data = np.zeros((len(self.config['to_pe'])),
@@ -682,3 +696,19 @@ class RawRecord(object):
             raise NotImplementedError
 
 
+    @guvectorize([(int64[:], float64[:], int64[:])], '(n),(n)->(n)')
+    def sum_pulses(x, y, res):
+        for i in range(x.shape[0]):
+            res[i] = x[i] + y[i]
+
+    def get_real_noise(self, records):
+        """
+        Get chunk(s) of noise sample from real noise data
+        """
+        # Randomly choose where in to start copying
+        real_data_sample_size = len(self.config['noise_data'])
+        id_t = np.random.randint(0, real_data_sample_size - len(records) )
+        data = self.config['noise_data']
+        result = data[id_t:id_t + len(records)]
+
+        return result
