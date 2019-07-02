@@ -12,7 +12,7 @@ from straxen.plugins.fax import Peak, RawRecord
 export, __all__ = strax.exporter()
 
 def rand_instructions(n=10):
-    nelectrons = 10 ** (np.random.uniform(4, 5, n))
+    nelectrons = 10 ** (np.random.uniform(6, 6.1, n))
 
     instructions = np.zeros(2 * n, dtype=[('event_number', np.int), ('type', '<U2'), ('t', np.int), ('x', np.float32),
                                           ('y', np.float32), ('z', np.float32), ('amp', np.int), ('recoil', '<U2')])
@@ -217,6 +217,8 @@ class RawRecordsSimulator(object):
     strax.Option('pmt_afterpulse_file',default = '/Users/petergaemers/Desktop/python/WFSimDev/pmt_after_pulse.npy'),
     strax.Option('spe_file',default = 'https://github.com/XENONnT/strax_auxiliary_files/blob/master/'
                                       'fax_files/XENON1T_spe_distributions.csv?raw=true'),
+    strax.Option('kr83m_map',
+                 default='/Users/petergaemers/Desktop/python/WFSimDev/Kr83m_Ddriven_per_pmt_params_dataframe.pkl')
 )
 class PeaksFromFax(strax.Plugin):
     provides = 'peaks'
@@ -277,12 +279,12 @@ class PeaksFromFax(strax.Plugin):
                                       'fax_files/XENON1T_spe_distributions.csv?raw=true'),
     strax.Option('noise_file',default = '/Users/petergaemers/Desktop/python/WFSimDev/real_noise_sample/'
                                         'real_noise_sample/170203_0850_00.npz'),
+    strax.Option('kr83m_map',default = '/Users/petergaemers/Desktop/python/WFSimDev/Kr83m_Ddriven_per_pmt_params_dataframe.pkl')
 )
 class RawRecordsFromFax(strax.Plugin):
     provides = 'raw_records'
     depends_on = tuple()
     dtype = strax.record_dtype()
-    # compressor = 'zstd'
     parallel = False
     rechunk_on_save = False
 

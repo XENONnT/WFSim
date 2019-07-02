@@ -413,7 +413,7 @@ class S2(Pulse):
     def s2_pattern_map_pp(self, pos):
         if 'params' not in self.__dict__:
             all_map_params = pd.read_pickle(
-                '/Users/petergaemers/Desktop/python/WFSimDev/Kr83m_Ddriven_per_pmt_params_dataframe.pkl')
+                self.config['kr83m_map'])
             self.params = all_map_params.loc[all_map_params.kr_run_id == 10,
                                              ['amp0', 'amp1', 'tao0', 'tao1', 'pmtx', 'pmty']].values.T
 
@@ -688,6 +688,7 @@ class RawRecord(object):
 
             self._raw_data['pulse']+= self.config['digitizer_reference_baseline']
             self._raw_data['rec_needed'] = np.ceil((self._raw_data['right']-self._raw_data['left']+2*trigger_window) / strax.DEFAULT_RECORD_LENGTH)
+            np.clip(self._raw_data['pulse'],a_min = -100,a_max = None , out = self._raw_data['pulse'])
 
         else:
             #For some reason the pulse is zero?
