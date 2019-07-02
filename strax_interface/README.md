@@ -6,22 +6,15 @@ Here are the files needed to run the waveform simulator fax and give output in t
 
 Copy the fax.py and fax_interface to your straxen/plugins folder. Then add "from . import fax_interface, fax" to the __init__.py file
 
-Since github has a limit on the maximum allowed file size not all configuration files can be hosted here. So you still need to get your hands on the files needed for pmt_after_pulse and noise. These guys are located on midway at:
+Since github has a limit on the maximum allowed file size not all configuration files can be hosted here. So you still need to get your hands on the files needed for afterpulses, kr83 patterns and noise. These guys are located on midway at:
 ```python
-'/project2/lgrandi/zhut/sim/WFSimDev/real_noise_sample/170203_0850_00.npz'
-'/project2/lgrandi/zhut/sim/WFSimDev/pmt_after_pulse.npy'
-'/project2/lgrandi/zhut/sim/Kr83m_Ddriven_per_pmt_params_dataframe.pkl'
+'/dali/lgrandi/pgaemers/WFSIM/'
 ```
-
+You need all 4
 Alternatively you can just disable both, afterpulses are currently not working and commenting line 152 in fax_interface.py will disable noise data.
-
-Additionally you need to download one more config files. In strax_auxilliary_files/fax_config you need to download  'ele_after_pulse.npy', due to formatting strax cannot read these directly so you need to have it on disk.
-
 
 Finally there is one challenge remaining. The default interpolating map of strax doesn't like what we need it to do. So you need to grab the one from here (WFSim/itp_map.py) and overwrite the default one in straxen.
 
-
-So after asking other people I missed one thing. You need one more file which is also on tianyu's midway, for now I'm not sure where but it should be more or less at the same place and it is called: [b]Kr83m_Ddriven_per_pmt_params_dataframe.pkl[/b]
 
 And in fax.py you need to change the hard coded path on line 415.
 
@@ -45,6 +38,7 @@ st = strax.Context(
                     noise_file= 'your_path_to_file',
                     ele_afterpulse_file= 'your_path_to_file',
                     pmt_afterpulse_file= 'your_path_to_file',
+                    kr83m_map = 'your_path_to_file'
                    )
 ```
 Nevents is an option telling fax how many events to simulate. The default value is 10, but maybe you want a different amount
