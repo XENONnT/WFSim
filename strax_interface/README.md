@@ -17,12 +17,6 @@ Alternatively you can just disable both, afterpulses are currently not working a
 
 Additionally you need to download one more config files. In strax_auxilliary_files/fax_config you need to download  'ele_after_pulse.npy', due to formatting strax cannot read these directly so you need to have it on disk.
 
-Then you need to add the following to the sum_waveform function in strax.peak_building around line 180, before the assert:
-```python
-if r_start ==r_end == 0:
-        continue
-```
-It likes to loop over records which only contain noise and then crashes cause there is only noise.
 
 Finally there is one challenge remaining. The default interpolating map of strax doesn't like what we need it to do. So you need to grab the one from here (WFSim/itp_map.py) and overwrite the default one in straxen.
 
@@ -80,12 +74,7 @@ When simulating fax will print the instructions used for the events.
 This causes a S2 to be downsampled into 1 bin and having a very small afterpulse somewhere much later. 
 The other thing is it is currently just not working due to some typo.
 
--The digitizer baseline is not added to the records.
 
 -You cannot read in instructions from somewhere
 
--We do not save the instructions
-
 -The pulses are not cliped when they should saturate
-
--strax.sum_waveform really really wants to loop over records without any hits in them and then crashes because there are not hits in the record
