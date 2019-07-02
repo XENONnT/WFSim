@@ -62,11 +62,4 @@ When simulating fax will print the instructions used for the events.
 
 
 ## Known issues
--Afterpulses are by default not included. This is due to two reasons. First is strax has a hard time with very long peaks. When including afterpulses the peaks get downsampled to still fit into the 200 samples of data we use to store sumwaveforms.
-This causes a S2 to be downsampled into 1 bin and having a very small afterpulse somewhere much later. 
-The other thing is it is currently just not working due to some typo.
-
-
 -You cannot read in instructions from somewhere
-
--The pulses are not cliped when they should saturate
