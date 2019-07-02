@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
-from numba import int64, float64, guvectorize
 
 from tqdm import tqdm
 import strax
@@ -113,7 +112,7 @@ class RawRecordsSimulator(object):
         self.config = config
         self.record = RawRecord(config)
         self.results = []
-        self.pulse_buffer = dict()
+        self.pulse_buffer = []
 
     def __call__(self, m_inst):
 
@@ -130,24 +129,24 @@ class RawRecordsSimulator(object):
 
                 self.t = ie['t']
                 self.event = ie['event_number']
-                self.pulse_buffer = dict()
+                self.pulse_buffer = []
 
             print(ie)
             self.record(ie)
 
-            self.pulse_buffer[ie['type']] = self.record._raw_data
+            self.pulse_buffer.append(self.record._raw_data)
             if ix == len(m_inst)-1:
                 yield self.store_buffer(self.pulse_buffer, ie['t'])
 
     def store_buffer(self, p_b, t):
         samples_per_record = strax.DEFAULT_RECORD_LENGTH
 
-        records_needed = np.sum([np.sum(p_b[key]['rec_needed']) for key in p_b.keys()])
+        records_needed = np.sum([np.sum(pulses['rec_needed']) for pulses in p_b])
         rr = np.zeros(int(records_needed),dtype = strax.record_dtype())
         output_record_index = 0
 
-        for type in p_b.keys():
-            for p in p_b[type]:
+        for pulses in p_b:
+            for p in pulses:
                 p_length = p['right'] - p['left'] + 101
                 n_records = int(np.ceil(p_length /  samples_per_record))
                 for rec_i in range(n_records):
