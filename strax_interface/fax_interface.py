@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
-from numba import int64, float64, guvectorize
 
 from tqdm import tqdm
 import strax
@@ -134,7 +133,6 @@ class RawRecordsSimulator(object):
             self.record(ie)
 
             self.pulse_buffer.append(self.record._raw_data)
-
             if ix == len(m_inst)-1:
                 yield self.store_buffer(self.pulse_buffer, ie['t'])
 
