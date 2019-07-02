@@ -10,13 +10,11 @@ Since github has a limit on the maximum allowed file size not all configuration 
 ```python
 '/dali/lgrandi/pgaemers/WFSIM/'
 ```
-You need all 4
+You need all 4.
+
 Alternatively you can just disable both, afterpulses are currently not working and commenting line 152 in fax_interface.py will disable noise data.
 
 Finally there is one challenge remaining. The default interpolating map of strax doesn't like what we need it to do. So you need to grab the one from here (WFSim/itp_map.py) and overwrite the default one in straxen.
-
-
-And in fax.py you need to change the hard coded path on line 415.
 
 ## Usage
 You can choose the simulate too two different data types. If you want a quick and dirty simulation and are not really interested in low level stuff you can simulate directly to Peaks. This is done by PeaksFromFax.
