@@ -636,8 +636,8 @@ class RawRecord(object):
         self.pulses = dict(
             s1=S1(config),
             s2=S2(config),
+            ele_ap=Afterpulse_Electron(config),
             pmt_ap=Afterpulse_PMT(config),
-            ele_ap=Afterpulse_Electron(config)
          )
 
         self.ptypes = self.pulses.keys()
@@ -654,13 +654,11 @@ class RawRecord(object):
         self.pulses[ptype](instruction)
         self.pulses['ele_ap'](self.pulses[ptype])
         self.pulses['pmt_ap'](self.pulses[ptype])
-        # self.pulses['pmt_ap'](self.pulses['ele_ap'])
+        if len(self.pulses['ele_ap']._pulses)  > 0:
+            self.pulses['pmt_ap'](self.pulses['ele_ap'])
 
         self._pulses_list = []
         self._raw_data = []
-
-        # for ptype in self.ptypes:
-            # self.raw_data(self.pulses._pulses[ptype])
 
         for ptype in self.ptypes:
             self.raw_data(getattr(self.pulses[ptype], '_pulses'))
