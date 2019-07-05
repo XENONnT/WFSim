@@ -1,7 +1,9 @@
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
-from numba import int64, float64, guvectorize
+
+import logging
+log = logging.getLogger('SimulationCore')
 
 from tqdm import tqdm
 import strax
@@ -12,14 +14,14 @@ from straxen.plugins.fax import Peak, RawRecord
 export, __all__ = strax.exporter()
 
 def rand_instructions(n=10):
-    nelectrons = 10 ** (np.random.uniform(4, 5, n))
+    nelectrons = 10 ** (np.random.uniform(1, 4, n))
 
     instructions = np.zeros(2 * n, dtype=[('event_number', np.int), ('type', '<U2'), ('t', np.int), ('x', np.float32),
                                           ('y', np.float32), ('z', np.float32), ('amp', np.int), ('recoil', '<U2')])
 
     instructions['event_number'] = np.repeat(np.arange(n), 2)
     instructions['type'] = np.tile(['s1', 's2'], n)
-    instructions['t'] = np.repeat(1.e3+5.e6*np.arange(n), 2)
+    instructions['t'] = np.repeat(5.e7+5.e7*np.arange(n), 2)
     r = np.sqrt(np.random.uniform(0, 2500, n))
     t = np.random.uniform(-np.pi, np.pi, n)
 
@@ -27,7 +29,7 @@ def rand_instructions(n=10):
     instructions['y'] = np.repeat(r * np.sin(t), 2)
     instructions['z'] = np.repeat(np.random.uniform(-100, 0, n), 2)
     instructions['amp'] = np.vstack(
-        [np.random.uniform(300, 301, n), nelectrons]).T.flatten().astype(int)
+        [np.random.uniform(10, 500, n), nelectrons]).T.flatten().astype(int)
     instructions['recoil'] = ['er' for i in range(n * 2)]
 
     return instructions
@@ -68,7 +70,7 @@ class PeakSimulator(object):
 
         p_length = len(p['data'][0])
         for i, ie in tqdm(enumerate(m_inst)):
-            print(ie)
+            # print(ie)
             self.peak(ie)
             p[i]['time'] = ie['t'] + self.peak.start + self.peak.event_duration / 2.
             swv_buffer_size = self.peak.event_duration
@@ -121,58 +123,58 @@ class RawRecordsSimulator(object):
                 self.event
             except:
                 self.event = ie['event_number']
-                self.t = ie['t']
 
             if self.event != ie['event_number']:
-                yield self.store_buffer(self.pulse_buffer,self.t)
-
-                self.t = ie['t']
+                yield self.fill_records(self.pulse_buffer)
                 self.event = ie['event_number']
                 self.pulse_buffer = []
 
             print(ie)
             self.record(ie)
-
             self.pulse_buffer.append(self.record._raw_data)
 
             if ix == len(m_inst)-1:
-                yield self.store_buffer(self.pulse_buffer, ie['t'])
+                yield self.fill_records(self.pulse_buffer)
+                self.pulse_buffer = []
 
-    def store_buffer(self, p_b, t):
+    def fill_records(self, p_b):
         samples_per_record = strax.DEFAULT_RECORD_LENGTH
 
-        records_needed = np.sum([np.sum(pulses['rec_needed']) for pulses in p_b])
+        records_needed = np.sum([np.sum(pulses[i]['rec_needed']) for pulses in p_b for i in range(len(pulses))])
         rr = np.zeros(int(records_needed),dtype = strax.record_dtype())
         output_record_index = 0
 
         for pulses in p_b:
-            for p in pulses:
-                p_length = p['right'] - p['left'] + 101
-                n_records = int(np.ceil(p_length /  samples_per_record))
-                for rec_i in range(n_records):
-                    if output_record_index == records_needed: #TODO this cannot be the right way to fix this.
-                        continue                                #Why is output_record_index, sometimes, larger then records needed?
-                    r = rr[output_record_index]
-                    r['channel'] = p['channel']
-                    r['dt'] = self.config['sample_duration']
-                    r['pulse_length'] = p_length
-                    r['record_i'] = rec_i
-                    r['time'] = t + (p['left']-50) * r['dt'] + rec_i * samples_per_record * r['dt']
+            for i in range(len(pulses)):
+                for p in pulses[i]:
+                    p_length = p['right'] - p['left'] + 2 * self.config['trigger_window']
+                    n_records = int(np.ceil(p_length /  samples_per_record))
+                    for rec_i in range(n_records):
+                        if output_record_index == records_needed: #TODO this cannot be the right way to fix this.
+                            print(
+                                f'output_record_index: {output_record_index} is larger then the total records_needed: {records_needed}')
+                            log.info(f'output_record_index: {output_record_index} is larger then the total records_needed: {records_needed}')
+                            continue                                #Why is output_record_index, sometimes, larger then records needed?
+                        r = rr[output_record_index]
+                        r['channel'] = p['channel']
+                        r['dt'] = self.config['sample_duration']
+                        r['pulse_length'] = p_length
+                        r['record_i'] = rec_i
+                        r['time'] = (p['left']-self.config['trigger_window']) * r['dt'] + rec_i * samples_per_record * r['dt']
+                        if rec_i != n_records  -  1:
+                            #The pulse doesn't fit on one record, so store a full chunk
+                            n_store = samples_per_record
+                            assert p_length > samples_per_record * (rec_i + 1)
 
-                    if rec_i != n_records  -  1:
-                        #The pulse doesn't fit on one record, so store a full chunk
-                        n_store = samples_per_record
-                        assert p_length > samples_per_record * (rec_i + 1)
+                        else:
+                            n_store = p_length - samples_per_record * rec_i
 
-                    else:
-                        n_store = p_length - samples_per_record * rec_i
+                        assert 0 <= n_store <= samples_per_record
+                        r['length'] = n_store
+                        offset = rec_i  * samples_per_record
 
-                    assert 0 <= n_store <= samples_per_record
-                    r['length'] = n_store
-                    offset = rec_i  * samples_per_record
-
-                    r['data'][:n_store] = p['pulse'][offset: offset + n_store]
-                    output_record_index +=1
+                        r['data'][:n_store] = p['pulse'][offset: offset + n_store]
+                        output_record_index +=1
 
         self.results.append(rr)
         y = self.finish_results()
@@ -185,19 +187,17 @@ class RawRecordsSimulator(object):
         records = strax.sort_by_time(records)
         strax.baseline(records)
         strax.integrate(records)
-        print("Returning %d records" % len(records))
+        # print("Returning %d records" % len(records))
         self.results = []
         return records
 
 
 @export
 @strax.takes_config(
-    strax.Option('fax_file', default=None, track=False,
+    strax.Option('fax_file', default=None, track=True,
                  help="Directory with fax instructions"),
     strax.Option('nevents',default = 100,track=False,
                 help="Number of random events to generate if no instructions are provided"),
-    strax.Option('max_pulse_length',default = 20000,
-                help='Maximum length of a pulse generated by a PMT in the Pulse class'),
     strax.Option('to_pe_file',
         default='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/master/to_pe.npy',
         help='link to the to_pe conversion factors'),
@@ -212,12 +212,13 @@ class RawRecordsSimulator(object):
     strax.Option('fax_config', default='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/master'
                                        '/fax_files/fax_config.json'),
     strax.Option('phase', default='liquid'),
-    strax.Option('ele_afterpulse_file',default = '/Users/petergaemers/Desktop/python/strax_auxiliary_files/fax_files/ele_after_pulse.npy'),
+    strax.Option('ele_afterpulse_file',default = '/Users/petergaemers/Desktop/python/strax_auxiliary_files/'
+                                                 'fax_files/ele_after_pulse.npy'),
     strax.Option('pmt_afterpulse_file',default = '/Users/petergaemers/Desktop/python/WFSimDev/pmt_after_pulse.npy'),
     strax.Option('spe_file',default = 'https://github.com/XENONnT/strax_auxiliary_files/blob/master/'
                                       'fax_files/XENON1T_spe_distributions.csv?raw=true'),
-    strax.Option('kr83m_map',
-                 default='/Users/petergaemers/Desktop/python/WFSimDev/Kr83m_Ddriven_per_pmt_params_dataframe.pkl')
+    strax.Option('kr83m_map',default = '/Users/petergaemers/Desktop/python/WFSimDev/'
+                                       'Kr83m_Ddriven_per_pmt_params_dataframe.pkl')
 )
 class PeaksFromFax(strax.Plugin):
     provides = 'peaks'
@@ -233,33 +234,45 @@ class PeaksFromFax(strax.Plugin):
 
     def setup(self):
         spe_dist = init_spe_scaling_factor_distributions(self.config['spe_file'])
+        all_params = get_resource(self.config['kr83m_map'],
+                                          fmt='npy', pickle=True)
+        self.to_pe = get_to_pe(self.run_id,self.config['to_pe_file'])
         self.config.update(get_resource(self.config['fax_config'],fmt='json'))
         self.config.update({'to_pe':self.to_pe,
-                            's1_light_map': InterpolatingMap(get_resource(self.config['s1_light_yield_map'],fmt='json')),
-                            's2_light_map': InterpolatingMap(get_resource(self.config['s2_light_yield_map'],fmt='json')),
-                            's1_pattern_map': InterpolatingMap(get_resource(self.config['s1_pattern_map'],fmt='json.gz')),
-                            's2_pattern_map': InterpolatingMap(get_resource(self.config['s2_pattern_map'],fmt='json.gz')),
-                            'uniform_to_pmt_ap': np.load(self.config['pmt_afterpulse_file'],allow_pickle=True).item(),
-                            'uniform_to_ele_ap': np.load(self.config['ele_afterpulse_file'],allow_pickle=True).item(),
+                            's1_light_map': InterpolatingMap(get_resource(self.config['s1_light_yield_map'],
+                                                                          fmt='json')),
+                            's2_light_map': InterpolatingMap(get_resource(self.config['s2_light_yield_map'],
+                                                                          fmt='json')),
+                            's1_pattern_map': InterpolatingMap(get_resource(self.config['s1_pattern_map'],
+                                                                            fmt='json.gz')),
+                            's2_pattern_map': InterpolatingMap(get_resource(self.config['s2_pattern_map'],
+                                                                            fmt='json.gz')),
+                            'uniform_to_pmt_ap': get_resource(self.config['pmt_afterpulse_file'],
+                                                                    fmt = 'npy', pickle=True).item(),
+                            'uniform_to_ele_ap': get_resource(self.config['ele_afterpulse_file'],
+                                                                    fmt = 'npy', pickle=True).item(),
                             'uniform_to_pe_arr': spe_dist,
-                               })
+                            'params':all_params.loc[all_params.kr_run_id == 10,
+                                         ['amp0', 'amp1', 'tao0', 'tao1', 'pmtx', 'pmty']].values.T
+                            })
 
     def iter(self, *args, **kwargs):
         sim = PeakSimulator(self.config)
         instructions = rand_instructions(self.config['nevents'])
+        np.save('./fax_truth_file.npy', instructions)
         yield sim(instructions)
 
 
 @export
 @strax.takes_config(
-    strax.Option('fax_file', default=None, track=False,
+    strax.Option('fax_file', default=None, track=True,
                  help="Directory with fax instructions"),
     strax.Option('nevents',default = 100,track=False,
                 help="Number of random events to generate if no instructions are provided"),
-    strax.Option('max_pulse_length',default = 200000,
-                help='Maximum length of a pulse generated by a PMT in the Pulse class'),
-    strax.Option('digitizer_trigger',default = 15,track=False,
+    strax.Option('digitizer_trigger',default = 15,track=True,
                  help="Minimum current in ADC to be measured by the digitizer in order to be written"),
+    strax.Option('trigger_window', default = 50, track=True,
+                 help='Digitizer trigger window'),
     strax.Option('to_pe_file',
         default='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/master/to_pe.npy',
         help='link to the to_pe conversion factors'),
@@ -274,41 +287,47 @@ class PeaksFromFax(strax.Plugin):
     strax.Option('fax_config', default='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/master'
                                        '/fax_files/fax_config.json'),
     strax.Option('phase', default='liquid'),
-    strax.Option('ele_afterpulse_file',default = '/Users/petergaemers/Desktop/python/strax_auxiliary_files/fax_files/ele_after_pulse.npy'),
+    strax.Option('ele_afterpulse_file',default = '/Users/petergaemers/Desktop/python/strax_auxiliary_files/'
+                                                 'fax_files/ele_after_pulse.npy'),
     strax.Option('pmt_afterpulse_file',default = '/Users/petergaemers/Desktop/python/WFSimDev/pmt_after_pulse.npy'),
     strax.Option('spe_file',default = 'https://github.com/XENONnT/strax_auxiliary_files/blob/master/'
                                       'fax_files/XENON1T_spe_distributions.csv?raw=true'),
-    strax.Option('noise_file',default = '/Users/petergaemers/Desktop/python/WFSimDev/real_noise_sample/'
-                                        'real_noise_sample/170203_0850_00.npz'),
-    strax.Option('kr83m_map',default = '/Users/petergaemers/Desktop/python/WFSimDev/Kr83m_Ddriven_per_pmt_params_dataframe.pkl')
+    strax.Option('noise_file',default = '/Users/petergaemers/Desktop/python/WFSimDev/'
+                                        'real_noise_sample/''real_noise_sample/170203_0850_00.npz'),
+    strax.Option('kr83m_map',default = '/Users/petergaemers/Desktop/python/WFSimDev/'
+                                       'Kr83m_Ddriven_per_pmt_params_dataframe.pkl')
 )
 class RawRecordsFromFax(strax.Plugin):
     provides = 'raw_records'
     depends_on = tuple()
     dtype = strax.record_dtype()
-    parallel = False
-    rechunk_on_save = False
+    parallel = True
+    rechunk_on_save = True
 
     def setup(self):
         spe_dist = init_spe_scaling_factor_distributions(self.config['spe_file'])
         noise_data = get_resource(self.config['noise_file'], fmt='npy')['arr_0'].flatten()
+        all_params = get_resource(self.config['kr83m_map'],
+                                          fmt='npy_pickle')
         self.to_pe = get_to_pe(self.run_id,self.config['to_pe_file'])
         self.config.update(get_resource(self.config['fax_config'],fmt='json'))
         self.config.update({'to_pe':self.to_pe,
                             's1_light_map': InterpolatingMap(get_resource(self.config['s1_light_yield_map'],
-                                                                          fmt='json')),
+                                                                          )),
                             's2_light_map': InterpolatingMap(get_resource(self.config['s2_light_yield_map'],
-                                                                          fmt='json')),
+                                                                          )),
                             's1_pattern_map': InterpolatingMap(get_resource(self.config['s1_pattern_map'],
-                                                                            fmt='json.gz')),
+                                                                            fmt='binary')),
                             's2_pattern_map': InterpolatingMap(get_resource(self.config['s2_pattern_map'],
-                                                                            fmt='json.gz')),
-                            'uniform_to_pmt_ap': np.load(self.config['pmt_afterpulse_file'],
-                                                         allow_pickle=True).item(),
-                            'uniform_to_ele_ap': np.load(self.config['ele_afterpulse_file'],
-                                                         allow_pickle=True).item(),
+                                                                            fmt='binary')),
+                            'uniform_to_pmt_ap': get_resource(self.config['pmt_afterpulse_file'],
+                                                                    fmt = 'npy_pickle').item(),
+                            'uniform_to_ele_ap': get_resource(self.config['ele_afterpulse_file'],
+                                                                    fmt = 'npy_pickle').item(),
                             'uniform_to_pe_arr': spe_dist,
                             'noise_data': noise_data,
+                            'params':all_params.loc[all_params.kr_run_id == 10,
+                                         ['amp0', 'amp1', 'tao0', 'tao1', 'pmtx', 'pmty']].values.T
                             })
 
     def iter(self, *args, **kwargs):
