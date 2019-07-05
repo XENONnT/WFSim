@@ -39,16 +39,26 @@ class Pulse(object):
                                                  self.config['pmt_transit_time_spread'],
                                                  len(self._photon_timings))
 
+        if len(self._photon_timings) == 0:
+            self._pulses = np.zeros(len(self.config['to_pe']), dtype=[('channel', np.int16), ('left', np.int64),
+                                                                        ('right', np.int64), ('duration', np.int64),
+                                                                        ('current', np.float64, 1)])
+            return
+
+        dt = self.config.get('sample_duration', 10)
+        pulse_start = np.floor(np.min(self._photon_timings) / dt) - int(self.config['samples_before_pulse_center'])
+        pulse_end = np.floor(np.max(self._photon_timings) / dt) + int(self.config['samples_before_pulse_center'])
+        pulse_length = pulse_end - pulse_start + 23 #This is the length of a pulse current
+
         pulses = np.zeros(len(self.config['to_pe']), dtype=[('channel', np.int16), ('left', np.int64),
                                                                         ('right', np.int64), ('duration', np.int64),
-                                                                        ('current', np.float64, self.config['max_pulse_length'])])
+                                                                        ('current', np.float64, int(pulse_length))])
 
         for ix, channel in enumerate(np.unique(self._photon_channels)):
             _channel_photon_timings = self._photon_timings[self._photon_channels == channel]
 
             # Compute sample index（quotient）and reminder
             # Determined by division between photon timing and sample duraiton.
-            dt = self.config.get('sample_duration', 10)
             _channel_photon_reminders = (_channel_photon_timings -
                                          np.floor(_channel_photon_timings / dt).astype(int) * dt).astype(int)
             _channel_photon_timings = np.floor(_channel_photon_timings / dt).astype(int)
@@ -180,7 +190,7 @@ class S1(Pulse):
         ly = self.config['s1_light_map']([[x, y, z]]) * self.config['s1_detection_efficiency']
         n_photons = np.random.binomial(n=n_photons, p=ly)
 
-        self.photon_timings(n_photons, recoil_type)
+        self.photon_timings(t, n_photons, recoil_type)
         # The new way iterpolation is written always require a list
         self.photon_channels([[x, y, z]])
 
@@ -202,12 +212,12 @@ class S1(Pulse):
             p=p_per_channel,
             replace=True)
 
-    def photon_timings(self, n_photons, recoil_type):
+    def photon_timings(self, t, n_photons, recoil_type):
         if n_photons == 0:
             self._photon_timings = np.array([])
             return 0
         try:
-            self._photon_timings = getattr(self, recoil_type.lower())(n_photons)
+            self._photon_timings = t + getattr(self, recoil_type.lower())(n_photons)
         except AttributeError:
             raise AttributeError('Recoil type must be ER, NR, alpha or LED, not %s' % recoil_type)
 
@@ -260,11 +270,11 @@ class S2(Pulse):
 
     def __call__(self, instruction):
         if isinstance(instruction, list) or len(instruction.shape) < 2:
-            instruction = np.array([instruction])
+            if not np.all(instruction['recoil'] =='ele_ap'):
+                instruction = np.array([instruction])
 
         _, _, t, x, y, z, n_electron, recoil_type = [
             np.array(v).reshape(-1) for v in zip(*instruction)]
-
 
         self._electron_timings = np.array([])
         self._electron_gains = np.array([])
@@ -331,12 +341,6 @@ class S2(Pulse):
         drift_time_stdev = np.sqrt(2 * self.config['diffusion_constant_liquid'] * drift_time_mean)
         drift_time_stdev /= self.config['drift_velocity_liquid']
         # Calculate electron arrival times in the ELR region
-        # if n_electron.size >=2:
-            # print(n_electron)
-            #This is to fix the dimension error which is els thrown when simulating afterpulses
-            # _electron_timings = t + \
-            #                     np.random.exponential(self.config['electron_trapping_time'], n_electron.size)
-        # else:
         _electron_timings = t + \
                             np.random.exponential(self.config['electron_trapping_time'], n_electron)
         if drift_time_stdev:
@@ -414,13 +418,7 @@ class S2(Pulse):
         self._photon_channels = self._photon_channels.astype(int)
 
     def s2_pattern_map_pp(self, pos):
-        if 'params' not in self.__dict__:
-            all_map_params = pd.read_pickle(
-                self.config['kr83m_map'])
-            self.params = all_map_params.loc[all_map_params.kr_run_id == 10,
-                                             ['amp0', 'amp1', 'tao0', 'tao1', 'pmtx', 'pmty']].values.T
-
-        amp0, amp1, tao0, tao1, pmtx, pmty = self.params
+        amp0, amp1, tao0, tao1, pmtx, pmty = self.config['params']
 
         def rms(x, y): return np.sqrt(np.square(x) + np.square(y))
 
@@ -429,6 +427,7 @@ class S2(Pulse):
         frac = (frac.T / np.sum(frac, axis=-1)).T
 
         return frac
+
 
 
 class Afterpulse_Electron(S2):
@@ -450,15 +449,13 @@ class Afterpulse_Electron(S2):
 
         if len(self.inst) < 1:
             return
-        super().__call__(self.inst.reindex(
-            ['event_number','type','t', 'x', 'y', 'z', 'amp', 'recoil'], axis=1).values)
+        super().__call__(self.inst)
 
     def electron_afterpulse(self, signal_pulse):
         """
         For electron afterpulses we assume a uniform x, y
         """
         now = time.time()
-
         delaytime_cdf = self.config['uniform_to_ele_ap']['liquid']['delaytime_cdf']
 
         # To save calculation we first find out how many photon will give rise ap
@@ -477,19 +474,24 @@ class Afterpulse_Electron(S2):
         ap_delay = ap_delay * 1000 + \
             np.argmin(
                 np.abs(delaytime_cdf[ap_delay[:, None]*1000 + np.arange(1000)] - rU0[:, None]), axis=-1)
+        np.clip(ap_delay, a_min=self.config['drift_time_gate'] + 1, a_max=None, out=ap_delay)
 
         # Randomly select original photon as time zeros
         t_zeros = signal_pulse._photon_timings[np.random.randint(
             low=0, high=len(signal_pulse._photon_timings),
             size=n_electron)]
 
-        self.inst = pd.DataFrame()
+        self.inst = np.zeros(len(t_zeros),dtype=[('event_number', np.int), ('type', '<U2'), ('t', np.int), ('x', np.float32),
+                                          ('y', np.float32), ('z', np.float32), ('amp', np.int), ('recoil', '<U6')])
+
         self.inst['type'] = 's2'
         self.inst['t'] = t_zeros
         self.inst['x'], self.inst['y'] = self._randomize_XY(n_electron)
         self.inst['z'] = - (ap_delay - self.config['drift_time_gate']) * \
             self.config['drift_velocity_liquid']
         self.inst['amp'] = 1
+        self.inst['recoil'] = 'ele_ap'
+
 
     def _randomize_XY(self, n):
         Rupper = 46
@@ -634,8 +636,8 @@ class RawRecord(object):
         self.pulses = dict(
             s1=S1(config),
             s2=S2(config),
-            ele_ap=Afterpulse_Electron(config),
-            pmt_ap=Afterpulse_PMT(config)
+            pmt_ap=Afterpulse_PMT(config),
+            ele_ap=Afterpulse_Electron(config)
          )
 
         self.ptypes = self.pulses.keys()
@@ -652,52 +654,62 @@ class RawRecord(object):
         self.pulses[ptype](instruction)
         self.pulses['ele_ap'](self.pulses[ptype])
         self.pulses['pmt_ap'](self.pulses[ptype])
+        # self.pulses['pmt_ap'](self.pulses['ele_ap'])
+
         self._pulses_list = []
+        self._raw_data = []
+
+        # for ptype in self.ptypes:
+            # self.raw_data(self.pulses._pulses[ptype])
+
         for ptype in self.ptypes:
-            self._pulses_list.extend(getattr(self.pulses[ptype], '_pulses'))
-        self._pulses = np.hstack(self._pulses_list)
+            self.raw_data(getattr(self.pulses[ptype], '_pulses'))
 
-        self.raw_data()
+    def raw_data(self, pulses):
+        if len(pulses) == 0: #To avoid trying to store a pulse which is not simulated (The S2 pulse of an S1 or vise versa)
+            return
+        elif pulses['current'][0].size > 1:
+            tw = self.config['trigger_window']
 
-    def raw_data(self):
-        if len(self._pulses):
-            self.current_2_adc = self.config['pmt_circuit_load_resistor'] \
+            current_2_adc = self.config['pmt_circuit_load_resistor'] \
                                  * self.config['external_amplification'] \
                                  / (self.config['digitizer_voltage_range'] / 2 ** (self.config['digitizer_bits']))
-            self._pulses['current'] =  -np.trunc(self._pulses['current'] * self.current_2_adc)
-            np.save('./pulses.npy',self._pulses)
-            pulses = self._pulses[np.where(np.min(self._pulses['current'],axis=1)<=-self.config['digitizer_trigger'])]
-            self.start = np.min(pulses['left'])
-            self.end = np.max(pulses['right'])
-            self.event_duration =  self.end - self.start + 101
+            pulses = pulses[np.where(np.max(pulses['current'],axis=1)>=self.config['digitizer_trigger']/current_2_adc)]
+            pulses['current'] =  -np.trunc(pulses['current'] * current_2_adc)
 
-            self._raw_data = np.zeros((len(pulses)),        #TODO Maybe call raw data for different pulse types seperatly to avoid very long empty pulses
-                                      dtype=[('pulse', np.int64, self.event_duration),('left',np.int),('right',np.int) ,('channel', np.int),('rec_needed',np.int)])
+            if not len(pulses):
+                print('No pulses above digitizer threshold.')
+                log.info('No pulses above digitizer threshold.')
+                return
+
+            start = np.min(pulses['left'])
+            end = np.max(pulses['right'])
+            event_duration =  end - start + 2 * tw
+
+            raw_data = np.zeros((len(pulses)),        #TODO Maybe call raw data for different pulse types seperatly to avoid very long empty pulses
+                                      dtype=[('pulse', np.int64, event_duration),('left',np.int),('right',np.int) ,('channel', np.int),('rec_needed',np.int)])
 
 
-            self._raw_data['channel'] = pulses['channel']
-            self._raw_data['left'] = pulses['left']
-            self._raw_data['right'] = pulses['right']
+            raw_data['channel'] = pulses['channel']
+            raw_data['left'] = pulses['left']
+            raw_data['right'] = pulses['right']
 
-            trigger_window = 50
             for ix, pulse in enumerate(pulses):
                 if np.sum(pulse['current'])==0:
+                    print('Skipping empty pulse')
+                    log.info('Skipping empty pulse')
                     continue
                 p_length = pulse['right'] - pulse['left']
-                self._raw_data[ix]['pulse'][0:2*trigger_window+p_length] = self.get_real_noise(self._raw_data[ix]['pulse'][0:2*trigger_window+p_length])
-                self._raw_data[ix]['pulse'][trigger_window:trigger_window+p_length] = self.sum_pulses(self._raw_data[ix]['pulse'][trigger_window:trigger_window+p_length],
+                raw_data[ix]['pulse'][0: 2 * tw + p_length] = self.get_real_noise(raw_data[ix]['pulse'][0 : 2*tw+p_length])
+                raw_data[ix]['pulse'][tw : tw + p_length] = self.sum_pulses(raw_data[ix]['pulse'][tw : tw+p_length],
                                                               pulse['current'][:p_length])
 
-            self._raw_data['pulse']+= self.config['digitizer_reference_baseline']
-            self._raw_data['rec_needed'] = np.ceil((self._raw_data['right']-self._raw_data['left']+2*trigger_window) / strax.DEFAULT_RECORD_LENGTH)
-            np.clip(self._raw_data['pulse'],a_min = -100,a_max = None , out = self._raw_data['pulse'])
-
+            raw_data['pulse']+= self.config['digitizer_reference_baseline']
+            raw_data['rec_needed'] = np.ceil((raw_data['right']-raw_data['left']+2*tw) / strax.DEFAULT_RECORD_LENGTH)
+            np.clip(raw_data['pulse'],a_min = -100,a_max = None , out = raw_data['pulse'])
+            self._raw_data.append(raw_data)
         else:
-            #For some reason the pulse is zero?
-            self._raw_data = np.zeros((len(self.config['to_pe'])),
-                                      dtype=[('pulse', np.int, 1), ('left',np.int), ('right',np.int), ('channel', np.int)])
-            raise NotImplementedError
-
+            log.info('No pulses to be stored')
 
     @guvectorize([(int64[:], float64[:], int64[:])], '(n),(n)->(n)')
     def sum_pulses(x, y, res):
