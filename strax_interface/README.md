@@ -12,9 +12,7 @@ Since github has a limit on the maximum allowed file size not all configuration 
 ```
 You need all 4.
 
-Alternatively you can just disable both, afterpulses are currently not working and commenting line 152 in fax_interface.py will disable noise data.
-
-Finally there is one challenge remaining. The default interpolating map of strax doesn't like what we need it to do. So you need to grab the one from here (WFSim/itp_map.py) and overwrite the default one in straxen.
+Finally there is one challenge remaining. The default interpolating map of strax doesn't like what we need it to do. So you need to grab the one from here and overwrite the default one in straxen.
 
 ## Usage
 You can choose the simulate too two different data types. If you want a quick and dirty simulation and are not really interested in low level stuff you can simulate directly to Peaks. This is done by PeaksFromFax.
@@ -57,9 +55,10 @@ register = [straxen.plugins.fax_interface.PeaksFromFax]
 ```
 
 ## Instructions
-By default fax will generate some random large signals. If you want to change this look at the rand_instructions function in fax_interface. The time is such to avoid overlapping events.
-When simulating fax will print the instructions used for the events.
+By default fax will generate some random large signals. If you want to change this look at the rand_instructions function in fax_interface.
+When simulating fax will print the instructions used for the events, and saves them to "fax_truth_file.npy"
 
 
 ## Known issues
 -You cannot read in instructions from somewhere
+-PMT Afterpulses caused by electron afterpulses get strange timestaps leading to a "peaks not sorted" error when building events. This is disabled by default
