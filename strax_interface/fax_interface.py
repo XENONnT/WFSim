@@ -333,5 +333,5 @@ class RawRecordsFromFax(strax.Plugin):
     def iter(self, *args, **kwargs):
         sim = RawRecordsSimulator(self.config)
         instructions = rand_instructions(self.config['nevents'])
-        np.save('./fax_truth_file.npy',instructions)
+        np.save(f'{run_id}_./fax_truth_file.npy',instructions)
         yield from sim(instructions)
