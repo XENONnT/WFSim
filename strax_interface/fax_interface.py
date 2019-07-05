@@ -5,6 +5,7 @@ from scipy.interpolate import interp1d
 import logging
 log = logging.getLogger('SimulationCore')
 
+
 from tqdm import tqdm
 import strax
 from straxen.common import get_resource, get_to_pe
@@ -132,7 +133,6 @@ class RawRecordsSimulator(object):
             print(ie)
             self.record(ie)
             self.pulse_buffer.append(self.record._raw_data)
-
             if ix == len(m_inst)-1:
                 yield self.fill_records(self.pulse_buffer)
                 self.pulse_buffer = []
