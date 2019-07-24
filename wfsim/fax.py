@@ -1,20 +1,21 @@
-import numpy as np
+import logging
 import time
 
-import pandas as pd
+from numba import int64, float64, guvectorize
+import numpy as np
 from scipy.interpolate import interp1d
 
-
-from numba import int64, float64, guvectorize
 from straxen import units
 import strax
 
-import logging
+export, __all__ = strax.exporter()
 
 log = logging.getLogger('SimulationCore')
 
-# Pulse building class
+
+@export
 class Pulse(object):
+    """Pulse building class"""
 
     def __init__(self, config):
         self.config = config
@@ -175,6 +176,7 @@ class Pulse(object):
         return np.random.exponential(1, size) * delay
 
 
+@export
 class S1(Pulse):
     """
     Given temperal inputs as well as number of photons
@@ -256,6 +258,7 @@ class S1(Pulse):
         return self.singlet_triplet_delays(size, self.config['s1_NR_singlet_fraction'])
 
 
+@export
 class S2(Pulse):
     """
     Given temperal inputs as well as number of electrons
@@ -429,7 +432,7 @@ class S2(Pulse):
         return frac
 
 
-
+@export
 class Afterpulse_Electron(S2):
     """
     Produce electron after pulse simulation, using already built cdfs
@@ -455,26 +458,14 @@ class Afterpulse_Electron(S2):
         """
         For electron afterpulses we assume a uniform x, y
         """
-        now = time.time()
-        delaytime_cdf = self.config['uniform_to_ele_ap']['liquid']['delaytime_cdf']
+        delaytime_pmf_hist = self.config['uniform_to_ele_ap']
 
         # To save calculation we first find out how many photon will give rise ap
-        n_electron = np.random.poisson(delaytime_cdf[-1] * len(signal_pulse._photon_timings))
+        n_electron = np.random.poisson(delaytime_pmf_hist.n
+                                       * len(signal_pulse._photon_timings))
 
-        # Assign each electron a random uniform number rU0 (0, delaytime_cdf[-1]]
-        rU0 = (1 - np.random.uniform(size=n_electron)) * delaytime_cdf[-1]
-
-        # The map is made so that the indices are delay time in unit of ns
-        # ap_delay = np.argmin(
-        #    np.abs(delaytime_cdf - rU0[:, None]), axis=-1)
-
-        # 80,0000 is bit too slow, so we lower it to 800 + 1000
-        ap_delay = np.argmin(
-            np.abs(delaytime_cdf[500::1000] - rU0[:, None]), axis=-1)
-        ap_delay = ap_delay * 1000 + \
-            np.argmin(
-                np.abs(delaytime_cdf[ap_delay[:, None]*1000 + np.arange(1000)] - rU0[:, None]), axis=-1)
-        np.clip(ap_delay, a_min=self.config['drift_time_gate'] + 1, a_max=None, out=ap_delay)
+        ap_delay = delaytime_pmf_hist.get_random(n_electron).clip(
+            self.config['drift_time_gate'] + 1, None)
 
         # Randomly select original photon as time zeros
         t_zeros = signal_pulse._photon_timings[np.random.randint(
@@ -505,6 +496,7 @@ class Afterpulse_Electron(S2):
         return x, y
 
 
+@export
 class Afterpulse_PMT(Pulse):
     """
     Produce pmt after pulse simulation, using already built cdfs
@@ -569,6 +561,7 @@ class Afterpulse_PMT(Pulse):
 
 
 
+@export
 class Peak(object):
 
     def __init__(self, config):
@@ -629,6 +622,7 @@ class Peak(object):
 
 
 
+@export
 class RawRecord(object):
 
     def __init__(self, config):
