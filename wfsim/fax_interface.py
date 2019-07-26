@@ -334,11 +334,16 @@ class RawRecordsFromFax(FaxSimulatorPlugin):
 
 @export
 class PeaksFromFax(FaxSimulatorPlugin):
-    provides = 'peaks'
+    provides = ('peaks','truth')
+    data_kind = dict(
+        peaks = 'peaks',
+        truth = 'truth',)
 
     def infer_dtype(self):
         self.to_pe = get_to_pe(self.run_id, self.config['to_pe_file'])
-        return strax.peak_dtype(len(self.to_pe))
+        return dict(
+            peaks = strax.peak_dtype(len(self.to_pe)),
+            truth = inst_dtype)
 
     def _setup_simulator(self):
         self.simulator = PeakSimulator(self.config)
@@ -348,5 +353,6 @@ class PeaksFromFax(FaxSimulatorPlugin):
         return chunk_i < len(self.instructions)
 
     def compute(self, chunk_i):
-        return self.simulator(self.instructions[chunk_i])
+        return dict(peaks = self.simulator(self.instructions[chunk_i]),
+                    truth = self.instructions)
 
