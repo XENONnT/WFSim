@@ -16,13 +16,18 @@ from .fax import Peak, RawRecord
 export, __all__ = strax.exporter()
 log = logging.getLogger('SimulationCore')
 
+inst_dtype = [('event_number', np.int), ('type', '<U2'), ('t', np.int), ('x', np.float32),
+                                          ('y', np.float32), ('z', np.float32), ('amp', np.int), ('recoil', '<U2')]
+
+def instruction_from_csv(file):
+    instructions = np.genfromtxt(file, delimiter = ',', dtype = inst_dtype)
+    return instructions
 
 @export
 def rand_instructions(n=10):
     nelectrons = 10 ** (np.random.uniform(1, 3, n))
 
-    instructions = np.zeros(2 * n, dtype=[('event_number', np.int), ('type', '<U2'), ('t', np.int), ('x', np.float32),
-                                          ('y', np.float32), ('z', np.float32), ('amp', np.int), ('recoil', '<U2')])
+    instructions = np.zeros(2 * n, dtype=  inst_dtype)
 
     instructions['event_number'] = np.repeat(np.arange(n), 2)
     instructions['type'] = np.tile(['s1', 's2'], n)
@@ -287,9 +292,11 @@ class FaxSimulatorPlugin(strax.Plugin):
                 get_resource(c[f's{si}_pattern_map'],
                              fmt='binary'))
 
-        # TODO PLACEHOLDER: simulate random instructions and save truth file
-        self.instructions = rand_instructions(c['nevents'])
-        np.save(f'./{self.run_id}_fax_truth_file.npy', self.instructions)
+        if c['fax_file']:
+            self.instructions = instruction_from_csv(c['fax_file'])
+            c['nevents'] = len(self.instructions)
+        else:
+            self.instructions = rand_instructions(c['nevents'])
 
         self._setup_simulator()
 
@@ -299,8 +306,17 @@ class FaxSimulatorPlugin(strax.Plugin):
 
 @export
 class RawRecordsFromFax(FaxSimulatorPlugin):
-    provides = 'raw_records'
-    dtype = strax.record_dtype()
+    provides = ('raw_records','truth')
+
+    data_kind = dict(
+        raw_records='raw_records',
+        truth='truth',)
+
+    dtype = dict(
+        raw_records = strax.record_dtype(),
+        truth= inst_dtype)
+
+
 
     def _setup_simulator(self):
         self.sim_iter = RawRecordsSimulator(self.config)(self.instructions)
@@ -312,16 +328,22 @@ class RawRecordsFromFax(FaxSimulatorPlugin):
         return chunk_i < self.config['nevents'] + 1
 
     def compute(self, chunk_i):
-        return next(self.sim_iter)
+        return dict(raw_records = next(self.sim_iter),
+                    truth = self.instructions)
 
 
 @export
 class PeaksFromFax(FaxSimulatorPlugin):
-    provides = 'peaks'
+    provides = ('peaks','truth')
+    data_kind = dict(
+        peaks = 'peaks',
+        truth = 'truth',)
 
     def infer_dtype(self):
         self.to_pe = get_to_pe(self.run_id, self.config['to_pe_file'])
-        return strax.peak_dtype(len(self.to_pe))
+        return dict(
+            peaks = strax.peak_dtype(len(self.to_pe)),
+            truth = inst_dtype)
 
     def _setup_simulator(self):
         self.simulator = PeakSimulator(self.config)
@@ -331,5 +353,6 @@ class PeaksFromFax(FaxSimulatorPlugin):
         return chunk_i < len(self.instructions)
 
     def compute(self, chunk_i):
-        return self.simulator(self.instructions[chunk_i])
+        return dict(peaks = self.simulator(self.instructions[chunk_i]),
+                    truth = self.instructions)
 
