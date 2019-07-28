@@ -10,12 +10,12 @@ def test_sim():
     run_id = '180519_1902'
 
     st = strax.Context(
+        storage=[],
         register=wfsim.RawRecordsFromFax,
         config=dict(nevents=4),
         **straxen.contexts.common_opts)
 
-    # Call for event_info so it immediately get processed as well
-    peaks = st.get_array(run_id, 'peaks')
+    rr = st.get_array(run_id, 'raw_records')
 
-    assert len(peaks) > 0
-    assert peaks['area'].sum() > 0
+    assert len(rr) > 0
+    assert rr['data'].sum() > 0
