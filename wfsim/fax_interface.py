@@ -14,6 +14,8 @@ from .itp_map import InterpolatingMap
 from .fax import Peak, RawRecord
 
 export, __all__ = strax.exporter()
+__all__ += ['inst_dtype']
+
 log = logging.getLogger('SimulationCore')
 
 inst_dtype = [('event_number', np.int), ('type', '<U2'), ('t', np.int), ('x', np.float32),
@@ -255,6 +257,10 @@ class FaxSimulatorPlugin(strax.Plugin):
     # TODO: this seems avoidable...
     parallel = False
 
+    # TODO: this state is needed for sorting checks,
+    # but it prevents prevent parallelization
+    last_chunk_time = -999999999999999
+
     def setup(self):
         c = self.config
         c.update(get_resource(c['fax_config'], fmt='json'))
@@ -300,6 +306,16 @@ class FaxSimulatorPlugin(strax.Plugin):
 
         self._setup_simulator()
 
+    def _sort_check(self, result):
+        if result['time'][0] < self.last_chunk_time + 5000:
+            raise RuntimeError(
+                "Simulator returned chunks with insufficient spacing. "
+                f"Last chunk's max time was {result['time'][0]}, "
+                f"this chunk's first time is {self.last_chunk_time}.")
+        if np.diff(result['time']).min() < 0:
+            raise RuntimeError("Simulator returned non-sorted records!")
+        self.last_chunk_time = result['time'].max()
+
     def source_finished(self):
         return True
 
@@ -316,19 +332,20 @@ class RawRecordsFromFax(FaxSimulatorPlugin):
         raw_records = strax.record_dtype(),
         truth= inst_dtype)
 
-
-
     def _setup_simulator(self):
         self.sim_iter = RawRecordsSimulator(self.config)(self.instructions)
 
     # This lets strax figure out when we are done making chunks
-    # [Jelle: 1 chunk = 1 event currently, right? Then why is the +1 needed?]
-    # TODO: why does source_finished not get called?? Something is wrong.
     def is_ready(self, chunk_i):
-        return chunk_i < self.config['nevents'] + 1
+        return chunk_i < self.config['nevents']
 
     def compute(self, chunk_i):
-        return dict(raw_records = next(self.sim_iter),
+        try:
+            result = next(self.sim_iter)
+        except StopIteration:
+            raise RuntimeError("Bug in chunk count computation")
+        self._sort_check(result)
+        return dict(raw_records = result,
                     truth = self.instructions)
 
 
@@ -353,6 +370,7 @@ class PeaksFromFax(FaxSimulatorPlugin):
         return chunk_i < len(self.instructions)
 
     def compute(self, chunk_i):
-        return dict(peaks = self.simulator(self.instructions[chunk_i]),
+        result = self.simulator(self.instructions[chunk_i])
+        self._sort_check(result)
+        return dict(peaks = result,
                     truth = self.instructions)
-
