@@ -1,7 +1,7 @@
 import logging
 import time
 
-from numba import int64, float64, guvectorize
+from numba import int64, float64, guvectorize, njit
 import numpy as np
 from scipy.interpolate import interp1d
 
@@ -89,7 +89,9 @@ class Pulse(object):
             pulse_current = np.zeros(pulse_right - pulse_left + 1)
 
             Pulse.add_current(_channel_photon_timings - min_timing,
-                              _channel_photon_reminders, _channel_photon_gains, pulse_current)
+                              _channel_photon_reminders, _channel_photon_gains,
+                              self._pmt_current_templates, self._template_length,
+                              pulse_current)
 
             pulses[ix]['channel'] = channel
             pulses[ix]['left'] = pulse_left
@@ -104,10 +106,6 @@ class Pulse(object):
         _pmt_current_templates[i] : photon timing fall between [10*m+i, 10*m+i+1)
         (i, m are integers)
         """
-        # 'Hidden' global variables to avoid passing class instance into guvectorized function
-        global _pmt_current_templates, _template_length
-        _pmt_current_templates = []
-        _template_length = 0
 
         # Interpolate on cdf ensures that each spe pulse would sum up to 1 pe*sample duration^-1
         pe_pulse_function = interp1d(
@@ -124,14 +122,15 @@ class Pulse(object):
         samples = np.linspace(-samples_before * sample_duration,
                               + samples_after * sample_duration,
                               1 + samples_before + samples_after)
-        _template_length = np.int(len(samples) - 1)
+        self._template_length = np.int(len(samples) - 1)
 
+        templates = []
         for r in np.arange(0, sample_duration, pmt_pulse_time_rounding):
             pmt_current = np.diff(pe_pulse_function(samples - r)) / sample_duration  # pe / 10 ns
             # Normalize here to counter tiny rounding error from interpolation
             pmt_current *= (1 / sample_duration) / np.sum(pmt_current)  # pe / 10 ns
-            _pmt_current_templates.append(pmt_current)
-        _pmt_current_templates = np.array(_pmt_current_templates)
+            templates.append(pmt_current)
+        self._pmt_current_templates = np.array(templates)
         log.debug('Create spe waveform templates with %s ns resolution' % pmt_pulse_time_rounding)
 
 
@@ -139,9 +138,11 @@ class Pulse(object):
     def clear_pulse_cache(self):
         self._pulses = []
 
-    @staticmethod  # Staticmethod decorator doesn't seem to do anything
-    @guvectorize([(int64, int64, float64, float64[:])], '(), (), (), (n)')
-    def add_current(_photon_timing_start, _reminder, _photon_gain, pulse):
+    @staticmethod
+    @njit
+    def add_current(_photon_timing_start, _reminder, _photon_gain,
+                    _pmt_current_templates, _template_length,
+                    pulse):
         #         """
         #         Simulate single channel waveform given the photon timings
         #         _photon_timing_start   - dim-1 integer array of photon timings in unit of samples
@@ -151,8 +152,11 @@ class Pulse(object):
         #         _pmt_current_templates - list of spe templates of different reminders
         #         The self argument is intentionally left out of this function.
         #         """
-        pulse[_photon_timing_start:_photon_timing_start + _template_length] += \
-            _pmt_current_templates[_reminder] * _photon_gain
+        for i in range(len(_photon_timing_start)):
+            start = _photon_timing_start[i]
+            pulse[start:start + _template_length] += \
+                _pmt_current_templates[_reminder[i]] * _photon_gain[i]
+        return pulse
 
 
     def singlet_triplet_delays(self, size, singlet_ratio):
