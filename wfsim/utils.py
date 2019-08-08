@@ -72,7 +72,7 @@ def get_resource(x, fmt='text'):
 
     # File resource
     if fmt == 'npy':
-        result = np.load(x)
+        result = np.load(x, allow_pickle=True).item()
     elif fmt == 'binary':
         with open(x, mode='rb') as f:
             result = f.read()
@@ -85,9 +85,10 @@ def get_resource(x, fmt='text'):
     elif fmt == 'json.gz':
         with gzip.open(x, 'rb') as f:
             result = json.load(f)
-
-    # Store in in-memory cache
-    cache_dict[x] = result
+    elif fmt == 'csv':
+        result = pd.read_csv(x)
+    elif fmt == 'hdf':
+        result = pd.read_hdf(x)
 
     return result
 

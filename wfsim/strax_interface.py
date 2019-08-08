@@ -10,8 +10,8 @@ from scipy.interpolate import interp1d
 import strax
 from straxen.common import get_resource, get_to_pe
 
-from .itp_map import InterpolatingMap
-from .fax import Peak, RawRecord
+from .utils import InterpolatingMap
+from .core import Peak, RawRecord
 
 export, __all__ = strax.exporter()
 __all__ += ['inst_dtype']
