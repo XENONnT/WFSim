@@ -1,5 +1,7 @@
 # Fax in strax
 
+[![Build Status](https://travis-ci.org/XENONnT/WFSim.svg?branch=master)](https://travis-ci.org/XENONnT/WFSim)
+
 Here are the files needed to run the waveform simulator fax and give output in the same formats as used by strax.
 
 ## Installation
