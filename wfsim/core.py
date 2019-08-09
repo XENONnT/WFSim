@@ -674,7 +674,9 @@ class RawRecord(object):
         for ptype in self.ptypes:
             self.raw_data(getattr(self.pulses[ptype], '_pulses'))
 
-        self.get_truth(self._raw_data[0], getattr(self.pulses[instruction[1]],'_pulses'), instruction)
+        self.get_truth(instruction,
+                       getattr(self.pulses[instruction[1]],'_photon_timings'),
+                       getattr(self.pulses[instruction[1]],'_electron_timings', []))
 
     def raw_data(self, pulses):
         if len(pulses) == 0: #To avoid trying to store a pulse which is not simulated (The S2 pulse of an S1 or vise versa)
@@ -697,7 +699,7 @@ class RawRecord(object):
             end = np.max(pulses['right'])
             event_duration =  end - start + 2 * tw
 
-            raw_data = np.zeros((len(pulses)),        #TODO Maybe call raw data for different pulse types seperatly to avoid very long empty pulses
+            raw_data = np.zeros((len(pulses)),
                                       dtype=[('pulse', np.int64, event_duration),('left',np.int),('right',np.int) ,
                                              ('channel', np.int),('rec_needed',np.int)])
 
@@ -725,12 +727,24 @@ class RawRecord(object):
         else:
             log.info('No pulses to be stored')
 
-    def get_truth(self,raw, pulses,instruction):
-        tr = np.zeros(1, dtype=[('left', np.int), ('right', np.int),
-                                ('photons', np.int)])
-        tr['left'] = np.min(raw['left'])
-        tr['right'] = np.max(raw['right'])
-        tr['photons'] = np.sum(pulses['photons'])
+    def get_truth(self,instruction, photon_timing, electron_timing):
+        tr = np.zeros(1 , dtype = [('n_photons', np.float),('t_mean_photons', np.float),('t_first_photons', np.float),
+                                   ('t_last_photons', np.float),('t_sigma_photons', np.float),('n_electrons', np.float),
+                                   ('t_mean_electrons', np.float),('t_first_electrons', np.float),
+                                   ('t_last_electrons', np.float),('t_sigma_electrons', np.float),])
+        for name, times in (('photons', photon_timing) , ('electrons', electron_timing)):
+            if len(times) != 0:
+                tr[f'n_{name}'] = len(times)
+                tr[f't_mean_{name}'] = np.mean(times)
+                tr[f't_first_{name}'] = np.min(times)
+                tr[f't_last_{name}'] = np.max(times)
+                tr[f't_sigma_{name}'] = np.std(times)
+            else:
+                tr[f'n_{name}'] = np.nan
+                tr[f't_mean_{name}'] = np.nan
+                tr[f't_first_{name}'] = np.nan
+                tr[f't_last_{name}'] = np.nan
+                tr[f't_sigma_{name}'] = np.nan
         truth = rfn.merge_arrays([instruction, tr], flatten=True, usemask=False)
         self._truth = truth
 
