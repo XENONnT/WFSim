@@ -1,4 +1,4 @@
 __version__ = '0.0.1'
 
-from .fax import *
-from .fax_interface import *
+from .core import *
+from .strax_interface import *
