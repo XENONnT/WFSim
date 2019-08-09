@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
 
+
+
 import strax
 from straxen.common import get_resource, get_to_pe
 
@@ -90,6 +92,7 @@ class PeakSimulator(object):
 
         # print(ie)
         self.peak(ie)
+        truth = self.peak._truth
         p[i]['time'] = ie['t'] + self.peak.start + self.peak.event_duration / 2.
         swv_buffer_size = self.peak.event_duration
         swv_buffer = np.zeros(swv_buffer_size,dtype=np.int32)
@@ -124,7 +127,7 @@ class PeakSimulator(object):
         sort_i = np.argsort(sort_key)
         p = p[sort_i]
 
-        return p
+        return p, truth
 
 
 @export
@@ -134,6 +137,7 @@ class RawRecordsSimulator(object):
         self.record = RawRecord(config)
         self.results = []
         self.pulse_buffer = []
+        self.truth = []
 
     def __call__(self, m_inst):
 
@@ -146,12 +150,15 @@ class RawRecordsSimulator(object):
                 yield self.fill_records(self.pulse_buffer)
                 self.event = ie['event_number']
                 self.pulse_buffer = []
+                self.truth = []
 
             self.record(ie)
             self.pulse_buffer.append(self.record._raw_data)
+            self.truth.append(self.record._truth)
             if ix == len(m_inst)-1:
                 yield self.fill_records(self.pulse_buffer)
                 self.pulse_buffer = []
+                self.truth = []
 
     def fill_records(self, p_b):
         samples_per_record = strax.DEFAULT_RECORD_LENGTH
@@ -198,6 +205,7 @@ class RawRecordsSimulator(object):
 
     def finish_results(self):
         records = np.concatenate(self.results)
+        truth = np.concatenate(self.truth)
         # In strax data, records are always stored
         # sorted, baselined and integrated
         records = strax.sort_by_time(records)
@@ -205,7 +213,7 @@ class RawRecordsSimulator(object):
         strax.integrate(records)
         # print("Returning %d records" % len(records))
         self.results = []
-        return records
+        return records, truth
 
 
 
@@ -330,7 +338,7 @@ class RawRecordsFromFax(FaxSimulatorPlugin):
 
     dtype = dict(
         raw_records = strax.record_dtype(),
-        truth= inst_dtype)
+        truth= inst_dtype+ [('left', np.int), ('right', np.int), ('photons', np.int)])
 
     def _setup_simulator(self):
         self.sim_iter = RawRecordsSimulator(self.config)(self.instructions)
@@ -341,12 +349,12 @@ class RawRecordsFromFax(FaxSimulatorPlugin):
 
     def compute(self, chunk_i):
         try:
-            result = next(self.sim_iter)
+            result, t = next(self.sim_iter)
         except StopIteration:
             raise RuntimeError("Bug in chunk count computation")
         self._sort_check(result)
         return dict(raw_records = result,
-                    truth = self.instructions)
+                    truth = t)
 
 
 @export
@@ -358,9 +366,10 @@ class PeaksFromFax(FaxSimulatorPlugin):
 
     def infer_dtype(self):
         self.to_pe = get_to_pe(self.run_id, self.config['to_pe_file'])
+        truth_dtype = inst_dtype + [('left', np.int), ('right', np.int), ('photons', np.int)]
         return dict(
             peaks = strax.peak_dtype(len(self.to_pe)),
-            truth = inst_dtype)
+            truth = truth_dtype)
 
     def _setup_simulator(self):
         self.simulator = PeakSimulator(self.config)
@@ -370,7 +379,7 @@ class PeaksFromFax(FaxSimulatorPlugin):
         return chunk_i < len(self.instructions)
 
     def compute(self, chunk_i):
-        result = self.simulator(self.instructions[chunk_i])
-        self._sort_check(result)
+        result, t = self.simulator(self.instructions[chunk_i])
+        # self._sort_check(result)
         return dict(peaks = result,
-                    truth = self.instructions)
+                    truth = t)

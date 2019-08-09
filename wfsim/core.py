@@ -4,6 +4,7 @@ import time
 from numba import int64, float64, guvectorize, njit
 import numpy as np
 from scipy.interpolate import interp1d
+import numpy.lib.recfunctions as rfn
 
 from straxen import units
 import strax
@@ -41,7 +42,8 @@ class Pulse(object):
                                                  len(self._photon_timings))
 
         if len(self._photon_timings) == 0:
-            self._pulses = np.zeros(len(self.config['to_pe']), dtype=[('channel', np.int16), ('left', np.int64),
+            self._pulses = np.zeros(len(self.config['to_pe']), dtype=[('photons', np.int16),('channel', np.int16),
+                                                                      ('left', np.int64),
                                                                         ('right', np.int64), ('duration', np.int64),
                                                                         ('current', np.float64, 1)])
             return
@@ -51,7 +53,8 @@ class Pulse(object):
         pulse_end = np.floor(np.max(self._photon_timings) / dt) + int(self.config['samples_before_pulse_center'])
         pulse_length = pulse_end - pulse_start + 23 #This is the length of a pulse current
 
-        pulses = np.zeros(len(self.config['to_pe']), dtype=[('channel', np.int16), ('left', np.int64),
+        pulses = np.zeros(len(self.config['to_pe']), dtype=[('photons', np.int16),
+                                                            ('channel', np.int16), ('left', np.int64),
                                                                         ('right', np.int64), ('duration', np.int64),
                                                                         ('current', np.float64, int(pulse_length))])
 
@@ -93,6 +96,7 @@ class Pulse(object):
                               self._pmt_current_templates, self._template_length,
                               pulse_current)
 
+            pulses[ix]['photons'] = len(_channel_photon_timings)
             pulses[ix]['channel'] = channel
             pulses[ix]['left'] = pulse_left
             pulses[ix]['right'] = pulse_right
@@ -598,6 +602,7 @@ class Peak(object):
         self._pulses = getattr(self.pulses[ptype],'_pulses')
 
         self.raw_data()
+        self.get_truth(instruction)
 
     def raw_data(self):
         if len(self._pulses):
@@ -624,6 +629,14 @@ class Peak(object):
                                       dtype=[('pulse', np.int, 1), ('left',np.int), ('right',np.int), ('channel', np.int)])
             raise NotImplementedError
 
+    def get_truth(self,instruction):
+        tr = np.zeros(1, dtype=[('left', np.int), ('right', np.int),
+                                ('photons', np.int)])
+        tr['left'] = np.min(self._pulses['left'][np.where(self._pulses['left']>0.)])
+        tr['right'] = np.max(self._pulses['right'])
+        tr['photons'] = np.sum(self._pulses['photons'])
+        truth = rfn.merge_arrays([instruction, tr], flatten=True, usemask=False)
+        self._truth = truth
 
 
 @export
@@ -657,11 +670,14 @@ class RawRecord(object):
 
         self._pulses_list = []
         self._raw_data = []
+        self._truth = []
 
         for ptype in self.ptypes:
-            self.raw_data(getattr(self.pulses[ptype], '_pulses'))
+            self.raw_data(getattr(self.pulses[ptype], '_pulses'), instruction)
 
-    def raw_data(self, pulses):
+        self.get_truth(self._raw_data[0], getattr(self.pulses[instruction[1]],'_pulses'), instruction)
+
+    def raw_data(self, pulses, instruction):
         if len(pulses) == 0: #To avoid trying to store a pulse which is not simulated (The S2 pulse of an S1 or vise versa)
             return
         elif pulses['current'][0].size > 1:
@@ -683,7 +699,8 @@ class RawRecord(object):
             event_duration =  end - start + 2 * tw
 
             raw_data = np.zeros((len(pulses)),        #TODO Maybe call raw data for different pulse types seperatly to avoid very long empty pulses
-                                      dtype=[('pulse', np.int64, event_duration),('left',np.int),('right',np.int) ,('channel', np.int),('rec_needed',np.int)])
+                                      dtype=[('pulse', np.int64, event_duration),('left',np.int),('right',np.int) ,
+                                             ('channel', np.int),('rec_needed',np.int)])
 
 
             raw_data['channel'] = pulses['channel']
@@ -703,9 +720,20 @@ class RawRecord(object):
             raw_data['pulse']+= self.config['digitizer_reference_baseline']
             raw_data['rec_needed'] = np.ceil((raw_data['right']-raw_data['left']+2*tw) / strax.DEFAULT_RECORD_LENGTH)
             np.clip(raw_data['pulse'],a_min = -100,a_max = None , out = raw_data['pulse'])
+
             self._raw_data.append(raw_data)
+
         else:
             log.info('No pulses to be stored')
+
+    def get_truth(self,raw, pulses,instruction):
+        tr = np.zeros(1, dtype=[('left', np.int), ('right', np.int),
+                                ('photons', np.int)])
+        tr['left'] = np.min(raw['left'])
+        tr['right'] = np.max(raw['right'])
+        tr['photons'] = np.sum(pulses['photons'])
+        truth = rfn.merge_arrays([instruction, tr], flatten=True, usemask=False)
+        self._truth = truth
 
     @guvectorize([(int64[:], float64[:], int64[:])], '(n),(n)->(n)')
     def sum_pulses(x, y, res):
