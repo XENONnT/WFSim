@@ -600,7 +600,9 @@ class Peak(object):
         self._pulses = getattr(self.pulses[ptype],'_pulses')
 
         self.raw_data()
-        self.get_truth(instruction)
+        self.get_truth(instruction,
+                       getattr(self.pulses[ptype],'_photon_timings'),
+                       getattr(self.pulses[ptype],'_electron_timings', []))
 
     def raw_data(self):
         if len(self._pulses):
@@ -629,11 +631,24 @@ class Peak(object):
                                              ('right',np.int), ('channel', np.int)])
             raise NotImplementedError
 
-    def get_truth(self,instruction):
-        tr = np.zeros(1, dtype=[('left', np.int), ('right', np.int), ('photons', np.int)])
-        tr['left'] = np.min(self._pulses['left'][np.where(self._pulses['left']>0.)])
-        tr['right'] = np.max(self._pulses['right'])
-        tr['photons'] = np.sum(self._pulses['photons'])
+    def get_truth(self,instruction, photon_timing, electron_timing):
+        tr = np.zeros(1 , dtype = [('n_photons', np.float),('t_mean_photons', np.float),('t_first_photons', np.float),
+                                   ('t_last_photons', np.float),('t_sigma_photons', np.float),('n_electrons', np.float),
+                                   ('t_mean_electrons', np.float),('t_first_electrons', np.float),
+                                   ('t_last_electrons', np.float),('t_sigma_electrons', np.float),])
+        for name, times in (('photons', photon_timing) , ('electrons', electron_timing)):
+            if len(times) != 0:
+                tr[f'n_{name}'] = len(times)
+                tr[f't_mean_{name}'] = np.mean(times)
+                tr[f't_first_{name}'] = np.min(times)
+                tr[f't_last_{name}'] = np.max(times)
+                tr[f't_sigma_{name}'] = np.std(times)
+            else:
+                tr[f'n_{name}'] = np.nan
+                tr[f't_mean_{name}'] = np.nan
+                tr[f't_first_{name}'] = np.nan
+                tr[f't_last_{name}'] = np.nan
+                tr[f't_sigma_{name}'] = np.nan
         truth = rfn.merge_arrays([instruction, tr], flatten=True, usemask=False)
         self._truth = truth
 
