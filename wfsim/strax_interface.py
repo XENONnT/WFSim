@@ -16,12 +16,17 @@ from .utils import InterpolatingMap
 from .core import Peak, RawRecord
 
 export, __all__ = strax.exporter()
-__all__ += ['inst_dtype']
+__all__ += ['inst_dtype','truth_extra_dtype']
 
 log = logging.getLogger('SimulationCore')
 
 inst_dtype = [('event_number', np.int), ('type', '<U2'), ('t', np.int), ('x', np.float32),
                                           ('y', np.float32), ('z', np.float32), ('amp', np.int), ('recoil', '<U2')]
+
+truth_extra_dtype = [('n_photons', np.float),('t_mean_photons', np.float),('t_first_photons', np.float),
+                     ('t_last_photons', np.float),('t_sigma_photons', np.float),('n_electrons', np.float),
+                     ('t_mean_electrons', np.float),('t_first_electrons', np.float),
+                     ('t_last_electrons', np.float),('t_sigma_electrons', np.float),]
 
 def instruction_from_csv(file):
     instructions = np.genfromtxt(file, delimiter = ',', dtype = inst_dtype)
@@ -338,7 +343,7 @@ class RawRecordsFromFax(FaxSimulatorPlugin):
 
     dtype = dict(
         raw_records = strax.record_dtype(),
-        truth= inst_dtype+ [('left', np.int), ('right', np.int), ('photons', np.int)])
+        truth = inst_dtype + truth_extra_dtype)
 
     def _setup_simulator(self):
         self.sim_iter = RawRecordsSimulator(self.config)(self.instructions)
@@ -366,7 +371,7 @@ class PeaksFromFax(FaxSimulatorPlugin):
 
     def infer_dtype(self):
         self.to_pe = get_to_pe(self.run_id, self.config['to_pe_file'])
-        truth_dtype = inst_dtype + [('left', np.int), ('right', np.int), ('photons', np.int)]
+        truth_dtype = inst_dtype + truth_extra_dtype
         return dict(
             peaks = strax.peak_dtype(len(self.to_pe)),
             truth = truth_dtype)
