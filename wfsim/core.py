@@ -43,9 +43,8 @@ class Pulse(object):
 
         if len(self._photon_timings) == 0:
             self._pulses = np.zeros(len(self.config['to_pe']), dtype=[('photons', np.int16),('channel', np.int16),
-                                                                      ('left', np.int64),
-                                                                        ('right', np.int64), ('duration', np.int64),
-                                                                        ('current', np.float64, 1)])
+                                                                      ('left', np.int64), ('right', np.int64),
+                                                                      ('duration', np.int64), ('current', np.float64, 1)])
             return
 
         dt = self.config.get('sample_duration', 10)
@@ -53,10 +52,9 @@ class Pulse(object):
         pulse_end = np.floor(np.max(self._photon_timings) / dt) + int(self.config['samples_before_pulse_center'])
         pulse_length = pulse_end - pulse_start + 23 #This is the length of a pulse current
 
-        pulses = np.zeros(len(self.config['to_pe']), dtype=[('photons', np.int16),
-                                                            ('channel', np.int16), ('left', np.int64),
-                                                                        ('right', np.int64), ('duration', np.int64),
-                                                                        ('current', np.float64, int(pulse_length))])
+        pulses = np.zeros(len(self.config['to_pe']), dtype=[('photons', np.int16), ('channel', np.int16),
+                                                            ('left', np.int64), ('right', np.int64),
+                                                            ('duration', np.int64), ('current', np.float64, int(pulse_length))])
 
         for ix, channel in enumerate(np.unique(self._photon_channels)):
             _channel_photon_timings = self._photon_timings[self._photon_channels == channel]
@@ -611,7 +609,8 @@ class Peak(object):
             self.event_duration =  self.end - self.start + 1
 
             self._raw_data = np.zeros((len(self.config['to_pe'])),
-                                      dtype=[('pulse', np.int, self.event_duration),('left',np.int),('right',np.int) ,('channel', np.int)])
+                                      dtype=[('pulse', np.int, self.event_duration),('left',np.int),
+                                             ('right',np.int) ,('channel', np.int)])
 
             self.current_2_adc = self.config['pmt_circuit_load_resistor'] \
                                  * self.config['external_amplification'] \
@@ -626,12 +625,12 @@ class Peak(object):
         else:
             #For some reason the pulse is zero?
             self._raw_data = np.zeros((len(self.config['to_pe'])),
-                                      dtype=[('pulse', np.int, 1), ('left',np.int), ('right',np.int), ('channel', np.int)])
+                                      dtype=[('pulse', np.int, 1), ('left',np.int),
+                                             ('right',np.int), ('channel', np.int)])
             raise NotImplementedError
 
     def get_truth(self,instruction):
-        tr = np.zeros(1, dtype=[('left', np.int), ('right', np.int),
-                                ('photons', np.int)])
+        tr = np.zeros(1, dtype=[('left', np.int), ('right', np.int), ('photons', np.int)])
         tr['left'] = np.min(self._pulses['left'][np.where(self._pulses['left']>0.)])
         tr['right'] = np.max(self._pulses['right'])
         tr['photons'] = np.sum(self._pulses['photons'])
@@ -673,11 +672,11 @@ class RawRecord(object):
         self._truth = []
 
         for ptype in self.ptypes:
-            self.raw_data(getattr(self.pulses[ptype], '_pulses'), instruction)
+            self.raw_data(getattr(self.pulses[ptype], '_pulses'))
 
         self.get_truth(self._raw_data[0], getattr(self.pulses[instruction[1]],'_pulses'), instruction)
 
-    def raw_data(self, pulses, instruction):
+    def raw_data(self, pulses):
         if len(pulses) == 0: #To avoid trying to store a pulse which is not simulated (The S2 pulse of an S1 or vise versa)
             return
         elif pulses['current'][0].size > 1:
