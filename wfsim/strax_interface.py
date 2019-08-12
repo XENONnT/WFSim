@@ -1,6 +1,8 @@
 import gzip
 import logging
 import pickle
+import uproot
+import nestpy
 from tqdm import tqdm
 
 import numpy as np
@@ -53,6 +55,47 @@ def rand_instructions(n=10):
 
     return instructions
 
+@export
+def read_g4(file):
+
+    nc = nestpy.NESTcalc(nestpy.VDetector())
+    A = 131.293
+    Z = 54.
+    density = 2.9  # g/cm^3
+    drift_field = 124  # V/cm
+    interaction = nestpy.INTERACTION_TYPE(7)
+
+    data = uproot.open(file)
+    all_ttrees = dict(data.allitems(filterclass=lambda cls: issubclass(cls, uproot.tree.TTreeMethods)))
+    e = all_ttrees[b'events/events;1']
+
+    ins = np.zeros(2 * len(e), dtype=inst_dtype)
+
+    sort_key = np.argsort(e.array('time')[:, 0])
+
+    e_dep, ins['x'], ins['y'], ins['z'], ins['t'] = e.array('etot')[sort_key], \
+                                                    np.repeat(e.array('xp_pri')[sort_key], 2) / 10, \
+                                                    np.repeat(e.array('yp_pri')[sort_key], 2) / 10, \
+                                                    np.repeat(e.array('zp_pri')[sort_key], 2), \
+                                                    np.repeat(e.array('time')[:, 0][sort_key], 2)
+
+    ins['event_number'] = np.repeat(np.arange(len(e)), 2)
+    ins['type'] = np.tile(('s1', 's2'), len(e))
+    ins['recoil'] = np.repeat('er', 2 * len(e))
+    quanta = []
+
+    for en in e_dep:
+        y = nc.GetYields(interaction,
+                         en,
+                         density,
+                         drift_field,
+                         A,
+                         Z,
+                         (1, 1))
+        quanta.append(nc.GetQuanta(y, density).photons)
+        quanta.append(nc.GetQuanta(y, density).electrons)
+    ins['amp'] = quanta
+    return ins
 
 @export
 def init_spe_scaling_factor_distributions(file):
@@ -312,8 +355,13 @@ class FaxSimulatorPlugin(strax.Plugin):
                              fmt='binary'))
 
         if c['fax_file']:
-            self.instructions = instruction_from_csv(c['fax_file'])
-            c['nevents'] = len(self.instructions)
+            if c['fax_file'][-5:] == '.root':
+                self.instructions = read_g4(c['fax_file'])
+                c['nevents'] = np.max(self.instructions['event_number'])
+            else:
+                self.instructions = instruction_from_csv(c['fax_file'])
+                c['nevents'] = np.max(self.instructions['event_number'])
+
         else:
             self.instructions = rand_instructions(c['nevents'])
 
