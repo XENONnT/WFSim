@@ -194,15 +194,9 @@ class InterpolatingMap(object):
     """
     data_field_names = ['timestamp', 'description', 'coordinate_system',
                     'name', 'irregular']
-    def __init__(self, data):
+    def __init__(self, data, fmt):
         self.log = logging.getLogger('InterpolatingMap')
-
-        if data.endswith('.gz'):
-            data_file = gzip.open(data).read()
-            self.data = json.loads(data_file.decode())
-        else:
-            with open(data) as data_file:
-                self.data = json.load(data_file)
+        self.data = get_resource(data, fmt)
 
         self.coordinate_system = cs = self.data['coordinate_system']
         if not len(cs):

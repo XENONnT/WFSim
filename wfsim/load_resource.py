@@ -32,11 +32,11 @@ class Resource(object):
             self.photon_area_distribution = get_resource(self.config['photon_area_distribution'], fmt='csv')
 
             # S1
-            self.s1_light_yield_map = itp_map(self.config['s1_light_yield_map'])
-            self.s1_pattern_map = itp_map(self.config['s1_pattern_map'])
+            self.s1_light_yield_map = itp_map(self.config['s1_light_yield_map'], fmt='json')
+            self.s1_pattern_map = itp_map(self.config['s1_pattern_map'], fmt='json.gz')
 
             # S2
-            self.s2_light_yield_map = itp_map(self.config['s2_light_yield_map'])
+            self.s2_light_yield_map = itp_map(self.config['s2_light_yield_map'], fmt='json')
             self.s2_per_pmt_params = get_resource(self.config['s2_per_pmt_params'], fmt='csv')
 
             # Electron After Pulses
