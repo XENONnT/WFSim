@@ -17,10 +17,7 @@ resource_config = {
 }
 for k in resource_config:
     resource_config[k] = osp.join('https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/'
-                         'b5ddb62b7f8308181b5c82a33de5982bac1835df/fax_files', resource_config[k])
-    if k == 's2_per_pmt_params':
-        resource_config[k] = osp.join('https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/'
-                         '4874cb458afcdc8f230464f1aa5bbe86cc1bc6ca/fax_files', resource_config[k])
+                         'master/fax_files', resource_config[k])
 
 class Resource(object):
     # The private nested inner class __Resource would only be instantiate once 
