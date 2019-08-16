@@ -5,7 +5,7 @@ from .utils import get_resource
 
 resource_config = {
     'photon_area_distribution': 'XENON1T_spe_distributions.csv',
-    's1_light_yield_map':       'XENON1T_s1_xyz_ly_kr83m_SR2_pax-6101_fdc-3d_v1.3.json',
+    's1_light_yield_map':       'XENON1T_s1_xyz_ly_kr83m_SR1_pax-680_fdc-3d_v0.json',
     's1_pattern_map':           'XENON1T_s1_xyz_patterns_interp_corrected_MCv2.1.0.json.gz',
     's2_light_yield_map':       'XENON1T_s2_xy_ly_SR1_v3.2.json',
     's2_pattern_map':           'XENON1T_s2_xy_patterns_top_corrected_MCv2.4.1.json.gz',
