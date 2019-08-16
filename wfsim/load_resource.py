@@ -19,30 +19,42 @@ for k in resource_config:
     resource_config[k] = osp.join('/project2/lgrandi/zhut/sim/WFSimDev', resource_config[k])
 
 class Resource(object):
+    # The private nested inner class __Resource would only be instantiate once 
+
+    class __Resource(object):
+
+        def __init__(self, config={}):
+            self.config = resource_config
+            self.config.update(config)
+
+            # Pulse
+            self.photon_area_distribution = get_resource(self.config['photon_area_distribution'], fmt='csv')
+
+            # S1
+            self.s1_light_yield_map = itp_map(self.config['s1_light_yield_map'])
+            self.s1_pattern_map = itp_map(self.config['s1_pattern_map'])
+
+            # S2
+            self.s2_light_yield_map = itp_map(self.config['s2_light_yield_map'])
+            self.s2_per_pmt_params = get_resource(self.config['s2_per_pmt_params'], fmt='csv')
+
+            # Electron After Pulses
+            # self.uniform_to_ele_ap = get_resource(self.config['ele_ap_cdfs'], fmt='npy')
+
+            # Electron After Pulses compressed, haven't figure out how pkl.gz works
+            self.uniform_to_ele_ap = get_resource(self.config['ele_ap_pdfs'], fmt='pkl.gz')
+
+            # Photon After Pulses
+            self.uniform_to_pmt_ap = get_resource(self.config['photon_ap_cdfs'], fmt='npy_pickle').item()
+
+            # Noise sample
+            self.noise_data = get_resource(self.config['noise_file'], fmt='npy')['arr_0'].flatten()
+        
+    instance = None
+    
     def __init__(self, config={}):
-        self.config = resource_config
-        self.config.update(config)
-
-        # Pulse
-        self.photon_area_distribution = get_resource(self.config['photon_area_distribution'], fmt='csv')
-
-        # S1
-        self.s1_light_yield_map = itp_map(self.config['s1_light_yield_map'])
-        self.s1_pattern_map = itp_map(self.config['s1_pattern_map'])
-
-        # S2
-        self.s2_light_yield_map = itp_map(self.config['s2_light_yield_map'])
-        self.s2_per_pmt_params = get_resource(self.config['s2_per_pmt_params'], fmt='csv')
-
-        # Electron After Pulses
-        # self.uniform_to_ele_ap = get_resource(self.config['ele_ap_cdfs'], fmt='npy')
-
-        # Electron After Pulses compressed, haven't figure out how pkl.gz works
-        self.uniform_to_ele_ap = get_resource(self.config['ele_ap_pdfs'], fmt='pkl.gz')
-
-        # Photon After Pulses
-        self.uniform_to_pmt_ap = get_resource(self.config['photon_ap_cdfs'], fmt='npy_pickle').item()
-        
-        # Noise sample
-        self.noise_data = get_resource(self.config['noise_file'], fmt='npy')['arr_0'].flatten()
-        
+        if not Resource.instance:
+            Resource.instance = Resource.__Resource(config)
+    
+    def __getattr__(self, name):
+        return getattr(self.instance, name)

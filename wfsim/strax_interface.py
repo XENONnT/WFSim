@@ -12,7 +12,6 @@ import strax
 from straxen.common import get_resource, get_to_pe
 
 from .utils import InterpolatingMap
-from .utils import get_resource as get_res
 from .core import Peak, RawRecord
 
 export, __all__ = strax.exporter()
@@ -229,7 +228,7 @@ class FaxSimulatorPlugin(strax.Plugin):
 
     def setup(self):
         c = self.config
-        c.update(get_res(c['fax_config'], fmt='json'))
+        c.update(get_resource(c['fax_config'], fmt='json'))
 
         # Gains
         c['to_pe'] = self.to_pe = get_to_pe(self.run_id, c['to_pe_file'])

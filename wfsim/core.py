@@ -10,8 +10,6 @@ from straxen import units
 import strax
 
 from .load_resource import Resource
-res = Resource()
-
 export, __all__ = strax.exporter()
 
 log = logging.getLogger('SimulationCore')
@@ -23,7 +21,7 @@ class Pulse(object):
 
     def __init__(self, config):
         self.config = config
-        self.resource = res
+        self.resource = Resource()
 
         self.init_pmt_current_templates()
         self.init_spe_scaling_factor_distributions()
@@ -694,7 +692,7 @@ class RawRecord(object):
             pmt_ap=Afterpulse_PMT(config),
          )
 
-        self.resource = res
+        self.resource = Resource()
         self.ptypes = self.pulses.keys()
 
     def __call__(self, instruction):
