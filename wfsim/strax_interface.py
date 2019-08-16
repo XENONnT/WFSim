@@ -11,9 +11,9 @@ from scipy.interpolate import interp1d
 import strax
 from straxen.common import get_resource, get_to_pe
 
-from utils import InterpolatingMap
-from utils import get_resource as get_res
-from core import Peak, RawRecord
+from .utils import InterpolatingMap
+from .utils import get_resource as get_res
+from .core import Peak, RawRecord
 
 export, __all__ = strax.exporter()
 __all__ += ['inst_dtype','truth_extra_dtype']

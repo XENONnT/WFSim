@@ -9,7 +9,7 @@ import numpy.lib.recfunctions as rfn
 from straxen import units
 import strax
 
-from load_resource import Resource
+from .load_resource import Resource
 res = Resource()
 
 export, __all__ = strax.exporter()
