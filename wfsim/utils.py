@@ -33,6 +33,7 @@ def get_resource(x, fmt='text'):
         # to prevent repeated downloads.
         cache_fn = strax.utils.deterministic_hash(x)
         cache_folders = ['./resource_cache',
+                         '/tmp/straxen_resource_cache',
                          '/dali/lgrandi/strax/resource_cache']
         for cache_folder in cache_folders:
             try:
@@ -95,7 +96,6 @@ def get_resource(x, fmt='text'):
         result = pd.read_csv(x)
     elif fmt == 'hdf':
         result = pd.read_hdf(x)
-
     return result
 
 import pandas as pd
