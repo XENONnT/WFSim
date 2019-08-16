@@ -31,7 +31,8 @@ def get_resource(x, fmt='text'):
     if '://' in x:
         # Web resource; look first in on-disk cache
         # to prevent repeated downloads.
-        cache_fn = strax.utils.deterministic_hash(x)
+        #cache_fn = strax.utils.deterministic_hash(x)
+        cache_fn = x.split('/')[-1]
         cache_folders = ['./resource_cache',
                          '/tmp/straxen_resource_cache',
                          '/dali/lgrandi/strax/resource_cache']
