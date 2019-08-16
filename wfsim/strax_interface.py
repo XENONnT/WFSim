@@ -210,7 +210,8 @@ class RawRecordsSimulator(object):
     strax.Option('to_pe_file',
         default='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/master/to_pe.npy',
         help='link to the to_pe conversion factors'),
-    strax.Option('fax_config', default='/project2/lgrandi/zhut/sim/WFSimDev/fax_config.json'),
+    strax.Option('fax_config', 
+        default='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/master/fax_files/fax_config.json'),
 )
 class FaxSimulatorPlugin(strax.Plugin):
     depends_on = tuple()
