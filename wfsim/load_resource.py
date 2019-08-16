@@ -12,12 +12,15 @@ resource_config = {
     's2_per_pmt_params':        'Kr83m_Ddriven_per_pmt_params_dataframe.csv',
     'ele_ap_cdfs':              'ele_after_pulse.npy',
     'ele_ap_pdfs':              'x1t_se_afterpulse_delaytiXme.pkl.gz',
-    'photon_ap_cdfs':           'pmt_after_pulse_v2.npy',
+    'photon_ap_cdfs':           'x1t_pmt_afterpulse_config.pkl.gz',
     'noise_file':               'x1t_noise_170203_0850_00_small.npz',
 }
 for k in resource_config:
     resource_config[k] = osp.join('https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/'
                          'b5ddb62b7f8308181b5c82a33de5982bac1835df/fax_files', resource_config[k])
+    if k == 's2_per_pmt_params':
+        resource_config[k] = osp.join('https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/'
+                         '4874cb458afcdc8f230464f1aa5bbe86cc1bc6ca/fax_files', resource_config[k])
 
 class Resource(object):
     # The private nested inner class __Resource would only be instantiate once 
