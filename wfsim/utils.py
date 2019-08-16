@@ -14,6 +14,7 @@ from scipy.spatial import cKDTree
 
 import numpy as np
 import json, gzip
+import pickle
 
 cache_dict = dict()
 
@@ -72,7 +73,9 @@ def get_resource(x, fmt='text'):
 
     # File resource
     if fmt == 'npy':
-        result = np.load(x, allow_pickle=True).item()
+        result = np.load(x)
+    if fmt == 'npy_pickle':
+        result = np.load(x, allow_pickle=True)
     elif fmt == 'binary':
         with open(x, mode='rb') as f:
             result = f.read()
@@ -85,6 +88,9 @@ def get_resource(x, fmt='text'):
     elif fmt == 'json.gz':
         with gzip.open(x, 'rb') as f:
             result = json.load(f)
+    elif fmt == 'pkl.gz':
+        with gzip.open(x, 'rb') as f:
+            result = pickle.load(f)
     elif fmt == 'csv':
         result = pd.read_csv(x)
     elif fmt == 'hdf':
@@ -190,9 +196,12 @@ class InterpolatingMap(object):
     def __init__(self, data):
         self.log = logging.getLogger('InterpolatingMap')
 
-        if isinstance(data, bytes):
-            data = gzip.decompress(data).decode()
-        self.data = json.loads(data)
+        if data.endswith('.gz'):
+            data_file = gzip.open(data).read()
+            self.data = json.loads(data_file.decode())
+        else:
+            with open(data) as data_file:
+                self.data = json.load(data_file)
 
         self.coordinate_system = cs = self.data['coordinate_system']
         if not len(cs):
