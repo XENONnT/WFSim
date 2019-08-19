@@ -7,11 +7,11 @@ resource_config = {
     'photon_area_distribution': 'XENON1T_spe_distributions.csv',
     's1_light_yield_map':       'XENON1T_s1_xyz_ly_kr83m_SR1_pax-680_fdc-3d_v0.json',
     's1_pattern_map':           'XENON1T_s1_xyz_patterns_interp_corrected_MCv2.1.0.json.gz',
-    's2_light_yield_map':       'XENON1T_s2_xy_ly_SR1_v3.2.json',
-    's2_pattern_map':           'XENON1T_s2_xy_patterns_top_corrected_MCv2.4.1.json.gz',
+    's2_light_yield_map':       'XENON1T_s2_xy_ly_SR1_v2.2.json',
+    's2_pattern_map':           'XENON1T_s2_xy_patterns_top_corrected_MCv2.1.0.json.gz',
     's2_per_pmt_params':        'Kr83m_Ddriven_per_pmt_params_dataframe.csv',
     'ele_ap_cdfs':              'ele_after_pulse.npy',
-    'ele_ap_pdfs':              'x1t_se_afterpulse_delaytiXme.pkl.gz',
+    'ele_ap_pdfs':              'x1t_se_afterpulse_delaytime.pkl.gz',
     'photon_ap_cdfs':           'x1t_pmt_afterpulse_config.pkl.gz',
     'noise_file':               'x1t_noise_170203_0850_00_small.npz',
 }
@@ -46,7 +46,7 @@ class Resource(object):
             self.uniform_to_ele_ap = get_resource(self.config['ele_ap_pdfs'], fmt='pkl.gz')
 
             # Photon After Pulses
-            self.uniform_to_pmt_ap = get_resource(self.config['photon_ap_cdfs'], fmt='npy_pickle').item()
+            self.uniform_to_pmt_ap = get_resource(self.config['photon_ap_cdfs'], fmt='pkl.gz')
 
             # Noise sample
             self.noise_data = get_resource(self.config['noise_file'], fmt='npy')['arr_0'].flatten()
