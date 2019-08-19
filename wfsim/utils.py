@@ -14,6 +14,7 @@ from scipy.spatial import cKDTree
 
 import numpy as np
 import json, gzip
+import pickle
 
 cache_dict = dict()
 
@@ -30,8 +31,10 @@ def get_resource(x, fmt='text'):
     if '://' in x:
         # Web resource; look first in on-disk cache
         # to prevent repeated downloads.
-        cache_fn = strax.utils.deterministic_hash(x)
+        #cache_fn = strax.utils.deterministic_hash(x)
+        cache_fn = x.split('/')[-1]
         cache_folders = ['./resource_cache',
+                         '/tmp/straxen_resource_cache',
                          '/dali/lgrandi/strax/resource_cache']
         for cache_folder in cache_folders:
             try:
@@ -72,7 +75,9 @@ def get_resource(x, fmt='text'):
 
     # File resource
     if fmt == 'npy':
-        result = np.load(x, allow_pickle=True).item()
+        result = np.load(x)
+    if fmt == 'npy_pickle':
+        result = np.load(x, allow_pickle=True)
     elif fmt == 'binary':
         with open(x, mode='rb') as f:
             result = f.read()
@@ -85,11 +90,13 @@ def get_resource(x, fmt='text'):
     elif fmt == 'json.gz':
         with gzip.open(x, 'rb') as f:
             result = json.load(f)
+    elif fmt == 'pkl.gz':
+        with gzip.open(x, 'rb') as f:
+            result = pickle.load(f)
     elif fmt == 'csv':
         result = pd.read_csv(x)
     elif fmt == 'hdf':
         result = pd.read_hdf(x)
-
     return result
 
 import pandas as pd
@@ -187,12 +194,9 @@ class InterpolatingMap(object):
     """
     data_field_names = ['timestamp', 'description', 'coordinate_system',
                     'name', 'irregular']
-    def __init__(self, data):
+    def __init__(self, data, fmt):
         self.log = logging.getLogger('InterpolatingMap')
-
-        if isinstance(data, bytes):
-            data = gzip.decompress(data).decode()
-        self.data = json.loads(data)
+        self.data = get_resource(data, fmt)
 
         self.coordinate_system = cs = self.data['coordinate_system']
         if not len(cs):

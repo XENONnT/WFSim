@@ -9,6 +9,7 @@ import numpy.lib.recfunctions as rfn
 from straxen import units
 import strax
 
+from .load_resource import Resource
 export, __all__ = strax.exporter()
 
 log = logging.getLogger('SimulationCore')
@@ -20,11 +21,13 @@ class Pulse(object):
 
     def __init__(self, config):
         self.config = config
+        self.resource = Resource()
 
         self.init_pmt_current_templates()
-        self.clear_pulse_cache()
-
+        self.init_spe_scaling_factor_distributions()
         self.turned_off_pmts = np.arange(len(config['gains']))[np.array(config['gains']) == 0]
+        
+        self.clear_pulse_cache()
 
     def __call__(self):
         """
@@ -69,16 +72,15 @@ class Pulse(object):
             # Sample from spe scaling factor distribution and to individual gain
             if '_photon_gains' not in self.__dict__:
                 _channel_photon_gains = self.config['gains'][channel] \
-                                        * self.config['uniform_to_pe_arr'][channel](
-                    np.random.random(len(_channel_photon_timings)))
+                    * self.uniform_to_pe_arr[channel](np.random.random(len(_channel_photon_timings)))
+
                 # Effectively adding double photoelectron emission by doubling gain
                 n_double_pe = np.random.binomial(len(_channel_photon_timings),
                                                  p=self.config['p_double_pe_emision'])
                 _dpe_index = np.random.choice(np.arange(len(_channel_photon_timings)),
                                               size=n_double_pe, replace=False)
                 _channel_photon_gains[_dpe_index] += self.config['gains'][channel] \
-                                                     * self.config['uniform_to_pe_arr'][channel](
-                    np.random.random(n_double_pe))
+                    * self.uniform_to_pe_arr[channel](np.random.random(n_double_pe))
             else:
                 _channel_photon_gains = np.array(self._photon_gains[self._photon_channels == channel])
 
@@ -135,7 +137,28 @@ class Pulse(object):
         self._pmt_current_templates = np.array(templates)
         log.debug('Create spe waveform templates with %s ns resolution' % pmt_pulse_time_rounding)
 
+    def init_spe_scaling_factor_distributions(self):
+        # Extract the spe pdf from a csv file into a pandas dataframe
+        spe_shapes = self.resource.photon_area_distribution
 
+        # Create a converter array from uniform random numbers to SPE gains (one interpolator per channel)
+        # Scale the distributions so that they have an SPE mean of 1 and then calculate the cdf
+        uniform_to_pe_arr = []
+        for ch in spe_shapes.columns[1:]:  # skip the first element which is the 'charge' header
+            if spe_shapes[ch].sum() > 0:
+                mean_spe = (spe_shapes['charge'] * spe_shapes[ch]).sum() / spe_shapes[ch].sum()
+                scaled_bins = spe_shapes['charge'] / mean_spe
+                cdf = np.cumsum(spe_shapes[ch]) / np.sum(spe_shapes[ch])
+            else:
+                # if sum is 0, just make some dummy axes to pass to interpolator
+                cdf = np.linspace(0, 1, 10)
+                scaled_bins = np.zeros_like(cdf)
+
+            uniform_to_pe_arr.append(interp1d(cdf, scaled_bins))
+        if uniform_to_pe_arr != []:
+            self.uniform_to_pe_arr = np.array(uniform_to_pe_arr)
+
+        log.debug('Initialize spe scaling factor distributions')
 
     def clear_pulse_cache(self):
         self._pulses = []
@@ -195,7 +218,7 @@ class S1(Pulse):
 
     def __call__(self, instruction):
         _, _, t, x, y, z, n_photons, recoil_type = instruction  # temporary solution for instruction passing
-        ly = self.config['s1_light_map']([[x, y, z]]) * self.config['s1_detection_efficiency']
+        ly = self.resource.s1_light_yield_map([[x, y, z]]) * self.config['s1_detection_efficiency']
         n_photons = np.random.binomial(n=n_photons, p=ly)
 
         self.photon_timings(t, n_photons, recoil_type)
@@ -210,7 +233,7 @@ class S1(Pulse):
             return 0
 
         channels = np.array(self.config['channels_in_detector']['tpc'])
-        p_per_channel = self.config['s1_pattern_map'](points)[0]
+        p_per_channel = self.resource.s1_pattern_map(points)[0]
         p_per_channel[np.in1d(channels, self.turned_off_pmts)] = 0
         p_per_channel /= np.sum(p_per_channel)
 
@@ -291,7 +314,7 @@ class S2(Pulse):
         self._photon_channels = np.array([])
 
         positions = np.array([x, y]).T  # For map interpolation
-        sc_gain = self.config['s2_light_map'](positions) * self.config['s2_secondary_sc_gain']
+        sc_gain = self.resource.s2_light_yield_map(positions) * self.config['s2_secondary_sc_gain']
 
         # Average drift time of the electrons
         self.drift_time_mean = - z / \
@@ -427,7 +450,12 @@ class S2(Pulse):
         self._photon_channels = self._photon_channels.astype(int)
 
     def s2_pattern_map_pp(self, pos):
-        amp0, amp1, tao0, tao1, pmtx, pmty = self.config['params']
+        if 'params' not in self.__dict__:
+            all_map_params = self.resource.s2_per_pmt_params
+            self.params = all_map_params.loc[all_map_params.kr_run_id == 10,
+                                             ['amp0', 'amp1', 'tao0', 'tao1', 'pmtx', 'pmty']].values.T
+
+        amp0, amp1, tao0, tao1, pmtx, pmty = self.params
 
         def rms(x, y): return np.sqrt(np.square(x) + np.square(y))
 
@@ -464,7 +492,7 @@ class Afterpulse_Electron(S2):
         """
         For electron afterpulses we assume a uniform x, y
         """
-        delaytime_pmf_hist = self.config['uniform_to_ele_ap']
+        delaytime_pmf_hist = self.resource.uniform_to_ele_ap
 
         # To save calculation we first find out how many photon will give rise ap
         n_electron = np.random.poisson(delaytime_pmf_hist.n
@@ -511,8 +539,6 @@ class Afterpulse_PMT(Pulse):
 
     def __init__(self, config):
         super().__init__(config)
-        self.element_list = ['Uniform', 'Ar', 'CH4', 'He', 'N2', 'Ne', 'Xe', 'Xe2+']
-
 
     def __call__(self, signal_pulse):
         if len(signal_pulse._photon_timings) == 0:
@@ -529,9 +555,10 @@ class Afterpulse_PMT(Pulse):
         """
         For pmt afterpulses, gain and dpe generation is a bit different from standard photons
         """
+        self.element_list = self.resource.uniform_to_pmt_ap.keys()
         for element in self.element_list:
-            delaytime_cdf = self.config['uniform_to_pmt_ap'][element]['delaytime_cdf']
-            amplitude_cdf = self.config['uniform_to_pmt_ap'][element]['delaytime_cdf']
+            delaytime_cdf = self.resource.uniform_to_pmt_ap[element]['delaytime_cdf']
+            amplitude_cdf = self.resource.uniform_to_pmt_ap[element]['amplitude_cdf']
 
             # Assign each photon two random uniform number rU0, rU1 from (0, 1]
             rU0 = 1 - np.random.uniform(size=len(signal_pulse._photon_timings))
@@ -665,6 +692,7 @@ class RawRecord(object):
             pmt_ap=Afterpulse_PMT(config),
          )
 
+        self.resource = Resource()
         self.ptypes = self.pulses.keys()
 
     def __call__(self, instruction):
@@ -773,9 +801,9 @@ class RawRecord(object):
         Get chunk(s) of noise sample from real noise data
         """
         # Randomly choose where in to start copying
-        real_data_sample_size = len(self.config['noise_data'])
+        real_data_sample_size = len(self.resource.noise_data)
         id_t = np.random.randint(0, real_data_sample_size - len(records) )
-        data = self.config['noise_data']
+        data = self.resource.noise_data
         result = data[id_t:id_t + len(records)]
 
         return result

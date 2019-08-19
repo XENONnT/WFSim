@@ -8,7 +8,6 @@ import pandas as pd
 from scipy.interpolate import interp1d
 
 
-
 import strax
 from straxen.common import get_resource, get_to_pe
 
@@ -52,29 +51,6 @@ def rand_instructions(n=10):
     instructions['recoil'] = ['er' for i in range(n * 2)]
 
     return instructions
-
-
-@export
-def init_spe_scaling_factor_distributions(file):
-    # Extract the spe pdf from a csv file into a pandas dataframe
-    spe_shapes = pd.read_csv(file)
-
-    # Create a converter array from uniform random numbers to SPE gains (one interpolator per channel)
-    # Scale the distributions so that they have an SPE mean of 1 and then calculate the cdf
-    uniform_to_pe_arr = []
-    for ch in spe_shapes.columns[1:]:  # skip the first element which is the 'charge' header
-        if spe_shapes[ch].sum() > 0:
-            mean_spe = (spe_shapes['charge'] * spe_shapes[ch]).sum() / spe_shapes[ch].sum()
-            scaled_bins = spe_shapes['charge'] / mean_spe
-            cdf = np.cumsum(spe_shapes[ch]) / np.sum(spe_shapes[ch])
-        else:
-            # if sum is 0, just make some dummy axes to pass to interpolator
-            cdf = np.linspace(0, 1, 10)
-            scaled_bins = np.zeros_like(cdf)
-
-        uniform_to_pe_arr.append(interp1d(cdf, scaled_bins))
-    if uniform_to_pe_arr != []:
-        return uniform_to_pe_arr
 
 
 @export
@@ -234,31 +210,8 @@ class RawRecordsSimulator(object):
     strax.Option('to_pe_file',
         default='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/master/to_pe.npy',
         help='link to the to_pe conversion factors'),
-    strax.Option('s1_light_yield_map',default='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/master/'
-                                              'fax_files/XENON1T_s1_xyz_ly_kr83m_SR1_pax-680_fdc-3d_v0.json'),
-    strax.Option('s1_pattern_map',default='https://github.com/XENONnT/strax_auxiliary_files/blob/master/'
-                                          'fax_files/XENON1T_s1_xyz_patterns_interp_corrected_MCv2.1.0.json.gz?raw=true'),
-    strax.Option('s2_light_yield_map',default='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/master/'
-                                              'fax_files/XENON1T_s2_xy_ly_SR1_v2.2.json'),
-    strax.Option('s2_pattern_map',default='https://github.com/XENONnT/strax_auxiliary_files/blob/master/'
-                                          'fax_files/XENON1T_s2_xy_patterns_top_corrected_MCv2.1.0.json.gz?raw=true'),
-    strax.Option('fax_config', default='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/master'
-                                       '/fax_files/fax_config.json'),
-    strax.Option('phase', default='liquid'),
-    strax.Option('ele_afterpulse_file',
-                 default='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/'
-                         'b5ddb62b7f8308181b5c82a33de5982bac1835df/fax_files/x1t_se_afterpulse_delaytime.pkl.gz'),
-    strax.Option('pmt_afterpulse_file',
-                 default='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/'
-                         'b5ddb62b7f8308181b5c82a33de5982bac1835df/fax_files/x1t_pmt_afterpulse_config.pkl.gz'),
-    strax.Option('spe_file',
-                 default='https://github.com/XENONnT/strax_auxiliary_files/blob/master/fax_files/XENON1T_spe_distributions.csv?raw=true'),
-    strax.Option('noise_file',
-                 default='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/'
-                         'b5ddb62b7f8308181b5c82a33de5982bac1835df/fax_files/170203_0850_00_small.npz'),
-    strax.Option('kr83m_map',
-                 default='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/'
-                         '4874cb458afcdc8f230464f1aa5bbe86cc1bc6ca/fax_files/Kr83m_Ddriven_per_pmt_params_dataframe.pkl'),
+    strax.Option('fax_config', 
+        default='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/master/fax_files/fax_config.json'),
 )
 class FaxSimulatorPlugin(strax.Plugin):
     depends_on = tuple()
@@ -280,36 +233,6 @@ class FaxSimulatorPlugin(strax.Plugin):
 
         # Gains
         c['to_pe'] = self.to_pe = get_to_pe(self.run_id, c['to_pe_file'])
-
-        # Per-PMT single-PE distributions
-        c['uniform_to_pe_arr'] = init_spe_scaling_factor_distributions(
-            c['spe_file'])
-
-        # PMT afterpulses
-        c['uniform_to_pmt_ap'] = pickle.loads(gzip.decompress(get_resource(
-            c['pmt_afterpulse_file'], fmt='binary')))
-
-        # Single-electron "afterpulses" (photoionization / delayed extraction)
-        c['uniform_to_ele_ap'] = pickle.loads(gzip.decompress(get_resource(
-            c['ele_afterpulse_file'], fmt='binary')))
-
-        # Real per-channel noise data
-        c['noise_data'] = get_resource(
-            c['noise_file'], fmt='npy')['arr_0'].flatten()
-
-        # Something?
-        all_params = get_resource(c['kr83m_map'], fmt='npy_pickle')
-        c['params'] = all_params.loc[
-            all_params.kr_run_id == 10,   # ???
-            ['amp0', 'amp1', 'tao0', 'tao1', 'pmtx', 'pmty']].values.T
-
-        # Light distribution maps
-        for si in [1, 2]:
-            c[f's{si}_light_map'] = InterpolatingMap(
-                get_resource(c[f's{si}_light_yield_map']))
-            c[f's{si}_pattern_map'] = InterpolatingMap(
-                get_resource(c[f's{si}_pattern_map'],
-                             fmt='binary'))
 
         if c['fax_file']:
             self.instructions = instruction_from_csv(c['fax_file'])
