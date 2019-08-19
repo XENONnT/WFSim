@@ -21,6 +21,7 @@ class Pulse(object):
 
     def __init__(self, config):
         self.config = config
+        self.config.update(getattr(self.config, self.__class__.__name__, {}))
         self.resource = Resource()
 
         self.init_pmt_current_templates()
@@ -51,6 +52,8 @@ class Pulse(object):
             return
 
         dt = self.config.get('sample_duration', 10)
+        self._n_double_pe = 0
+        self._n_double_pe_bot = 0
         pulse_start = np.floor(np.min(self._photon_timings) / dt) - int(self.config['samples_before_pulse_center'])
         pulse_end = np.floor(np.max(self._photon_timings) / dt) + int(self.config['samples_before_pulse_center'])
         pulse_length = pulse_end - pulse_start + 23 #This is the length of a pulse current
@@ -59,8 +62,10 @@ class Pulse(object):
                                                             ('left', np.int64), ('right', np.int64),
                                                             ('duration', np.int64), ('current', np.float64, int(pulse_length))])
 
-        for ix, channel in enumerate(np.unique(self._photon_channels)):
-            _channel_photon_timings = self._photon_timings[self._photon_channels == channel]
+        counts_start = 0
+        for channel, counts in zip(*np.unique(self._photon_channels, return_counts=True)):
+            _channel_photon_timings = self._photon_timings[counts_start:counts_start+counts]
+            counts_start += counts
 
             # Compute sample index（quotient）and reminder
             # Determined by division between photon timing and sample duraiton.
@@ -96,12 +101,12 @@ class Pulse(object):
                               self._pmt_current_templates, self._template_length,
                               pulse_current)
 
-            pulses[ix]['photons'] = len(_channel_photon_timings)
-            pulses[ix]['channel'] = channel
-            pulses[ix]['left'] = pulse_left
-            pulses[ix]['right'] = pulse_right
-            pulses[ix]['duration'] = pulse_right - pulse_left + 1
-            pulses[ix]['current'][:pulse_right - pulse_left + 1] = pulse_current
+            pulses[channel]['photons'] = len(_channel_photon_timings)
+            pulses[channel]['channel'] = channel
+            pulses[channel]['left'] = pulse_left
+            pulses[channel]['right'] = pulse_right
+            pulses[channel]['duration'] = pulse_right - pulse_left + 1
+            pulses[channel]['current'][:pulse_right - pulse_left + 1] = pulse_current
         self._pulses = pulses
 
     def init_pmt_current_templates(self):
@@ -560,31 +565,35 @@ class Afterpulse_PMT(Pulse):
             delaytime_cdf = self.resource.uniform_to_pmt_ap[element]['delaytime_cdf']
             amplitude_cdf = self.resource.uniform_to_pmt_ap[element]['amplitude_cdf']
 
-            # Assign each photon two random uniform number rU0, rU1 from (0, 1]
+            # Assign each photon FRIST random uniform number rU0 from (0, 1] for timing
             rU0 = 1 - np.random.uniform(size=len(signal_pulse._photon_timings))
-            rU1 = 1 - np.random.uniform(size=len(signal_pulse._photon_timings))
 
             # Select those photons with U <= max of cdf of specific channel
             sel_photon_id = np.where(rU0 <= delaytime_cdf[signal_pulse._photon_channels, -1])[0]
+            if len(sel_photon_id) == 0: continue
             sel_photon_channel = signal_pulse._photon_channels[sel_photon_id]
 
-            # The map is made so that the indices are delay time in unit of ns
-            ap_delay = np.argmin(
-                np.abs(
-                    delaytime_cdf[sel_photon_channel]
-                    - rU0[sel_photon_id][:, None]), axis=-1)
+            # Assign selected photon SECOND random uniform number rU1 from (0, 1] for amplitude
+            rU1 = 1 - np.random.uniform(size=len(sel_photon_id))
 
-            if element == 'Uniform':
+            # The map is made so that the indices are delay time in unit of ns
+            if 'Uniform' in element:
+                ap_delay = np.random.uniform(delaytime_cdf[sel_photon_channel, 0], 
+                    delaytime_cdf[sel_photon_channel, 1])                
                 ap_amplitude = np.ones_like(ap_delay)
             else:
+                ap_delay = np.argmin(
+                    np.abs(
+                        delaytime_cdf[sel_photon_channel]
+                        - rU0[sel_photon_id][:, None]), axis=-1)
                 ap_amplitude = np.argmin(
                     np.abs(
                         amplitude_cdf[sel_photon_channel]
-                        - rU1[sel_photon_id][:, None]), axis=-1)/100.
+                        - rU1[:, None]), axis=-1)/100.
 
-            self._photon_timings += list(signal_pulse._photon_timings[sel_photon_id] + ap_delay)
-            self._photon_channels += list(signal_pulse._photon_channels[sel_photon_id])
-            self._photon_amplitude += list(ap_amplitude)
+            self._photon_timings += (signal_pulse._photon_timings[sel_photon_id] + ap_delay).tolist()
+            self._photon_channels += signal_pulse._photon_channels[sel_photon_id].tolist()
+            self._photon_amplitude += np.atleast_1d(ap_amplitude).tolist()
 
         self._photon_timings = np.array(self._photon_timings)
         self._photon_channels = np.array(self._photon_channels).astype(int)
