@@ -8,9 +8,9 @@ import numpy as np
 import pandas as pd
 
 import strax
+from straxen.common import get_resource
 
 from .core import RawData
-from .utils import get_resource
 
 export, __all__ = strax.exporter()
 __all__ += ['instruction_dtype', 'truth_extra_dtype']
@@ -205,8 +205,6 @@ class FaxSimulatorPlugin(strax.Plugin):
 
         else:
             self.instructions = rand_instructions(c)
-
-        self._setup_simulator()
 
     def _sort_check(self, result):
         if result['time'][0] < self.last_chunk_time + 5000:
