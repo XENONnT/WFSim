@@ -1,56 +1,54 @@
-import gzip
 import logging
+import time
 import pickle
 import uproot
 import nestpy
-from tqdm import tqdm
 
 import numpy as np
 import pandas as pd
-from scipy.interpolate import interp1d
-
 
 import strax
-from straxen.common import get_resource, get_to_pe
+from straxen.common import get_resource
 
-from .utils import InterpolatingMap
-from .core import Peak, RawRecord
+from .core import RawData
 
 export, __all__ = strax.exporter()
-__all__ += ['inst_dtype','truth_extra_dtype']
+__all__ += ['instruction_dtype', 'truth_extra_dtype']
+
+instruction_dtype = [('event_number', np.int), ('type', '<U2'), ('t', np.int), 
+    ('x', np.float32), ('y', np.float32), ('z', np.float32), 
+    ('amp', np.int), ('recoil', '<U2')]
+
+truth_extra_dtype = [('n_photon', np.float), ('n_electron', np.float),
+    ('t_first_photon', np.float), ('t_last_photon', np.float), 
+    ('t_mean_photon', np.float), ('t_sigma_photon', np.float), 
+    ('t_first_electron', np.float), ('t_last_electron', np.float), 
+    ('t_mean_electron', np.float), ('t_sigma_electron', np.float),]
 
 log = logging.getLogger('SimulationCore')
 
-inst_dtype = [('event_number', np.int), ('type', '<U2'), ('t', np.int), ('x', np.float32),
-                                          ('y', np.float32), ('z', np.float32), ('amp', np.int), ('recoil', '<U2')]
-
-truth_extra_dtype = [('n_photons', np.float),('t_mean_photons', np.float),('t_first_photons', np.float),
-                     ('t_last_photons', np.float),('t_sigma_photons', np.float),('n_electrons', np.float),
-                     ('t_mean_electrons', np.float),('t_first_electrons', np.float),
-                     ('t_last_electrons', np.float),('t_sigma_electrons', np.float),]
-
-def instruction_from_csv(file):
-    instructions = np.genfromtxt(file, delimiter = ',', dtype = inst_dtype)
-    return instructions
 
 @export
-def rand_instructions(n=10):
-    nelectrons = 10 ** (np.random.uniform(1, 3, n))
-
-    instructions = np.zeros(2 * n, dtype=  inst_dtype)
-
-    instructions['event_number'] = np.repeat(np.arange(n), 2)
+def rand_instructions(c):
+    n = c['nevents'] = c['event_rate'] * c['chunk_size'] * c['nchunk']
+    c['total_time'] = c['chunk_size'] * c['nchunk']
+    instructions = np.zeros(2 * n, dtype=instruction_dtype)
+    uniform_sampled_times = np.sort(np.random.uniform(0, c['total_time'], c['nevents']))
+    instructions['t'] = np.repeat(uniform_sampled_times, 2) * int(1e9)
+    instructions['event_number'] = np.digitize(instructions['t'], 
+         1e9 * np.arange(c['nchunk']) * c['chunk_size']) - 1
     instructions['type'] = np.tile(['s1', 's2'], n)
-    instructions['t'] = np.repeat(5.e7+5.e7*np.arange(n), 2)
+    instructions['recoil'] = ['er' for i in range(n * 2)]
+
     r = np.sqrt(np.random.uniform(0, 2500, n))
     t = np.random.uniform(-np.pi, np.pi, n)
-
     instructions['x'] = np.repeat(r * np.cos(t), 2)
     instructions['y'] = np.repeat(r * np.sin(t), 2)
     instructions['z'] = np.repeat(np.random.uniform(-100, 0, n), 2)
-    instructions['amp'] = np.vstack(
-        [np.random.uniform(10, 500, n), nelectrons]).T.flatten().astype(int)
-    instructions['recoil'] = ['er' for i in range(n * 2)]
+
+    nphotons = np.random.uniform(10, 500, n)
+    nelectrons = 10 ** (np.random.uniform(1, 3, n))
+    instructions['amp'] = np.vstack([nphotons, nelectrons]).T.flatten().astype(int)
 
     return instructions
 
@@ -97,165 +95,88 @@ def read_g4(file):
     return ins
 
 @export
-class PeakSimulator(object):
-
+class ChunkRawRecords(object):
     def __init__(self, config):
         self.config = config
-        self.peak = Peak(config)
+        self.rawdata = RawData(config)
+        self.record_buffer = np.zeros(500000, dtype=strax.record_dtype()) # 2*250 ms buffer
+        self.truth_buffer = np.zeros(1000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)]) # 500 s1 + 500 s2
 
-    def __call__(self, master_instruction):
-        m_inst = master_instruction
-
-        p = np.zeros(1, dtype=strax.peak_dtype(len(self.config['to_pe'])))
-        p['channel'] = -1
-        p['dt'] = self.config['sample_duration']
-
-        p_length = len(p['data'][0])
-        i = 0
-        ie = m_inst
-
-        # print(ie)
-        self.peak(ie)
-        truth = self.peak._truth
-        p[i]['time'] = ie['t'] + self.peak.start + self.peak.event_duration / 2.
-        swv_buffer_size = self.peak.event_duration
-        swv_buffer = np.zeros(swv_buffer_size,dtype=np.int32)
-        # Now we need to get the sumwaveform out of the data, we just copy a large part of sum_waveform
-        # Now we need to get the data out of the event into the peak
-        p[i]['area_per_channel'] = np.sum(self.peak._raw_data['pulse'],axis=1)*self.config['to_pe']
-
-        swv_buffer = np.sum(self.peak._raw_data['pulse']*
-                            np.tile(self.config['to_pe'],(self.peak.event_duration,1)).T, axis=0)
-
-        downs_f = int(np.ceil(swv_buffer_size / p_length))
-        if downs_f > 1:
-            #             # Compute peak length after downsampling.
-            #             # We floor rather than ceil here, potentially cutting off
-            #             # some samples from the right edge of the peak.
-            #             # If we would ceil, the peak could grow larger and
-            #             # overlap with a subsequent next peak, crashing strax later.
-            new_ns = p[i]['length'] = int(np.floor(swv_buffer_size / downs_f))
-            p[i]['data'][:new_ns] = \
-                swv_buffer[:new_ns * downs_f].reshape(-1, downs_f).sum(axis=1)
-            p[i]['dt'] *= downs_f
-        else:
-            p[i]['data'][:swv_buffer_size] = swv_buffer[:swv_buffer_size]
-            p[i]['length'] = swv_buffer_size
-        #
-        #         # Store the total area and saturation count
-        p[i]['area'] = np.sum(p[i]['area_per_channel'])
-        swv_buffer[:] = 0
-
-        strax.compute_widths(p)
-        sort_key = p['time'] - p['time'].min()
-        sort_i = np.argsort(sort_key)
-        p = p[sort_i]
-
-        return p, truth
-
-
-@export
-class RawRecordsSimulator(object):
-    def __init__(self, config):
-        self.config = config
-        self.record = RawRecord(config)
-        self.results = []
-        self.pulse_buffer = []
-        self.truth = []
-
-    def __call__(self, m_inst):
-
-        for ix, ie in enumerate(tqdm(m_inst, desc='Simulating raw records')):
-            # First keep track of in which event we are:
-            if not hasattr(self, 'event'):
-                self.event = ie['event_number']
-
-            if self.event != ie['event_number']:
-                yield self.fill_records(self.pulse_buffer)
-                self.event = ie['event_number']
-                self.pulse_buffer = []
-                self.truth = []
-
-            self.record(ie)
-            self.pulse_buffer.append(self.record._raw_data)
-            self.truth.append(self.record._truth)
-            if ix == len(m_inst)-1:
-                yield self.fill_records(self.pulse_buffer)
-                self.pulse_buffer = []
-                self.truth = []
-
-    def fill_records(self, p_b):
+    def __call__(self, instructions):
+        # Save the constants as privates
         samples_per_record = strax.DEFAULT_RECORD_LENGTH
+        buffer_length = len(self.record_buffer)
+        dt = self.config['sample_duration']
 
-        records_needed = np.sum([np.sum(pulses[i]['rec_needed']) for pulses in p_b for i in range(len(pulses))])
-        rr = np.zeros(int(records_needed),dtype = strax.record_dtype())
-        output_record_index = 0
+        chunk_i = record_j = 0 # Indices of chunk(event), record buffer
+        for channel, left, right, data in self.rawdata(instructions):
+            pulse_length = right - left + 1
+            records_needed = int(np.ceil(pulse_length / samples_per_record))
 
-        for pulses in p_b:
-            for i in range(len(pulses)):
-                for p in pulses[i]:
-                    p_length = p['right'] - p['left'] + 2 * self.config['trigger_window']
-                    n_records = int(np.ceil(p_length /  samples_per_record))
-                    for rec_i in range(n_records):
-                        if output_record_index == records_needed: #TODO this cannot be the right way to fix this.
-                            print(
-                                f'output_record_index: {output_record_index} is larger then the total records_needed: {records_needed}')
-                            log.info(f'output_record_index: {output_record_index} is larger then the total records_needed: {records_needed}')
-                            continue                                #Why is output_record_index, sometimes, larger then records needed?
-                        r = rr[output_record_index]
-                        r['channel'] = p['channel']
-                        r['dt'] = self.config['sample_duration']
-                        r['pulse_length'] = p_length
-                        r['record_i'] = rec_i
-                        r['time'] = (p['left']-self.config['trigger_window']) * r['dt'] + rec_i * samples_per_record * r['dt']
-                        if rec_i != n_records  -  1:
-                            #The pulse doesn't fit on one record, so store a full chunk
-                            n_store = samples_per_record
-                            assert p_length > samples_per_record * (rec_i + 1)
+            # Currently chunk is decided by instruction using event_number
+            # TODO: mimic daq strax insertor chunking
+            if instructions['event_number'][self.rawdata.instruction_index] > chunk_i:
+                yield self.final_results(record_j)
+                record_j = 0 # Reset record buffer
+                self.truth_buffer['fill'] = np.zeros_like(len(self.truth_buffer)) # Reset truth buffer
+                chunk_i = instructions['event_number'][self.rawdata.instruction_index]
 
-                        else:
-                            n_store = p_length - samples_per_record * rec_i
+            if record_j + records_needed > buffer_length:
+                log.Warning('Chunck size too large, insufficient record buffer')
+                yield self.final_results(record_j)
+                record_j = 0
+                self.truth_buffer['fill'] = np.zeros_like(len(self.truth_buffer))
+            
+            if record_j + records_needed > buffer_length:
+                log.Warning('Pulse length too large, insufficient record buffer, skipping pulse')
+                continue
 
-                        assert 0 <= n_store <= samples_per_record
-                        r['length'] = n_store
-                        offset = rec_i  * samples_per_record
+            # WARNING baseline and area fields are zeros before finish_results
+            s = slice(record_j, record_j + records_needed)
+            self.record_buffer[s]['channel'] = channel
+            self.record_buffer[s]['dt'] = dt
+            self.record_buffer[s]['time'] = dt * (left + samples_per_record * np.arange(records_needed))
+            self.record_buffer[s]['length'] = [min(pulse_length, samples_per_record * (i+1)) 
+                - samples_per_record * i for i in range(records_needed)]
+            self.record_buffer[s]['pulse_length'] = pulse_length
+            self.record_buffer[s]['record_i'] = np.arange(records_needed)
+            self.record_buffer[s]['data'] = np.pad(data, 
+                (0, records_needed * samples_per_record - pulse_length), 'constant').reshape((-1, samples_per_record))
 
-                        r['data'][:n_store] = p['pulse'][offset: offset + n_store]
-                        output_record_index +=1
+            record_j += records_needed
 
-        self.results.append(rr)
-        y = self.finish_results()
-        return y
+        yield self.final_results(record_j)
 
-    def finish_results(self):
-        records = np.concatenate(self.results)
-        truth = np.concatenate(self.truth)
-        # In strax data, records are always stored
-        # sorted, baselined and integrated
-        records = strax.sort_by_time(records)
+    def final_results(self, record_j):
+        records = self.record_buffer[:record_j] # Copy the records from buffer
+        records = strax.sort_by_time(records) # Must keep this for sorted output
         strax.baseline(records)
         strax.integrate(records)
-        # print("Returning %d records" % len(records))
-        self.results = []
-        return records, truth
 
+        _truth = self.truth_buffer[self.truth_buffer['fill']]
+        # Return truth without 'fill' field
+        truth = np.zeros(len(_truth), dtype=instruction_dtype + truth_extra_dtype)
+        for name in truth.dtype.names:
+            truth[name] = _truth[name]
+
+        return dict(raw_records=records, truth=truth)
+
+    def source_finished(self):
+        return self.rawdata.source_finished
 
 
 @strax.takes_config(
     strax.Option('fax_file', default=None, track=True,
                  help="Directory with fax instructions"),
-    strax.Option('nevents',default = 100,track=False,
-                help="Number of random events to generate if no instructions are provided"),
-    strax.Option('digitizer_trigger',default = 15,track=True,
-                 help="Minimum current in ADC to be measured by the digitizer in order to be written"),
-    strax.Option('trigger_window', default = 50, track=True,
-                 help='Digitizer trigger window'),
-    strax.Option('to_pe_file',
-        default='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/master/to_pe.npy',
-        help='link to the to_pe conversion factors'),
+    strax.Option('event_rate', default=5, track=False,
+                 help="Average number of events per second"),
+    strax.Option('chunk_size', default=5, track=False,
+                 help="Duration of each chunk in seconds"),
+    strax.Option('nchunk', default=4, track=False,
+                 help="Number of chunks to simulate"),
     strax.Option('fax_config', 
-        default='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/master/fax_files/fax_config.json'),
-)
+                 default='https://raw.githubusercontent.com/XENONnT/'
+                 'strax_auxiliary_files/master/fax_files/fax_config.json'),)
 class FaxSimulatorPlugin(strax.Plugin):
     depends_on = tuple()
 
@@ -274,9 +195,6 @@ class FaxSimulatorPlugin(strax.Plugin):
         c = self.config
         c.update(get_resource(c['fax_config'], fmt='json'))
 
-        # Gains
-        c['to_pe'] = self.to_pe = get_to_pe(self.run_id, c['to_pe_file'])
-
         if c['fax_file']:
             if c['fax_file'][-5:] == '.root':
                 self.instructions = read_g4(c['fax_file'])
@@ -286,76 +204,47 @@ class FaxSimulatorPlugin(strax.Plugin):
                 c['nevents'] = np.max(self.instructions['event_number'])
 
         else:
-            self.instructions = rand_instructions(c['nevents'])
-
-        self._setup_simulator()
+            self.instructions = rand_instructions(c)
 
     def _sort_check(self, result):
         if result['time'][0] < self.last_chunk_time + 5000:
             raise RuntimeError(
                 "Simulator returned chunks with insufficient spacing. "
-                f"Last chunk's max time was {result['time'][0]}, "
-                f"this chunk's first time is {self.last_chunk_time}.")
+                f"Last chunk's max time was {self.last_chunk_time}, "
+                f"this chunk's first time is {result['time'][0]}.")
         if np.diff(result['time']).min() < 0:
             raise RuntimeError("Simulator returned non-sorted records!")
         self.last_chunk_time = result['time'].max()
 
-    def source_finished(self):
-        return True
-
-
 @export
 class RawRecordsFromFax(FaxSimulatorPlugin):
-    provides = ('raw_records','truth')
+    provides = ('raw_records', 'truth')
+    data_kind = {k: k for k in provides}
+    dtype = dict(raw_records = strax.record_dtype(),
+                 truth = instruction_dtype + truth_extra_dtype,)
 
-    data_kind = dict(
-        raw_records='raw_records',
-        truth='truth',)
-
-    dtype = dict(
-        raw_records = strax.record_dtype(),
-        truth = inst_dtype + truth_extra_dtype)
-
-    def _setup_simulator(self):
-        self.sim_iter = RawRecordsSimulator(self.config)(self.instructions)
-
-    # This lets strax figure out when we are done making chunks
+    def setup(self):
+        super().setup()
+        self.sim = ChunkRawRecords(self.config)
+        self.sim_iter = self.sim(self.instructions)
+        
     def is_ready(self, chunk_i):
-        return chunk_i < self.config['nevents']
+        """Overwritten to mimic online input plugin.
+        Returns False to check source finished;
+        Returns True to get next chunk.
+        """
+        if 'ready' not in self.__dict__: self.ready = False
+        self.ready ^= True # Flip
+        return self.ready
+
+    def source_finished(self):
+        """Return whether all instructions has been used."""
+        return self.sim.source_finished()
 
     def compute(self, chunk_i):
         try:
-            result, t = next(self.sim_iter)
+            result = next(self.sim_iter)
         except StopIteration:
             raise RuntimeError("Bug in chunk count computation")
-        self._sort_check(result)
-        return dict(raw_records = result,
-                    truth = t)
-
-
-@export
-class PeaksFromFax(FaxSimulatorPlugin):
-    provides = ('peaks','truth')
-    data_kind = dict(
-        peaks = 'peaks',
-        truth = 'truth',)
-
-    def infer_dtype(self):
-        self.to_pe = get_to_pe(self.run_id, self.config['to_pe_file'])
-        truth_dtype = inst_dtype + truth_extra_dtype
-        return dict(
-            peaks = strax.peak_dtype(len(self.to_pe)),
-            truth = truth_dtype)
-
-    def _setup_simulator(self):
-        self.simulator = PeakSimulator(self.config)
-
-    # In this simulator 1 instruction = 1 chunk... not sure if this makes sense
-    def is_ready(self, chunk_i):
-        return chunk_i < len(self.instructions)
-
-    def compute(self, chunk_i):
-        result, t = self.simulator(self.instructions[chunk_i])
-        # self._sort_check(result)
-        return dict(peaks = result,
-                    truth = t)
+        self._sort_check(result['raw_records'])
+        return result

@@ -14,7 +14,7 @@ def test_sim():
         st = strax.Context(
             storage=tempdir,
             register=wfsim.RawRecordsFromFax,
-            config=dict(nevents=4),
+            config=dict(dict(nchunk=2, event_rate=1, chunk_size=5)),
             **straxen.contexts.common_opts)
 
         rr = st.get_array(run_id, 'raw_records')
