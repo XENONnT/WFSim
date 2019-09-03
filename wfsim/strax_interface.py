@@ -13,13 +13,13 @@ from .core import RawData
 from .utils import get_resource
 
 export, __all__ = strax.exporter()
-__all__ += ['inst_dtype', 'truth_extra_dtype']
+__all__ += ['instruction_dtype', 'truth_extra_dtype']
 
 instruction_dtype = [('event_number', np.int), ('type', '<U2'), ('t', np.int), 
     ('x', np.float32), ('y', np.float32), ('z', np.float32), 
     ('amp', np.int), ('recoil', '<U2')]
 
-sim_truth_dtype = [('n_photon', np.float), ('n_electron', np.float),
+truth_extra_dtype = [('n_photon', np.float), ('n_electron', np.float),
     ('t_first_photon', np.float), ('t_last_photon', np.float), 
     ('t_mean_photon', np.float), ('t_sigma_photon', np.float), 
     ('t_first_electron', np.float), ('t_last_electron', np.float), 
@@ -100,7 +100,7 @@ class ChunkRawRecords(object):
         self.config = config
         self.rawdata = RawData(config)
         self.record_buffer = np.zeros(500000, dtype=strax.record_dtype()) # 2*250 ms buffer
-        self.truth_buffer = np.zeros(1000, dtype=instruction_dtype + sim_truth_dtype + [('fill', bool)]) # 500 s1 + 500 s2
+        self.truth_buffer = np.zeros(1000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)]) # 500 s1 + 500 s2
 
     def __call__(self, instructions):
         # Save the constants as privates
@@ -155,7 +155,7 @@ class ChunkRawRecords(object):
 
         _truth = self.truth_buffer[self.truth_buffer['fill']]
         # Return truth without 'fill' field
-        truth = np.zeros(len(_truth), dtype=instruction_dtype + sim_truth_dtype)
+        truth = np.zeros(len(_truth), dtype=instruction_dtype + truth_extra_dtype)
         for name in truth.dtype.names:
             truth[name] = _truth[name]
 
@@ -221,7 +221,7 @@ class RawRecordsFromFax(FaxSimulatorPlugin):
     provides = ('raw_records', 'truth')
     data_kind = {k: k for k in provides}
     dtype = dict(raw_records = strax.record_dtype(),
-                 truth = instruction_dtype + sim_truth_dtype,)
+                 truth = instruction_dtype + truth_extra_dtype,)
 
     def setup(self):
         super().setup()
