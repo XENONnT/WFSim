@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from .load_resource import Resource
 from .utils import find_intervals_below_threshold, exporter
-import .units
+from . import units
 
 export, __all__ = exporter()
 
