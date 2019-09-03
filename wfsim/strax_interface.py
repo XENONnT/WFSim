@@ -166,6 +166,8 @@ class ChunkRawRecords(object):
 
 
 @strax.takes_config(
+    strax.Option('fax_file', default=None, track=True,
+                 help="Directory with fax instructions"),
     strax.Option('event_rate', default=5, track=False,
                  help="Average number of events per second"),
     strax.Option('chunk_size', default=5, track=False,
