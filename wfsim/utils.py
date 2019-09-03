@@ -10,7 +10,21 @@ import urllib.request
 import logging
 import re
 
-from scipy.spatial import cKDTree
+def exporter(export_self=False):
+    """Export utility modified from https://stackoverflow.com/a/41895194
+    Returns export decorator, __all__ list
+    """
+    all_ = []
+    if export_self:
+        all_.append('exporter')
+
+    def decorator(obj):
+        all_.append(obj.__name__)
+        return obj
+
+    return decorator, all_
+
+export, __all__ = exporter(export_self=True)
 
 import numpy as np
 import json, gzip
@@ -18,6 +32,7 @@ import pickle
 
 cache_dict = dict()
 
+@export
 def get_resource(x, fmt='text'):
     """Return contents of file or URL x
     :param binary: Resource is binary. Return bytes instead of a string.
@@ -123,6 +138,7 @@ def init_spe_scaling_factor_distributions(file):
     if uniform_to_pe_arr != []:
         return uniform_to_pe_arr
     
+from scipy.spatial import cKDTree
 
 class InterpolateAndExtrapolate(object):
     """Linearly interpolate- and extrapolate using inverse-distance
@@ -154,7 +170,6 @@ class InterpolateAndExtrapolate(object):
             weights=1/np.clip(distances[valid], 1e-6, float('inf')),
             axis=-1)
         return result
-
 
 class InterpolateAndExtrapolateArray(InterpolateAndExtrapolate):
 
@@ -244,3 +259,50 @@ class InterpolatingMap(object):
         :param map_name: Name of the map to use. Default is 'map'.
         """
         return self.interpolators[map_name](positions)
+
+import numba
+@export
+@numba.jit(numba.int32(numba.int64[:], numba.int64, numba.int64, numba.int64[:, :]),
+           nopython=True)
+def find_intervals_below_threshold(w, threshold, holdoff, result_buffer):
+    """Fills result_buffer with l, r bounds of intervals in w > threshold.
+    :param w: Waveform to do hitfinding in
+    :param threshold: Threshold for including an interval
+    :param result_buffer: numpy N*2 array of ints, will be filled by function.
+                          if more than N intervals are found, none past the first N will be processed.
+    :returns : number of intervals processed
+    Boundary indices are inclusive, i.e. the right boundary is the last index which was > threshold
+    """
+    result_buffer_size = len(result_buffer)
+    last_index_in_w = len(w) - 1
+
+    in_interval = False
+    current_interval = 0
+    current_interval_start = -1
+    current_interval_end = -1
+
+    for i, x in enumerate(w):
+
+        if x < threshold:
+            if not in_interval:
+                # Start of an interval
+                in_interval = True
+                current_interval_start = i
+
+            current_interval_end = i
+
+        if ((i == last_index_in_w and in_interval) or 
+            (x >= threshold and i >= current_interval_end + holdoff and in_interval)):
+            # End of the current interval
+            in_interval = False
+
+            # Add bounds to result buffer
+            result_buffer[current_interval, 0] = current_interval_start
+            result_buffer[current_interval, 1] = current_interval_end
+            current_interval += 1
+
+            if current_interval == result_buffer_size:
+                result_buffer[current_interval, 1] = len(w) - 1
+
+    n_intervals = current_interval      # No +1, as current_interval was incremented also when the last interval closed
+    return n_intervals

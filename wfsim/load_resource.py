@@ -1,7 +1,7 @@
 import pandas as pd
 import os.path as osp
-from .utils import InterpolatingMap as itp_map
-from .utils import get_resource
+from utils import InterpolatingMap as itp_map
+from utils import get_resource
 
 resource_config = {
     'photon_area_distribution': 'XENON1T_spe_distributions.csv',
@@ -18,6 +18,8 @@ resource_config = {
 for k in resource_config:
     resource_config[k] = osp.join('https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/'
                          'master/fax_files', resource_config[k])
+for k in resource_config:
+    resource_config[k] = osp.join('/project2/lgrandi/zhut/sim/WFSimDev', resource_config[k])
 
 class Resource(object):
     # The private nested inner class __Resource would only be instantiate once 
