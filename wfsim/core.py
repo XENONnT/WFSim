@@ -631,8 +631,10 @@ class RawData(object):
             # Go on generating pulses from instruction
             self.sim_data(instruction)
             # For each instruction, truth will be wrote to buffer
-            if not truth_buffer == None:
+            # print(truth_buffer)
+            if len(truth_buffer):
                 self.get_truth(instruction, truth_buffer)
+
             # The instruction index is saved for chunking
             self.instruction_index = ix
 

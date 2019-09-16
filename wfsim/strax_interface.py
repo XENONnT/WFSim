@@ -109,7 +109,7 @@ class ChunkRawRecords(object):
         dt = self.config['sample_duration']
 
         chunk_i = record_j = 0 # Indices of chunk(event), record buffer
-        for channel, left, right, data in self.rawdata(instructions):
+        for channel, left, right, data in self.rawdata(instructions, self.truth_buffer):
             pulse_length = right - left + 1
             records_needed = int(np.ceil(pulse_length / samples_per_record))
 
@@ -176,7 +176,10 @@ class ChunkRawRecords(object):
                  help="Number of chunks to simulate"),
     strax.Option('fax_config', 
                  default='https://raw.githubusercontent.com/XENONnT/'
-                 'strax_auxiliary_files/master/fax_files/fax_config.json'),)
+                 'strax_auxiliary_files/master/fax_files/fax_config.json'),
+    strax.Option('samples_to_store_before', default = 2),
+    strax.Option('samples_to_store_after',default = 20),
+    strax.Option('zle_threshold',default = 0))
 class FaxSimulatorPlugin(strax.Plugin):
     depends_on = tuple()
 
