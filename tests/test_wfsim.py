@@ -14,10 +14,12 @@ def test_sim():
         st = strax.Context(
             storage=tempdir,
             register=wfsim.RawRecordsFromFax,
-            config=dict(dict(nchunk=2, event_rate=1, chunk_size=5)),
+            config=dict(dict(nchunk=1, event_rate=1, chunk_size=10)),
             **straxen.contexts.common_opts)
 
         rr = st.get_array(run_id, 'raw_records')
+        p = st.get_array(run_id, 'peaks')
 
     assert len(rr) > 0
     assert rr['data'].sum() > 0
+    assert p['data'].sum() > 0
