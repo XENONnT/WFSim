@@ -4,7 +4,7 @@ import strax
 import straxen
 import wfsim
 
-strax.mailbox.Mailbox.DEFAULT_TIMEOUT = 20
+strax.mailbox.Mailbox.DEFAULT_TIMEOUT = 60
 
 
 def test_sim():
