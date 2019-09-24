@@ -722,7 +722,7 @@ class RawData(object):
     def get_truth(self, instruction, truth_buffer):
         ix = np.argmin(truth_buffer['fill']) # Index of the first line not filled
         for name in 'photon', 'electron':
-            times = getattr(self.pulses[instruction['type']], '_timings'.format(name=name), [])
+            times = getattr(self.pulses[instruction['type']], '_{name}_timings'.format(name=name), [])
             if len(times) != 0:
                 truth_buffer[ix]['n_{name}'.format(name=name)] = len(times)
                 truth_buffer[ix]['t_mean_{name}'.format(name=name)] = np.mean(times)
