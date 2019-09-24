@@ -8,10 +8,16 @@ Here are the files needed to run the waveform simulator fax and give output in t
 
 Clone the repository and let pip install it for you
 ```
-git clone https://github.com/Xenonnt/WFSim
+git clone https://github.com/XENONnT/WFSim
 pip install -e ./WFSim
 ```
 
+Or on midway
+```
+/project2/lgrandi/xenonnt/development/xnt_env
+git clone https://github.com/XENONnT/WFSim
+pip install -e ./WFSim --user
+```
 
 ## Usage
 In the notebook folder there is a short test notebook showing basic usage.
