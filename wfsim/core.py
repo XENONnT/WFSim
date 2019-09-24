@@ -6,9 +6,9 @@ import numpy as np
 from scipy.interpolate import interp1d
 from tqdm import tqdm
 
-from load_resource import Resource
-from utils import find_intervals_below_threshold, exporter
-import units
+from .load_resource import Resource
+from .utils import find_intervals_below_threshold, exporter
+from . import units
 
 export, __all__ = exporter()
 

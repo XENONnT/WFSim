@@ -1,7 +1,7 @@
 import pandas as pd
 import os.path as osp
-from utils import InterpolatingMap as itp_map
-from utils import get_resource
+from .utils import InterpolatingMap as itp_map
+from .utils import get_resource
 
 resource_config = {
     'photon_area_distribution': 'XENON1T_spe_distributions.csv',
