@@ -53,6 +53,10 @@ def rand_instructions(c):
     return instructions
 
 @export
+def instruction_from_csv(file):
+    return pd.read_csv(file).to_records(index=False)
+
+@export
 def read_g4(file):
 
     nc = nestpy.NESTcalc(nestpy.VDetector())
@@ -122,7 +126,7 @@ class ChunkRawRecords(object):
                 chunk_i = instructions['event_number'][self.rawdata.instruction_index]
 
             if record_j + records_needed > buffer_length:
-                log.Warning('Chunck size too large, insufficient record buffer')
+                log.warning('Chunck size too large, insufficient record buffer')
                 yield self.final_results(record_j)
                 record_j = 0
                 self.truth_buffer['fill'] = np.zeros_like(len(self.truth_buffer))
@@ -178,7 +182,7 @@ class ChunkRawRecords(object):
                  default='https://raw.githubusercontent.com/XENONnT/'
                  'strax_auxiliary_files/master/fax_files/fax_config.json'),
     strax.Option('samples_to_store_before', default = 2),
-    strax.Option('samples_to_store_after',default = 20),
+    strax.Option('samples_to_store_after', default = 20),
     strax.Option('zle_threshold',default = 0))
 class FaxSimulatorPlugin(strax.Plugin):
     depends_on = tuple()
@@ -193,6 +197,9 @@ class FaxSimulatorPlugin(strax.Plugin):
     # TODO: this state is needed for sorting checks,
     # but it prevents prevent parallelization
     last_chunk_time = -999999999999999
+
+    # A very very long input timeout, our simulator takes time
+    input_timeout = 3600 # hr
 
     def setup(self):
         c = self.config
@@ -213,8 +220,9 @@ class FaxSimulatorPlugin(strax.Plugin):
         if result['time'][0] < self.last_chunk_time + 5000:
             raise RuntimeError(
                 "Simulator returned chunks with insufficient spacing. "
-                f"Last chunk's max time was {self.last_chunk_time}, "
-                f"this chunk's first time is {result['time'][0]}.")
+                "Last chunk's max time was {timeA}, "
+                "this chunk's first time is {timeB}.".format(timeA=self.last_chunk_time, 
+        timeB=result['time'][0]))
         if np.diff(result['time']).min() < 0:
             raise RuntimeError("Simulator returned non-sorted records!")
         self.last_chunk_time = result['time'].max()

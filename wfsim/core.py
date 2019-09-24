@@ -722,19 +722,19 @@ class RawData(object):
     def get_truth(self, instruction, truth_buffer):
         ix = np.argmin(truth_buffer['fill']) # Index of the first line not filled
         for name in 'photon', 'electron':
-            times = getattr(self.pulses[instruction['type']], f'_{name}_timings', [])
+            times = getattr(self.pulses[instruction['type']], '_{name}_timings'.format(name=name), [])
             if len(times) != 0:
-                truth_buffer[ix][f'n_{name}'] = len(times)
-                truth_buffer[ix][f't_mean_{name}'] = np.mean(times)
-                truth_buffer[ix][f't_first_{name}'] = np.min(times)
-                truth_buffer[ix][f't_last_{name}'] = np.max(times)
-                truth_buffer[ix][f't_sigma_{name}'] = np.std(times)
+                truth_buffer[ix]['n_{name}'.format(name=name)] = len(times)
+                truth_buffer[ix]['t_mean_{name}'.format(name=name)] = np.mean(times)
+                truth_buffer[ix]['t_first_{name}'.format(name=name)] = np.min(times)
+                truth_buffer[ix]['t_last_{name}'.format(name=name)] = np.max(times)
+                truth_buffer[ix]['t_sigma_{name}'.format(name=name)] = np.std(times)
             else:
-                truth_buffer[ix][f'n_{name}'] = 0
-                truth_buffer[ix][f't_mean_{name}'] = np.nan
-                truth_buffer[ix][f't_first_{name}'] = np.nan
-                truth_buffer[ix][f't_last_{name}'] = np.nan
-                truth_buffer[ix][f't_sigma_{name}'] = np.nan
+                truth_buffer[ix]['n_{name}'.format(name=name)] = 0
+                truth_buffer[ix]['t_mean_{name}'.format(name=name)] = np.nan
+                truth_buffer[ix]['t_first_{name}'.format(name=name)] = np.nan
+                truth_buffer[ix]['t_last_{name}'.format(name=name)] = np.nan
+                truth_buffer[ix]['t_sigma_{name}'.format(name=name)] = np.nan
         for name in instruction.dtype.names:
             truth_buffer[ix][name] = instruction[name]
         truth_buffer[ix]['fill'] = True
