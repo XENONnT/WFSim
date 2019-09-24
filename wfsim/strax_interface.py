@@ -95,6 +95,10 @@ def read_g4(file):
     return ins
 
 @export
+def instruction_from_csv(file):
+    return pd.read_csv(file).to_records(index=False)
+
+@export
 class ChunkRawRecords(object):
     def __init__(self, config):
         self.config = config
@@ -193,6 +197,9 @@ class FaxSimulatorPlugin(strax.Plugin):
     # TODO: this state is needed for sorting checks,
     # but it prevents prevent parallelization
     last_chunk_time = -999999999999999
+
+    # A very very long timeout for chunk simulation
+    input_timeout = 3600
 
     def setup(self):
         c = self.config
