@@ -32,9 +32,10 @@ log = logging.getLogger('SimulationCore')
 def rand_instructions(c):
     n = c['nevents'] = c['event_rate'] * c['chunk_size'] * c['nchunk']
     c['total_time'] = c['chunk_size'] * c['nchunk']
+
     instructions = np.zeros(2 * n, dtype=instruction_dtype)
-    uniform_sampled_times = np.sort(np.random.uniform(0, c['total_time'], c['nevents']))
-    instructions['t'] = np.repeat(uniform_sampled_times, 2) * int(1e9)
+    uniform_times = c['total_time'] * (np.arange(n) + 0.5) / n
+    instructions['t'] = np.repeat(uniform_times, 2) * int(1e9)
     instructions['event_number'] = np.digitize(instructions['t'], 
          1e9 * np.arange(c['nchunk']) * c['chunk_size']) - 1
     instructions['type'] = np.tile(['s1', 's2'], n)
@@ -46,8 +47,8 @@ def rand_instructions(c):
     instructions['y'] = np.repeat(r * np.sin(t), 2)
     instructions['z'] = np.repeat(np.random.uniform(-100, 0, n), 2)
 
-    nphotons = np.random.uniform(10, 500, n)
-    nelectrons = 10 ** (np.random.uniform(1, 3, n))
+    nphotons = np.random.uniform(2000, 2050, n)
+    nelectrons = 10 ** (np.random.uniform(1, 4, n))
     instructions['amp'] = np.vstack([nphotons, nelectrons]).T.flatten().astype(int)
 
     return instructions
@@ -70,17 +71,17 @@ def read_g4(file):
     all_ttrees = dict(data.allitems(filterclass=lambda cls: issubclass(cls, uproot.tree.TTreeMethods)))
     e = all_ttrees[b'events/events;1']
 
-    ins = np.zeros(2 * len(e), dtype=inst_dtype)
+    ins = np.zeros(2 * len(e), dtype=instruction_dtype)
 
     sort_key = np.argsort(e.array('time')[:, 0])
 
     e_dep, ins['x'], ins['y'], ins['z'], ins['t'] = e.array('etot')[sort_key], \
                                                     np.repeat(e.array('xp_pri')[sort_key], 2) / 10, \
                                                     np.repeat(e.array('yp_pri')[sort_key], 2) / 10, \
-                                                    np.repeat(e.array('zp_pri')[sort_key], 2), \
-                                                    np.repeat(e.array('time')[:, 0][sort_key], 2)
+                                                    np.repeat(e.array('zp_pri')[sort_key], 2) / 10, \
+                                                    1e9*np.repeat(e.array('time')[:, 0][sort_key], 2)
 
-    ins['event_number'] = np.repeat(np.arange(len(e)), 2)
+    ins['event_number'] = 0
     ins['type'] = np.tile(('s1', 's2'), len(e))
     ins['recoil'] = np.repeat('er', 2 * len(e))
     quanta = []
@@ -102,9 +103,9 @@ def read_g4(file):
 class ChunkRawRecords(object):
     def __init__(self, config):
         self.config = config
-        self.rawdata = RawData(config)
-        self.record_buffer = np.zeros(500000, dtype=strax.record_dtype()) # 2*250 ms buffer
-        self.truth_buffer = np.zeros(1000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)]) # 500 s1 + 500 s2
+        self.rawdata = RawData(self.config)
+        self.record_buffer = np.zeros(5000000, dtype=strax.record_dtype()) # 2*250 ms buffer
+        self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)]) # 500 s1 + 500 s2
 
     def __call__(self, instructions):
         # Save the constants as privates
@@ -119,6 +120,7 @@ class ChunkRawRecords(object):
 
             # Currently chunk is decided by instruction using event_number
             # TODO: mimic daq strax insertor chunking
+            chunk_i =0
             if instructions['event_number'][self.rawdata.instruction_index] > chunk_i:
                 yield self.final_results(record_j)
                 record_j = 0 # Reset record buffer
@@ -172,6 +174,8 @@ class ChunkRawRecords(object):
 @strax.takes_config(
     strax.Option('fax_file', default=None, track=True,
                  help="Directory with fax instructions"),
+    strax.Option('experiment', default='XENON1T', track=True,
+                 help="Directory with fax instructions"),
     strax.Option('event_rate', default=5, track=False,
                  help="Average number of events per second"),
     strax.Option('chunk_size', default=5, track=False,
@@ -216,6 +220,11 @@ class FaxSimulatorPlugin(strax.Plugin):
         else:
             self.instructions = rand_instructions(c)
 
+        assert np.all(self.instructions['x']**2+self.instructions['y']**2 < 2500), "Interation is outside the TPC"
+        assert np.all(self.instructions['z'] < 0) & np.all(self.instructions['z']>-100), "Interation is outside the TPC"
+        assert np.all(self.instructions['amp']>0), "Interaction has zero size"
+
+
     def _sort_check(self, result):
         if result['time'][0] < self.last_chunk_time + 5000:
             raise RuntimeError(
@@ -231,14 +240,17 @@ class FaxSimulatorPlugin(strax.Plugin):
 class RawRecordsFromFax(FaxSimulatorPlugin):
     provides = ('raw_records', 'truth')
     data_kind = {k: k for k in provides}
-    dtype = dict(raw_records = strax.record_dtype(),
-                 truth = instruction_dtype + truth_extra_dtype,)
 
     def setup(self):
         super().setup()
         self.sim = ChunkRawRecords(self.config)
         self.sim_iter = self.sim(self.instructions)
-        
+
+    def infer_dtype(self):
+        dtype = dict(raw_records=strax.record_dtype(),
+                     truth=instruction_dtype + truth_extra_dtype)
+        return dtype
+
     def is_ready(self, chunk_i):
         """Overwritten to mimic online input plugin.
         Returns False to check source finished;
