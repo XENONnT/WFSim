@@ -21,7 +21,7 @@ class Pulse(object):
     def __init__(self, config):
         self.config = config
         self.config.update(getattr(self.config, self.__class__.__name__, {}))
-        self.resource = Resource()
+        self.resource = Resource(config)
 
         self.init_pmt_current_templates()
         self.init_spe_scaling_factor_distributions()
@@ -217,7 +217,7 @@ class S1(Pulse):
         self.phase = 'liquid'  # To distinguish singlet/triplet time delay.
 
     def __call__(self, instruction):
-        _, _, t, x, y, z, n_photons, recoil_type = instruction  # temporary solution for instruction passing
+        _, _, t, x, y, z, n_photons, recoil_type, *rest = instruction  # temporary solution for instruction passing
         ly = self.resource.s1_light_yield_map([[x, y, z]]) * self.config['s1_detection_efficiency']
         n_photons = np.random.binomial(n=n_photons, p=ly)
 
@@ -305,7 +305,7 @@ class S2(Pulse):
             if not np.all(instruction['recoil'] =='ele_ap'):
                 instruction = np.array([instruction])
 
-        _, _, t, x, y, z, n_electron, recoil_type = [
+        _, _, t, x, y, z, n_electron, recoil_type, *rest = [
             np.array(v).reshape(-1) for v in zip(*instruction)]
 
         self._electron_timings = np.array([])
@@ -612,16 +612,24 @@ class RawData(object):
             pmt_ap=Afterpulse_PMT(config),
          )
         self.pulses_cache = []
-        self.resource = Resource()
+        self.resource = Resource(self.config)
 
     def __call__(self, instructions, truth_buffer=None):
         self.last_pulse_end_time = 0
         self.pulses_cache = []
         self._raw_data = []
         self.source_finished = False
+        # if len(wfsim.strax_interface.instructions_dtype)>8:
 
         for ix, instruction in enumerate(tqdm(instructions, desc='Simulating Raw Records')):
             # Once there is a 1 ms gap process and clean pulses cache
+            # if self.pulses['ele_ap'].inst
+            # # obj.attr_name exists.
+            if len(instruction) > 8:
+                for par in instruction.dtype.names:
+                    if par in self.config:
+                        self.config[par] = instruction[par]
+
             if instruction['t'] > self.last_pulse_end_time + 1e6:
                 # Transform "pulses" into raw records
                 self.digitize_pulse_cache()
@@ -722,19 +730,19 @@ class RawData(object):
     def get_truth(self, instruction, truth_buffer):
         ix = np.argmin(truth_buffer['fill']) # Index of the first line not filled
         for name in 'photon', 'electron':
-            times = getattr(self.pulses[instruction['type']], f'_{name}_timings', [])
+            times = getattr(self.pulses[instruction['type']], '_{name}_timings'.format(name=name), [])
             if len(times) != 0:
-                truth_buffer[ix][f'n_{name}'] = len(times)
-                truth_buffer[ix][f't_mean_{name}'] = np.mean(times)
-                truth_buffer[ix][f't_first_{name}'] = np.min(times)
-                truth_buffer[ix][f't_last_{name}'] = np.max(times)
-                truth_buffer[ix][f't_sigma_{name}'] = np.std(times)
+                truth_buffer[ix]['n_{name}'.format(name=name)] = len(times)
+                truth_buffer[ix]['t_mean_{name}'.format(name=name)] = np.mean(times)
+                truth_buffer[ix]['t_first_{name}'.format(name=name)] = np.min(times)
+                truth_buffer[ix]['t_last_{name}'.format(name=name)] = np.max(times)
+                truth_buffer[ix]['t_sigma_{name}'.format(name=name)] = np.std(times)
             else:
-                truth_buffer[ix][f'n_{name}'] = 0
-                truth_buffer[ix][f't_mean_{name}'] = np.nan
-                truth_buffer[ix][f't_first_{name}'] = np.nan
-                truth_buffer[ix][f't_last_{name}'] = np.nan
-                truth_buffer[ix][f't_sigma_{name}'] = np.nan
+                truth_buffer[ix]['n_{name}'.format(name=name)] = 0
+                truth_buffer[ix]['t_mean_{name}'.format(name=name)] = np.nan
+                truth_buffer[ix]['t_first_{name}'.format(name=name)] = np.nan
+                truth_buffer[ix]['t_last_{name}'.format(name=name)] = np.nan
+                truth_buffer[ix]['t_sigma_{name}'.format(name=name)] = np.nan
         for name in instruction.dtype.names:
             truth_buffer[ix][name] = instruction[name]
         truth_buffer[ix]['fill'] = True
