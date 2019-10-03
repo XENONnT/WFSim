@@ -630,7 +630,7 @@ class RawData(object):
                     if par in self.config:
                         self.config[par] = instruction[par]
 
-            if instruction['t'] > self.last_pulse_end_time + 1e6:
+            if instruction['t'] > self.last_pulse_end_time + 1e7:
                 # Transform "pulses" into raw records
                 self.digitize_pulse_cache()
                 yield from self.ZLE()
@@ -655,10 +655,10 @@ class RawData(object):
         self.pulses[ptype](instruction)
         self.pulses['ele_ap'](self.pulses[ptype])
         self.pulses['pmt_ap'](self.pulses[ptype])
-    
+        #
         for pt in [ptype, 'ele_ap', 'pmt_ap']:
             self.pulses_cache += getattr(self.pulses[pt], '_pulses')
-
+        #
         if len(self.pulses['ele_ap']._pulses)  > 0:
             self.pulses['pmt_ap'](self.pulses['ele_ap'])
             self.pulses_cache += getattr(self.pulses['pmt_ap'], '_pulses')
@@ -673,8 +673,8 @@ class RawData(object):
                 * self.config['external_amplification'] \
                 / (self.config['digitizer_voltage_range'] / 2 ** (self.config['digitizer_bits']))
 
-            self.left = np.min([p['left'] for p in self.pulses_cache])
-            self.right = np.max([p['right'] for p in self.pulses_cache])
+            self.left = np.min([p['left'] for p in self.pulses_cache]) - self.config['trigger_window']
+            self.right = np.max([p['right'] for p in self.pulses_cache]) + self.config['trigger_window']
             if self.left % 2 != 0: self.left -= 1 # Seems like a digizier effect
 
             # Use noise array to pave the fundation of the pulses
@@ -717,8 +717,9 @@ class RawData(object):
                 result_buffer=self.zle_intervals_buffer,)
             
             itvs_to_encode = self.zle_intervals_buffer[:n_itvs_found]
-            itvs_to_encode[:, 0] -= self.config['samples_to_store_before']
-            itvs_to_encode[:, 1] += self.config['samples_to_store_after']
+            itvs_to_encode[:, 0] -= self.config['trigger_window']
+            itvs_to_encode[:, 1] += self.config['trigger_window']
+            np.save('./itvs.npy',itvs_to_encode)
             itvs_to_encode = np.clip(itvs_to_encode, 0, len(data) - 1)
             # Land trigger window on even numbers
             itvs_to_encode[:, 0] = np.ceil(itvs_to_encode[:, 0] / 2.0) * 2
