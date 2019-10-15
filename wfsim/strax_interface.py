@@ -205,8 +205,8 @@ class FaxSimulatorPlugin(strax.Plugin):
     # but it prevents prevent parallelization
     last_chunk_time = -999999999999999
 
-    # A very very long timeout for chunk simulation
-    input_timeout = 3600
+    # A very very long input timeout, our simulator takes time
+    input_timeout = 3600 # as an hour
 
     def setup(self):
         c = self.config
