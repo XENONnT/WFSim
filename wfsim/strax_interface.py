@@ -15,7 +15,7 @@ from .core import RawData
 export, __all__ = strax.exporter()
 __all__ += ['instruction_dtype', 'truth_extra_dtype']
 
-instruction_dtype = [('event_number', np.int), ('type', '<U2'), ('t', np.int), 
+instruction_dtype = [('event_number', np.int), ('type', np.int), ('t', np.int), 
     ('x', np.float32), ('y', np.float32), ('z', np.float32), 
     ('amp', np.int), ('recoil', '<U2')]
 
@@ -38,7 +38,7 @@ def rand_instructions(c):
     instructions['t'] = np.repeat(uniform_times, 2) * int(1e9)
     instructions['event_number'] = np.digitize(instructions['t'], 
          1e9 * np.arange(c['nchunk']) * c['chunk_size']) - 1
-    instructions['type'] = np.tile(['s1', 's2'], n)
+    instructions['type'] = np.tile([1, 2], n)
     instructions['recoil'] = ['er' for i in range(n * 2)]
 
     r = np.sqrt(np.random.uniform(0, 2500, n))

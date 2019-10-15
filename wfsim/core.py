@@ -649,9 +649,13 @@ class RawData(object):
         self.source_finished = True
         self.digitize_pulse_cache()
         yield from self.ZLE()
+        
+    @staticmethod
+    def symtype(ptype):
+        return ['s1', 's2'][ptype - 1]
 
     def sim_data(self, instruction):
-        ptype = instruction[1]
+        ptype = self.symtype(instruction['type'])
         self.pulses[ptype](instruction)
         self.pulses['ele_ap'](self.pulses[ptype])
         self.pulses['pmt_ap'](self.pulses[ptype])
@@ -730,7 +734,7 @@ class RawData(object):
     def get_truth(self, instruction, truth_buffer):
         ix = np.argmin(truth_buffer['fill']) # Index of the first line not filled
         for name in 'photon', 'electron':
-            times = getattr(self.pulses[instruction['type']], '_{name}_timings'.format(name=name), [])
+            times = getattr(self.pulses[self.symtype(instruction['type'])], '_{name}_timings'.format(name=name), [])
             if len(times) != 0:
                 truth_buffer[ix]['n_{name}'.format(name=name)] = len(times)
                 truth_buffer[ix]['t_mean_{name}'.format(name=name)] = np.mean(times)
