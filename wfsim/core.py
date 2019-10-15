@@ -86,7 +86,7 @@ class Pulse(object):
             pulse_right = max_timing + int(self.config['samples_to_store_after'])
             pulse_current = np.zeros(pulse_right - pulse_left + 1)
 
-            Pulse.add_current(_channel_photon_timings - min_timing,
+            Pulse.add_current(_channel_photon_timings - pulse_left,
                               _channel_photon_reminders, _channel_photon_gains,
                               self._pmt_current_templates, self._template_length,
                               pulse_current)
@@ -713,13 +713,12 @@ class RawData(object):
             n_itvs_found = find_intervals_below_threshold(
                 data,
                 threshold=threshold,
-                holdoff=self.config['samples_to_store_before'] + self.config['samples_to_store_after'] + 1,
+                holdoff=self.config['trigger_window'] + self.config['trigger_window'] + 1,
                 result_buffer=self.zle_intervals_buffer,)
-            
+
             itvs_to_encode = self.zle_intervals_buffer[:n_itvs_found]
             itvs_to_encode[:, 0] -= self.config['trigger_window']
             itvs_to_encode[:, 1] += self.config['trigger_window']
-            np.save('./itvs.npy',itvs_to_encode)
             itvs_to_encode = np.clip(itvs_to_encode, 0, len(data) - 1)
             # Land trigger window on even numbers
             itvs_to_encode[:, 0] = np.ceil(itvs_to_encode[:, 0] / 2.0) * 2

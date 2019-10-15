@@ -54,10 +54,6 @@ def rand_instructions(c):
     return instructions
 
 @export
-def instruction_from_csv(file):
-    return pd.read_csv(file).to_records(index=False)
-
-@export
 def read_g4(file):
 
     nc = nestpy.NESTcalc(nestpy.VDetector())
@@ -193,8 +189,8 @@ class ChunkRawRecords(object):
                  default=2),
     strax.Option('samples_to_store_after',
                  default=20),
-    strax.Option('trigger_window', default = 50),
-    strax.Option('zle_threshold',default = 0))
+    strax.Option('trigger_window', default=50),
+    strax.Option('zle_threshold', default=0))
 class FaxSimulatorPlugin(strax.Plugin):
     depends_on = tuple()
 
