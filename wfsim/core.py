@@ -86,7 +86,7 @@ class Pulse(object):
             pulse_right = max_timing + int(self.config['samples_to_store_after'])
             pulse_current = np.zeros(pulse_right - pulse_left + 1)
 
-            Pulse.add_current(_channel_photon_timings - min_timing,
+            Pulse.add_current(_channel_photon_timings - pulse_left,
                               _channel_photon_reminders, _channel_photon_gains,
                               self._pmt_current_templates, self._template_length,
                               pulse_current)
@@ -649,9 +649,13 @@ class RawData(object):
         self.source_finished = True
         self.digitize_pulse_cache()
         yield from self.ZLE()
+        
+    @staticmethod
+    def symtype(ptype):
+        return ['s1', 's2'][ptype - 1]
 
     def sim_data(self, instruction):
-        ptype = instruction[1]
+        ptype = self.symtype(instruction['type'])
         self.pulses[ptype](instruction)
         self.pulses['ele_ap'](self.pulses[ptype])
         self.pulses['pmt_ap'](self.pulses[ptype])
@@ -713,13 +717,12 @@ class RawData(object):
             n_itvs_found = find_intervals_below_threshold(
                 data,
                 threshold=threshold,
-                holdoff=self.config['samples_to_store_before'] + self.config['samples_to_store_after'] + 1,
+                holdoff=self.config['trigger_window'] + self.config['trigger_window'] + 1,
                 result_buffer=self.zle_intervals_buffer,)
-            
+
             itvs_to_encode = self.zle_intervals_buffer[:n_itvs_found]
             itvs_to_encode[:, 0] -= self.config['trigger_window']
             itvs_to_encode[:, 1] += self.config['trigger_window']
-            np.save('./itvs.npy',itvs_to_encode)
             itvs_to_encode = np.clip(itvs_to_encode, 0, len(data) - 1)
             # Land trigger window on even numbers
             itvs_to_encode[:, 0] = np.ceil(itvs_to_encode[:, 0] / 2.0) * 2
@@ -731,7 +734,7 @@ class RawData(object):
     def get_truth(self, instruction, truth_buffer):
         ix = np.argmin(truth_buffer['fill']) # Index of the first line not filled
         for name in 'photon', 'electron':
-            times = getattr(self.pulses[instruction['type']], '_{name}_timings'.format(name=name), [])
+            times = getattr(self.pulses[self.symtype(instruction['type'])], '_{name}_timings'.format(name=name), [])
             if len(times) != 0:
                 truth_buffer[ix]['n_{name}'.format(name=name)] = len(times)
                 truth_buffer[ix]['t_mean_{name}'.format(name=name)] = np.mean(times)

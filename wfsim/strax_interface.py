@@ -15,7 +15,7 @@ from .core import RawData
 export, __all__ = strax.exporter()
 __all__ += ['instruction_dtype', 'truth_extra_dtype']
 
-instruction_dtype = [('event_number', np.int), ('type', '<U2'), ('t', np.int), 
+instruction_dtype = [('event_number', np.int), ('type', np.int), ('t', np.int), 
     ('x', np.float32), ('y', np.float32), ('z', np.float32), 
     ('amp', np.int), ('recoil', '<U2')]
 
@@ -38,7 +38,7 @@ def rand_instructions(c):
     instructions['t'] = np.repeat(uniform_times, 2) * int(1e9)
     instructions['event_number'] = np.digitize(instructions['t'], 
          1e9 * np.arange(c['nchunk']) * c['chunk_size']) - 1
-    instructions['type'] = np.tile(['s1', 's2'], n)
+    instructions['type'] = np.tile([1, 2], n)
     instructions['recoil'] = ['er' for i in range(n * 2)]
 
     r = np.sqrt(np.random.uniform(0, 2500, n))
@@ -52,10 +52,6 @@ def rand_instructions(c):
     instructions['amp'] = np.vstack([nphotons, nelectrons]).T.flatten().astype(int)
 
     return instructions
-
-@export
-def instruction_from_csv(file):
-    return pd.read_csv(file).to_records(index=False)
 
 @export
 def read_g4(file):
@@ -82,7 +78,7 @@ def read_g4(file):
                                                     1e9*np.repeat(e.array('time')[:, 0][sort_key], 2)
 
     ins['event_number'] = 0
-    ins['type'] = np.tile(('s1', 's2'), len(e))
+    ins['type'] = np.tile((1, 2), len(e))
     ins['recoil'] = np.repeat('er', 2 * len(e))
     quanta = []
 
@@ -98,6 +94,10 @@ def read_g4(file):
         quanta.append(nc.GetQuanta(y, density).electrons)
     ins['amp'] = quanta
     return ins
+
+@export
+def instruction_from_csv(file):
+    return pd.read_csv(file).to_records(index=False)
 
 @export
 class ChunkRawRecords(object):
@@ -189,8 +189,8 @@ class ChunkRawRecords(object):
                  default=2),
     strax.Option('samples_to_store_after',
                  default=20),
-    strax.Option('trigger_window', default = 50),
-    strax.Option('zle_threshold',default = 0))
+    strax.Option('trigger_window', default=50),
+    strax.Option('zle_threshold', default=0))
 class FaxSimulatorPlugin(strax.Plugin):
     depends_on = tuple()
 
@@ -206,7 +206,7 @@ class FaxSimulatorPlugin(strax.Plugin):
     last_chunk_time = -999999999999999
 
     # A very very long input timeout, our simulator takes time
-    input_timeout = 3600 # hr
+    input_timeout = 3600 # as an hour
 
     def setup(self):
         c = self.config
