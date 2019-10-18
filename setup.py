@@ -20,7 +20,7 @@ setuptools.setup(
     setup_requires=['pytest-runner'],
     install_requires=requires,
     tests_require=requires + ['pytest'],
-    python_requires=">=2.5",
+    python_requires=">=3.6",
     extras_require={
         'docs': [
             'sphinx',
