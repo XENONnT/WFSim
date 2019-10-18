@@ -78,7 +78,7 @@ def read_g4(file):
                                                     1e9*np.repeat(e.array('time')[:, 0][sort_key], 2)
 
     ins['event_number'] = 0
-    ins['type'] = np.tile((1, 2), len(e))
+    ins['type'] = np.tile(('s1', 's2'), len(e))
     ins['recoil'] = np.repeat('er', 2 * len(e))
     quanta = []
 

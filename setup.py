@@ -20,7 +20,7 @@ setuptools.setup(
     setup_requires=['pytest-runner'],
     install_requires=requires,
     tests_require=requires + ['pytest'],
-    python_requires=">=3.6",
+    python_requires=">=2.5",
     extras_require={
         'docs': [
             'sphinx',
@@ -28,7 +28,8 @@ setuptools.setup(
             'nbsphinx',
             'recommonmark',
             'graphviz']},
-    packages=setuptools.find_packages(),
+    packages=['wfsim',
+              'wfsim.pax_datastructure',],
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'License :: OSI Approved :: BSD License',
