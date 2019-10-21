@@ -28,7 +28,8 @@ setuptools.setup(
             'nbsphinx',
             'recommonmark',
             'graphviz']},
-    packages=setuptools.find_packages(),
+    packages=['wfsim',
+              'wfsim.pax_datastructure',],
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'License :: OSI Approved :: BSD License',
