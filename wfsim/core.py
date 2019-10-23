@@ -324,6 +324,10 @@ class S2(Pulse):
         electron_lifetime_correction = np.exp(- 1 * self.drift_time_mean /
                                               self.config['electron_lifetime_liquid'])
         cy = self.config['electron_extraction_yield'] * electron_lifetime_correction
+        
+        #why are there cy greater than 1? We should check this
+        cy = np.clip(cy, a_min = 0, a_max = 1)
+
         n_electron = np.random.binomial(n=list(n_electron), p=cy)
 
         # Second generate photon timing and channel

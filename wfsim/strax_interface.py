@@ -55,31 +55,57 @@ def rand_instructions(c):
 
 @export
 def read_g4(file):
-
+    
     nc = nestpy.NESTcalc(nestpy.VDetector())
     A = 131.293
     Z = 54.
-    density = 2.9  # g/cm^3
-    drift_field = 124  # V/cm
+    density = 2.862  # g/cm^3   #SR1 Value
+    drift_field = 82  # V/cm    #SR1 Value
     interaction = nestpy.INTERACTION_TYPE(7)
 
     data = uproot.open(file)
     all_ttrees = dict(data.allitems(filterclass=lambda cls: issubclass(cls, uproot.tree.TTreeMethods)))
     e = all_ttrees[b'events/events;1']
 
-    ins = np.zeros(2 * len(e), dtype=instruction_dtype)
+    time = e.array('time')
+    n_events = len(e.array('time'))
+    #lets separate the events in time by a constant time difference
+    time = time+np.arange(n_events)
+        
+    #Events should be in the TPC
+    xp = e.array("xp") / 10
+    yp = e.array("yp") /10 
+    zp = e.array("zp") /10 
+    e_dep = e.array('ed')
+    
+    tpc_radius_square = 2500
+    z_lower = -100
+    z_upper = 0
+    
+    TPC_Cut = (zp > z_lower) & (zp < z_upper) & (xp**2+yp**2 <tpc_radius_square)
+    xp = xp[TPC_Cut]
+    yp = yp[TPC_Cut]
+    zp = zp[TPC_Cut]
+    e_dep = e_dep[TPC_Cut]
+    time = time[TPC_Cut]
+    
+    event_number = np.repeat(e.array("eventid"),e.array("nsteps"))[TPC_Cut.flatten()]
+    
+    n_instructions = len(time.flatten())
+    ins = np.zeros(2*n_instructions, dtype=instruction_dtype)
 
-    sort_key = np.argsort(e.array('time')[:, 0])
+    e_dep, ins['x'], ins['y'], ins['z'], ins['t'] = e_dep.flatten(), \
+                                                    np.repeat(xp.flatten(),2 )/ 10, \
+                                                    np.repeat(yp.flatten(),2 ) / 10, \
+                                                    np.repeat(zp.flatten(),2 ) / 10, \
+                                                    1e9*np.repeat(time.flatten(),2 )
+    
+    
+    
+    ins['event_number'] = np.repeat(event_number,2)
+    ins['type'] = np.tile((1, 2), n_instructions)
+    ins['recoil'] = np.repeat('er', 2 * n_instructions)
 
-    e_dep, ins['x'], ins['y'], ins['z'], ins['t'] = e.array('etot')[sort_key], \
-                                                    np.repeat(e.array('xp_pri')[sort_key], 2) / 10, \
-                                                    np.repeat(e.array('yp_pri')[sort_key], 2) / 10, \
-                                                    np.repeat(e.array('zp_pri')[sort_key], 2) / 10, \
-                                                    1e9*np.repeat(e.array('time')[:, 0][sort_key], 2)
-
-    ins['event_number'] = 0
-    ins['type'] = np.tile((1, 2), len(e))
-    ins['recoil'] = np.repeat('er', 2 * len(e))
     quanta = []
 
     for en in e_dep:
@@ -93,6 +119,10 @@ def read_g4(file):
         quanta.append(nc.GetQuanta(y, density).photons)
         quanta.append(nc.GetQuanta(y, density).electrons)
     ins['amp'] = quanta
+    
+    #cut interactions without electrons or photons
+    ins = ins[ins["amp"] > 0]
+    
     return ins
 
 @export

@@ -92,7 +92,7 @@ class PaxEventSimulator(object):
 
         if self.config['fax_file']:
             if self.config['fax_file'][-5:] == '.root':
-                self.instructions = read_g4(c['fax_file'])
+                self.instructions = read_g4(self.config['fax_file'])
                 self.config['nevents'] = np.max(self.instructions['event_number'])
             else:
                 self.instructions = instruction_from_csv(self.config['fax_file'])
@@ -135,7 +135,8 @@ class PaxEventSimulator(object):
             
             self.output_dir = os.path.join(self.config['output_name'], 
                 '%s_MC_%d' % (self.config['experiment'], self.config['run_number']))
-            if not os.path.exists(self.output_dir): os.mkdir(self.output_dir)
+            #if not os.path.exists(self.output_dir): os.mkdir(self.output_dir)
+            os.makedirs(self.output_dir, exist_ok=True)
             
             # Start the temporary file. Events will first be written here, until events_per_file is reached
             self.tempfile = os.path.join(self.output_dir, 'temp.' + self.file_extension)
@@ -162,7 +163,8 @@ class PaxEventSimulator(object):
         def close_current_file(self):
             """Closes the currently open file, if there is one. Also handles temporary file renaming. """
             if self.last_event_written is None:
-                self.log.info("You didn't write any events... Did you crash pax?")
+                #self.log.info("You didn't write any events... Did you crash pax?")
+                print("You didn't write any events... Did you crash pax?")
                 return
 
             self.current_file.close()
