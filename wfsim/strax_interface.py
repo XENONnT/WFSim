@@ -150,7 +150,6 @@ class ChunkRawRecords(object):
 
             # Currently chunk is decided by instruction using event_number
             # TODO: mimic daq strax insertor chunking
-            chunk_i =0
             if instructions['event_number'][self.rawdata.instruction_index] > chunk_i:
                 yield self.final_results(record_j)
                 record_j = 0 # Reset record buffer
