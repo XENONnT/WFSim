@@ -19,7 +19,9 @@ instruction_dtype = [('event_number', np.int), ('type', np.int), ('t', np.int),
     ('x', np.float32), ('y', np.float32), ('z', np.float32), 
     ('amp', np.int), ('recoil', '<U2')]
 
-truth_extra_dtype = [('n_photon', np.float), ('n_electron', np.float),
+truth_extra_dtype = [
+    ('n_electron', np.float),
+    ('n_photon', np.float), ('n_photon_bottom', np.float),
     ('t_first_photon', np.float), ('t_last_photon', np.float), 
     ('t_mean_photon', np.float), ('t_sigma_photon', np.float), 
     ('t_first_electron', np.float), ('t_last_electron', np.float), 
@@ -142,33 +144,30 @@ class ChunkRawRecords(object):
         samples_per_record = strax.DEFAULT_RECORD_LENGTH
         buffer_length = len(self.record_buffer)
         dt = self.config['sample_duration']
+        rext = self.config['right_raw_extension']
+        cksz = self.config['chunk_size'] * 1e9
+        
+        self.record_j = 0 # Buffer fill level
+        self.chunk_time = np.min(instructions['t']) + cksz # Starting chunk
 
-        chunk_i = record_j = 0 # Indices of chunk(event), record buffer
         for channel, left, right, data in self.rawdata(instructions, self.truth_buffer):
             pulse_length = right - left + 1
             records_needed = int(np.ceil(pulse_length / samples_per_record))
-
-            # Currently chunk is decided by instruction using event_number
-            # TODO: mimic daq strax insertor chunking
-            chunk_i =0
-            if instructions['event_number'][self.rawdata.instruction_index] > chunk_i:
-                yield self.final_results(record_j)
-                record_j = 0 # Reset record buffer
-                self.truth_buffer['fill'] = np.zeros_like(len(self.truth_buffer)) # Reset truth buffer
-                chunk_i = instructions['event_number'][self.rawdata.instruction_index]
-
-            if record_j + records_needed > buffer_length:
-                log.warning('Chunck size too large, insufficient record buffer')
-                yield self.final_results(record_j)
-                record_j = 0
-                self.truth_buffer['fill'] = np.zeros_like(len(self.truth_buffer))
             
-            if record_j + records_needed > buffer_length:
+            if left * 10 > self.chunk_time + 2 * rext:    
+                yield self.final_results()
+                self.chunk_time += cksz
+
+            if self.record_j + records_needed > buffer_length:
+                log.warning('Chunck size too large, insufficient record buffer')
+                yield self.final_results()
+
+            if self.record_j + records_needed > buffer_length:
                 log.Warning('Pulse length too large, insufficient record buffer, skipping pulse')
                 continue
 
             # WARNING baseline and area fields are zeros before finish_results
-            s = slice(record_j, record_j + records_needed)
+            s = slice(self.record_j, self.record_j + records_needed)
             self.record_buffer[s]['channel'] = channel
             self.record_buffer[s]['dt'] = dt
             self.record_buffer[s]['time'] = dt * (left + samples_per_record * np.arange(records_needed))
@@ -179,23 +178,34 @@ class ChunkRawRecords(object):
             self.record_buffer[s]['data'] = np.pad(data, 
                 (0, records_needed * samples_per_record - pulse_length), 'constant').reshape((-1, samples_per_record))
 
-            record_j += records_needed
+            self.record_j += records_needed
 
-        yield self.final_results(record_j)
+        yield self.final_results()
 
-    def final_results(self, record_j):
-        records = self.record_buffer[:record_j] # Copy the records from buffer
+    def final_results(self):
+        records = self.record_buffer[:self.record_j] # Copy the records from buffer
         records = strax.sort_by_time(records) # Must keep this for sorted output
+
+        mask = records['time'] >= self.chunk_time
+        self.record_buffer[:np.sum(mask)] = records[mask]
+        self.record_j = np.sum(mask)
+        records = records[~mask]
         strax.baseline(records)
         strax.integrate(records)
 
-        _truth = self.truth_buffer[self.truth_buffer['fill']]
-        # Return truth without 'fill' field
-        truth = np.zeros(len(_truth), dtype=instruction_dtype + truth_extra_dtype)
-        for name in truth.dtype.names:
-            truth[name] = _truth[name]
+        truth = self.truth_buffer[self.truth_buffer['fill']]
+        # truth = strax.sort_by_time(truth) # Unsupported
 
-        return dict(raw_records=records, truth=truth)
+        mask = truth['t_first_photon'] >= self.chunk_time
+        self.truth_buffer[:np.sum(mask)] = truth[mask]
+        self.truth_buffer['fill'][np.sum(mask):] = False
+
+        # Return truth without 'fill' field
+        _truth = np.zeros(len(truth), dtype=instruction_dtype + truth_extra_dtype)
+        for name in _truth.dtype.names:
+            _truth[name] = truth[name]
+
+        return dict(raw_records=records, truth=_truth)
 
     def source_finished(self):
         return self.rawdata.source_finished
@@ -219,6 +229,7 @@ class ChunkRawRecords(object):
                  default=2),
     strax.Option('samples_to_store_after',
                  default=20),
+    strax.Option('right_raw_extension', default=10000),
     strax.Option('trigger_window', default=50),
     strax.Option('zle_threshold', default=0))
 class FaxSimulatorPlugin(strax.Plugin):
@@ -302,5 +313,5 @@ class RawRecordsFromFax(FaxSimulatorPlugin):
             result = next(self.sim_iter)
         except StopIteration:
             raise RuntimeError("Bug in chunk count computation")
-        self._sort_check(result['raw_records'])
+        # self._sort_check(result['raw_records'])
         return result

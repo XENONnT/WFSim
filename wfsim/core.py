@@ -72,6 +72,10 @@ class Pulse(object):
                 # Add some double photoelectron emission by adding another sampled gain
                 n_double_pe = np.random.binomial(len(_channel_photon_timings),
                                                  p=self.config['p_double_pe_emision'])
+                self._n_double_pe += n_double_pe
+                if channel in self.config['channels_bottom']:
+                    self._n_double_pe_bot += n_double_pe
+
                 _dpe_index = np.random.choice(np.arange(len(_channel_photon_timings)),
                                               size=n_double_pe, replace=False)
                 _channel_photon_gains[_dpe_index] += self.config['gains'][channel] \
@@ -217,38 +221,44 @@ class S1(Pulse):
         self.phase = 'liquid'  # To distinguish singlet/triplet time delay.
 
     def __call__(self, instruction):
-        _, _, t, x, y, z, n_photons, recoil_type, *rest = instruction  # temporary solution for instruction passing
-        ly = self.resource.s1_light_yield_map([[x, y, z]]) * self.config['s1_detection_efficiency']
+        if len(instruction.shape) < 1:
+            # shape of recarr is a bit strange
+            instruction = np.array([instruction])
+
+        _, _, t, x, y, z, n_photons, recoil_type, *rest = [
+            np.array(v).reshape(-1) for v in zip(*instruction)]
+        
+        positions = np.array([x, y, z]).T  # For map interpolation
+        ly = self.resource.s1_light_yield_map(positions) * self.config['s1_detection_efficiency']
         n_photons = np.random.binomial(n=n_photons, p=ly)
 
-        self.photon_timings(t, n_photons, recoil_type)
+        self._photon_timings = np.array([])
+        list(map(self.photon_timings, t, n_photons, recoil_type))
         # The new way iterpolation is written always require a list
-        self.photon_channels([[x, y, z]])
+        self.photon_channels(positions, n_photons)
 
         super().__call__()
 
-    def photon_channels(self, points):
-        if len(self._photon_timings) == 0:
-            self._photon_channels = []
-            return 0
-
+    def photon_channels(self, points, n_photons):
         channels = np.array(self.config['channels_in_detector']['tpc'])
-        p_per_channel = self.resource.s1_pattern_map(points)[0]
-        p_per_channel[np.in1d(channels, self.turned_off_pmts)] = 0
-        p_per_channel /= np.sum(p_per_channel)
-
-        self._photon_channels = np.random.choice(
-            channels,
-            size=len(self._photon_timings),
-            p=p_per_channel,
-            replace=True)
+        p_per_channel = self.resource.s1_pattern_map(points)
+        p_per_channel[:, np.in1d(channels, self.turned_off_pmts)] = 0
+        
+        self._photon_channels = np.array([]).astype(int)
+        for ppc, n in zip(p_per_channel, n_photons):
+            self._photon_channels = np.append(self._photon_channels,
+                    np.random.choice(
+                        channels,
+                        size=n,
+                        p=ppc / np.sum(ppc),
+                        replace=True))
 
     def photon_timings(self, t, n_photons, recoil_type):
         if n_photons == 0:
-            self._photon_timings = np.array([])
-            return 0
+            return
         try:
-            self._photon_timings = t + getattr(self, recoil_type.lower())(n_photons)
+            self._photon_timings = np.append(self._photon_timings,
+                t + getattr(self, recoil_type.lower())(n_photons))
         except AttributeError:
             raise AttributeError('Recoil type must be ER, NR, alpha or LED, not %s' % recoil_type)
 
@@ -298,40 +308,35 @@ class S2(Pulse):
         super().__init__(config)
 
         self.phase = 'gas'  # To distinguish singlet/triplet time delay.
-        self.luminescence_switch_threshold = 100  # More then those electrons use simplified luminescence model
+        self.luminescence_switch_threshold = 100  # When to use simplified model (NOT IN USE)
 
     def __call__(self, instruction):
-        if isinstance(instruction, list) or len(instruction.shape) < 2:
-            if not np.all(instruction['recoil'] =='ele_ap'):
-                instruction = np.array([instruction])
+        if len(instruction.shape) < 1:
+            # shape of recarr is a bit strange
+            instruction = np.array([instruction])
 
         _, _, t, x, y, z, n_electron, recoil_type, *rest = [
             np.array(v).reshape(-1) for v in zip(*instruction)]
-
-        self._electron_timings = np.array([])
-        self._electron_gains = np.array([])
-        self._photon_timings = np.array([])
-        self._photon_channels = np.array([])
 
         positions = np.array([x, y]).T  # For map interpolation
         sc_gain = self.resource.s2_light_yield_map(positions) * self.config['s2_secondary_sc_gain']
 
         # Average drift time of the electrons
         self.drift_time_mean = - z / \
-                               self.config['drift_velocity_liquid'] + self.config['drift_time_gate']
+            self.config['drift_velocity_liquid'] + self.config['drift_time_gate']
 
         # Absorb electrons during the drift
         electron_lifetime_correction = np.exp(- 1 * self.drift_time_mean /
-                                              self.config['electron_lifetime_liquid'])
+            self.config['electron_lifetime_liquid'])
         cy = self.config['electron_extraction_yield'] * electron_lifetime_correction
-        
+
         #why are there cy greater than 1? We should check this
         cy = np.clip(cy, a_min = 0, a_max = 1)
 
-        n_electron = np.random.binomial(n=list(n_electron), p=cy)
+        n_electron = np.random.binomial(n=n_electron, p=cy)
 
         # Second generate photon timing and channel
-        self.photon_timings(t,n_electron, z, sc_gain)
+        self.photon_timings(t, n_electron, z, sc_gain)
         self.photon_channels(positions)
 
         super().__call__()
@@ -388,6 +393,8 @@ class S2(Pulse):
 
     def photon_timings(self,t, n_electron, z, sc_gain):
         # First generate electron timinga
+        self._electron_timings = np.array([])
+        self._electron_gains = np.array([])
         list(map(self.electron_timings, t, n_electron, z, sc_gain))
 
         # TODO log this
@@ -471,7 +478,7 @@ class S2(Pulse):
 
 
 @export
-class Afterpulse_Electron(S2):
+class PhotoIonization_Electron(S2):
     """
     Produce electron after pulse simulation, using already built cdfs
     The cdfs follow distribution parameters extracted from data.
@@ -482,19 +489,11 @@ class Afterpulse_Electron(S2):
         self.element_list = ['liquid']
         self._photon_timings = []
 
-    def __call__(self, signal_pulse):
-        if len(signal_pulse._photon_timings) == 0:
-            self.clear_pulse_cache()
-            return
+    def generate_instruction(self, signal_pulse, signal_pulse_instruction):
+        if len(signal_pulse._photon_timings) == 0: return []
+        return self.electron_afterpulse(signal_pulse, signal_pulse_instruction)
 
-        self.electron_afterpulse(signal_pulse)
-
-        if len(self.inst) < 1:
-            self.clear_pulse_cache()
-            return
-        super().__call__(self.inst)
-
-    def electron_afterpulse(self, signal_pulse):
+    def electron_afterpulse(self, signal_pulse, signal_pulse_instruction):
         """
         For electron afterpulses we assume a uniform x, y
         """
@@ -512,32 +511,28 @@ class Afterpulse_Electron(S2):
             low=0, high=len(signal_pulse._photon_timings),
             size=n_electron)]
 
-        self.inst = np.zeros(len(t_zeros),dtype=[('event_number', np.int), ('type', '<U2'), ('t', np.int), ('x', np.float32),
-                                          ('y', np.float32), ('z', np.float32), ('amp', np.int), ('recoil', '<U6')])
+        instruction = np.repeat(signal_pulse_instruction[0], n_electron)
 
-        self.inst['type'] = 's2'
-        self.inst['t'] = t_zeros
-        self.inst['x'], self.inst['y'] = self._randomize_XY(n_electron)
-        self.inst['z'] = - (ap_delay - self.config['drift_time_gate']) * \
+        instruction['type'] = 4 # pi_el
+        instruction['t'] = t_zeros
+        instruction['x'], instruction['y'] = self._rand_position(n_electron)
+        instruction['z'] = - (ap_delay - self.config['drift_time_gate']) * \
             self.config['drift_velocity_liquid']
-        self.inst['amp'] = 1
-        self.inst['recoil'] = 'ele_ap'
+        instruction['amp'] = 1
 
+        return instruction
 
-    def _randomize_XY(self, n):
+    def _rand_position(self, n):
         Rupper = 46
 
         r = np.sqrt(np.random.uniform(0, Rupper*Rupper, n))
         angle = np.random.uniform(-np.pi, np.pi, n)
 
-        x = r * np.cos(angle)
-        y = r * np.sin(angle)
-
-        return x, y
+        return r * np.cos(angle), r * np.sin(angle)
 
 
 @export
-class Afterpulse_PMT(Pulse):
+class PMT_Afterpulse(Pulse):
     """
     Produce pmt after pulse simulation, using already built cdfs
     The cdfs follow distribution parameters extracted from data.
@@ -612,77 +607,130 @@ class RawData(object):
         self.pulses = dict(
             s1=S1(config),
             s2=S2(config),
-            ele_ap=Afterpulse_Electron(config),
-            pmt_ap=Afterpulse_PMT(config),
-         )
-        self.pulses_cache = []
+            pi_el=PhotoIonization_Electron(config),
+            pmt_ap=PMT_Afterpulse(config),
+        )
         self.resource = Resource(self.config)
 
-    def __call__(self, instructions, truth_buffer=None):
-        self.last_pulse_end_time = 0
-        self.pulses_cache = []
-        self._raw_data = []
+    def __call__(self, instructions, truth_buffer=[]):
+
+        # Pre-load some constents from config
+        v = self.config['drift_velocity_liquid']
+        rext = self.config['right_raw_extension']
+
+        # Data cache
+        self._pulses_cache = []
+        self._raw_data_cache = []
+
+        # Iteration conditions
         self.source_finished = False
-        # if len(wfsim.strax_interface.instructions_dtype)>8:
+        self.last_pulse_end_time = - np.inf
 
-        for ix, instruction in enumerate(tqdm(instructions, desc='Simulating Raw Records')):
-            # Once there is a 1 ms gap process and clean pulses cache
-            # if self.pulses['ele_ap'].inst
-            # # obj.attr_name exists.
-            if len(instruction) > 8:
-                for par in instruction.dtype.names:
-                    if par in self.config:
-                        self.config[par] = instruction[par]
+        # Primary instructions must be sorted by signal time
+        # int(type) by design S1-esque being odd, S2-esque being even
+        # Make a list of clusters of instructions, with gap smaller then rext
+        inst_time = instructions['t'] + instructions['z']  / v * (instructions['type'] % 2 - 1)
+        inst_queue = np.argsort(inst_time)
+        inst_queue = np.split(inst_queue, np.where(np.diff(inst_time[inst_queue]) > rext)[0]+1)
 
-            if instruction['t'] > self.last_pulse_end_time + 1e7:
-                # Transform "pulses" into raw records
+        # Instruction buffer
+        instb = np.zeros(100000, dtype=instructions.dtype) # size ~ 1% of size of primary
+        instb_filled = np.zeros_like(instb, dtype=bool) # Mask of where buffer is filled
+
+        # ik those are illegible, messy logic. lmk if you have a better way
+        pbar = tqdm(total=len(inst_queue), desc='Simulating Raw Records')
+        while not self.source_finished:
+
+            # A) Add a new instruction into buffer
+            try:
+                ixs = inst_queue.pop(0) # The index from original instruction list
+                self.source_finished = len(inst_queue) == 0
+                assert len(np.where(~instb_filled)[0]) > len(ixs), "Run out of instruction buffer"
+                ib = np.where(~instb_filled)[0][:len(ixs)] # The index of first empty slot in buffer
+                instb[ib] = instructions[ixs]
+                instb_filled[ib] = True
+                pbar.update(1)
+            except: pass
+
+            # B) Cluster instructions again with gap size <= rext
+            instb_indx = np.where(instb_filled)[0]
+            instb_type = instb[instb_indx]['type']
+            instb_time = instb[instb_indx]['t'] + instb[instb_indx]['z']  \
+                / v * (instb_type % 2 - 1)
+            instb_queue = np.argsort(instb_time,  kind='stable')
+            instb_queue = np.split(instb_queue, 
+                np.where(np.diff(instb_time[instb_queue]) > rext)[0]+1)
+            
+            # C) Push pulse cache out first if nothing right after them
+            if np.min(instb_time) - self.last_pulse_end_time > rext and not np.isinf(self.last_pulse_end_time):
                 self.digitize_pulse_cache()
                 yield from self.ZLE()
-                self.pulses_cache = []
 
-            # Go on generating pulses from instruction
-            self.sim_data(instruction)
-            # For each instruction, truth will be wrote to buffer
-            # print(truth_buffer)
-            if len(truth_buffer):
-                self.get_truth(instruction, truth_buffer)
+            # D) Run all clusters before the current source
+            stop_at_this_group = False
+            for ibqs in instb_queue:
+                for ptype in [1, 2, 3, 4]:
+                    mask = instb_type[ibqs] == ptype
+                    if np.sum(mask) == 0: continue # No such instruction type
+                    instb_run = instb_indx[ibqs[mask]] # Take hold of todo list
 
-            # The instruction index is saved for chunking
-            self.instruction_index = ix
+                    if self.symtype(ptype) in ['s1', 's2']:
+                        stop_at_this_group = True # Stop group iteration
+                        _instb_run = np.array_split(instb_run, len(instb_run))
+                    else: _instb_run = [instb_run] # Small trick to make truth small
 
-        self.source_finished = True
-        self.digitize_pulse_cache()
-        yield from self.ZLE()
-        
+                    # Run pulse simulation for real
+                    for instb_run in _instb_run:
+                        for instb_secondary in self.sim_data(instb[instb_run]):
+                            ib = np.where(~instb_filled)[0][:len(instb_secondary)]
+                            instb[ib] = instb_secondary
+                            instb_filled[ib] = True
+
+                        if len(truth_buffer): # Extract truth info
+                            self.get_truth(instb[instb_run], truth_buffer)
+
+                        instb_filled[instb_run] = False # Free buffer AFTER copyting into truth buffer
+
+                if stop_at_this_group: break
+                self.digitize_pulse_cache() # from pulse cache to raw data
+                yield from self.ZLE()
+                
+            self.source_finished = len(inst_queue) == 0 and np.sum(instb_filled) == 0
+        pbar.close()
+
     @staticmethod
     def symtype(ptype):
-        return ['s1', 's2'][ptype - 1]
+        return ['s1', 's2', 'unknown', 'pi_el', 'pmt_ap'][ptype - 1]
 
     def sim_data(self, instruction):
-        ptype = self.symtype(instruction['type'])
+        ptype = self.symtype(instruction['type'][0])
         self.pulses[ptype](instruction)
-        self.pulses['ele_ap'](self.pulses[ptype])
         self.pulses['pmt_ap'](self.pulses[ptype])
-        #
-        for pt in [ptype, 'ele_ap', 'pmt_ap']:
-            self.pulses_cache += getattr(self.pulses[pt], '_pulses')
-        #
-        if len(self.pulses['ele_ap']._pulses)  > 0:
-            self.pulses['pmt_ap'](self.pulses['ele_ap'])
-            self.pulses_cache += getattr(self.pulses['pmt_ap'], '_pulses')
+        
+        for pt in [ptype, 'pmt_ap']:
+            _pulses = getattr(self.pulses[ptype], '_pulses')
+            if len(_pulses) > 0:
+                self._pulses_cache += _pulses
+                self.last_pulse_end_time = max(self.last_pulse_end_time,
+                    np.max([p['right'] for p in _pulses]) * 10)
 
-        if len(self.pulses_cache) > 0:
-            self.last_pulse_end_time = max(self.last_pulse_end_time,
-                np.max([p['right'] for p in self.pulses_cache]) * 10)
-
+        if ptype in ['s1', 's2']:
+            yield self.pulses['pi_el'].generate_instruction(
+                self.pulses[ptype], instruction)
+        
     def digitize_pulse_cache(self):
-        if len(self.pulses_cache) > 0:
+        """
+        Superimpose pulses (wfsim definition) into WFs w/ dynamic range truncation
+        """
+        if len(self._pulses_cache) > 0:
             self.current_2_adc = self.config['pmt_circuit_load_resistor'] \
                 * self.config['external_amplification'] \
                 / (self.config['digitizer_voltage_range'] / 2 ** (self.config['digitizer_bits']))
 
-            self.left = np.min([p['left'] for p in self.pulses_cache]) - self.config['trigger_window']
-            self.right = np.max([p['right'] for p in self.pulses_cache]) + self.config['trigger_window']
+            self.left = np.min([p['left'] for p in self._pulses_cache]) - self.config['trigger_window']
+            self.right = np.max([p['right'] for p in self._pulses_cache]) + self.config['trigger_window']
+            assert self.right - self.left < 100000, "Pulse cache too long"
+
             if self.left % 2 != 0: self.left -= 1 # Seems like a digizier effect
 
             # Use noise array to pave the fundation of the pulses
@@ -690,13 +738,13 @@ class RawData(object):
             self._raw_data = np.zeros((len(self.config['channels_in_detector']['tpc']),
                 self.right - self.left + 1), dtype=('<i8'))
 
-            for ix, _pulse in enumerate(self.pulses_cache):
+            for ix, _pulse in enumerate(self._pulses_cache):
                 # Could round instead of trunc... no one cares!
                 adc_wave = - np.trunc(_pulse['current'] * self.current_2_adc).astype(int)
                 self._raw_data[_pulse['channel'],
                     _pulse['left'] - self.left:_pulse['right'] - self.left + 1] += adc_wave
                 
-            self.pulses_cache = [] # Memory control
+            self._pulses_cache = [] # Memory control
 
             # Digitizers have finite number of bits per channel, so clip the signal.
             self._raw_data += self.config['digitizer_reference_baseline']
@@ -705,6 +753,9 @@ class RawData(object):
             # self._raw_data = np.clip(self._raw_data, 0, 2 ** (self.config['digitizer_bits']))
 
     def ZLE(self):
+        """
+        Modified software zero lengh encoding, coverting WFs into pulses (XENON definition)
+        """
         # Ask for memory allocation just once
         if 'zle_intervals_buffer' not in self.__dict__:
             self.zle_intervals_buffer = -1 * np.ones((50000, 2), dtype=np.int64)
@@ -737,8 +788,9 @@ class RawData(object):
 
     def get_truth(self, instruction, truth_buffer):
         ix = np.argmin(truth_buffer['fill']) # Index of the first line not filled
+        pulse = self.pulses[self.symtype(instruction['type'][0])]
         for name in 'photon', 'electron':
-            times = getattr(self.pulses[self.symtype(instruction['type'])], '_{name}_timings'.format(name=name), [])
+            times = getattr(pulse, '_{name}_timings'.format(name=name), [])
             if len(times) != 0:
                 truth_buffer[ix]['n_{name}'.format(name=name)] = len(times)
                 truth_buffer[ix]['t_mean_{name}'.format(name=name)] = np.mean(times)
@@ -746,13 +798,23 @@ class RawData(object):
                 truth_buffer[ix]['t_last_{name}'.format(name=name)] = np.max(times)
                 truth_buffer[ix]['t_sigma_{name}'.format(name=name)] = np.std(times)
             else:
+                if self.symtype(instruction['type'][0]) not in ['s1', 's2']: return
                 truth_buffer[ix]['n_{name}'.format(name=name)] = 0
                 truth_buffer[ix]['t_mean_{name}'.format(name=name)] = np.nan
                 truth_buffer[ix]['t_first_{name}'.format(name=name)] = np.nan
                 truth_buffer[ix]['t_last_{name}'.format(name=name)] = np.nan
                 truth_buffer[ix]['t_sigma_{name}'.format(name=name)] = np.nan
+        # Area fraction top
+        channels = getattr(self.pulses[self.symtype(instruction['type'][0])], 
+            '_photon_channels', [])
+        n_dpe = getattr(pulse, '_n_double_pe', 0)
+        n_dpe_bot = getattr(pulse, '_n_double_pe_bot', 0)
+        truth_buffer[ix]['n_photon'] += n_dpe
+        truth_buffer[ix]['n_photon_bottom'] = np.sum(np.isin(channels, self.config['channels_bottom'])) \
+            + n_dpe_bot
+        # Copy-pasting instruction
         for name in instruction.dtype.names:
-            truth_buffer[ix][name] = instruction[name]
+            truth_buffer[ix][name] = instruction[name][0]
         truth_buffer[ix]['fill'] = True
 
     def get_real_noise(self, length):
