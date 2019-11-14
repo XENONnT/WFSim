@@ -625,6 +625,7 @@ class RawData(object):
         # Iteration conditions
         self.source_finished = False
         self.last_pulse_end_time = - np.inf
+        self.instruction_event_number = np.min(instructions['event_number'])
 
         # Primary instructions must be sorted by signal time
         # int(type) by design S1-esque being odd, S2-esque being even
@@ -717,6 +718,8 @@ class RawData(object):
         if ptype in ['s1', 's2']:
             yield self.pulses['pi_el'].generate_instruction(
                 self.pulses[ptype], instruction)
+
+            self.instruction_event_number = instruction['event_number'][0]
         
     def digitize_pulse_cache(self):
         """
@@ -814,7 +817,12 @@ class RawData(object):
             + n_dpe_bot
         # Copy-pasting instruction
         for name in instruction.dtype.names:
-            truth_buffer[ix][name] = instruction[name][0]
+            if len(instruction) > 1 and name in 'txyz':
+                truth_buffer[ix][name] = np.average(instruction[name])
+            elif len(instruction) > 1 and name == 'amp':
+                truth_buffer[ix][name] = np.sum(instruction[name])
+            else:
+                truth_buffer[ix][name] = instruction[name][0]
         truth_buffer[ix]['fill'] = True
 
     def get_real_noise(self, length):

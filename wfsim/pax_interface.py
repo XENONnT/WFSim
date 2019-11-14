@@ -22,21 +22,22 @@ class PaxEvents(object):
     def __init__(self, config):
         self.config = config
         self.rawdata = RawData(self.config)
+        
         self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)]) # 500 s1 + 500 s2
 
     def __call__(self, instructions):
         event_i = 0 # Indices of event
         new_event = True
-        
+
         first_left = np.inf
         last_right = -np.inf
         
         for channel, left, right, data in self.rawdata(instructions, self.truth_buffer):
-            if instructions['event_number'][self.rawdata.instruction_index] > event_i:
+            if self.rawdata.instruction_event_number > event_i:
                 event.start_time=(first_left - 100000) * self.config['sample_duration']
                 event.stop_time=(last_right + 100000) * self.config['sample_duration']
                 yield event
-                event_i = instructions['event_number'][self.rawdata.instruction_index]
+                event_i = self.rawdata.instruction_event_number
                 new_event = True
 
             if new_event:
@@ -68,6 +69,7 @@ default_config = {
         'strax_auxiliary_files/master/fax_files/fax_config.json'),
     'samples_to_store_before':2,
     'samples_to_store_after':20,
+    'right_raw_extension':10000,
     'trigger_window':50,
     'zle_threshold':0,
     'run_number':10000, # Change run_number to prevent overwritting
@@ -184,3 +186,10 @@ class PaxEventSimulator(object):
             event = self.transfer_plugin.transfer_event(event)    
             self.output_plugin.write_event(event)
         self.output_plugin.close_current_file()
+
+        # Save truth file as well
+        truth_file_path = os.path.join(self.output_plugin.output_dir,
+                '%s-%d-truth.csv' % (self.config['experiment'], self.config['run_number']))
+        truth = pd.DataFrame(self.pax_event.truth_buffer[self.pax_event.truth_buffer['fill']])
+        truth.drop(columns='fill', inplace=True)
+        truth.to_csv(truth_file_path, index=False)
