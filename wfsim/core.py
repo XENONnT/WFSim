@@ -709,7 +709,7 @@ class RawData(object):
         self.pulses['pmt_ap'](self.pulses[ptype])
         
         for pt in [ptype, 'pmt_ap']:
-            _pulses = getattr(self.pulses[ptype], '_pulses')
+            _pulses = getattr(self.pulses[pt], '_pulses')
             if len(_pulses) > 0:
                 self._pulses_cache += _pulses
                 self.last_pulse_end_time = max(self.last_pulse_end_time,
@@ -725,7 +725,9 @@ class RawData(object):
         """
         Superimpose pulses (wfsim definition) into WFs w/ dynamic range truncation
         """
-        if len(self._pulses_cache) > 0:
+        if len(self._pulses_cache) == 0:
+            self._raw_data = []
+        else:
             self.current_2_adc = self.config['pmt_circuit_load_resistor'] \
                 * self.config['external_amplification'] \
                 / (self.config['digitizer_voltage_range'] / 2 ** (self.config['digitizer_bits']))
@@ -761,7 +763,7 @@ class RawData(object):
         """
         # Ask for memory allocation just once
         if 'zle_intervals_buffer' not in self.__dict__:
-            self.zle_intervals_buffer = -1 * np.ones((50000, 2), dtype=np.int64)
+            self.zle_intervals_buffer = -1 * np.ones((50000, 2), dtype=np.int64)            
         
         for ix, data in enumerate(self._raw_data):
             # For simulated data taking reference baseline as baseline
