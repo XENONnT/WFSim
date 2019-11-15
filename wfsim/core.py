@@ -709,7 +709,7 @@ class RawData(object):
         self.pulses['pmt_ap'](self.pulses[ptype])
         
         for pt in [ptype, 'pmt_ap']:
-            _pulses = getattr(self.pulses[ptype], '_pulses')
+            _pulses = getattr(self.pulses[pt], '_pulses')
             if len(_pulses) > 0:
                 self._pulses_cache += _pulses
                 self.last_pulse_end_time = max(self.last_pulse_end_time,
