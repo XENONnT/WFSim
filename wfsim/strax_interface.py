@@ -183,16 +183,16 @@ class ChunkRawRecords(object):
 
     def final_results(self):
         records = self.record_buffer[:self.blevel] # No copying the records from buffer
-        mask = records['time'] < self.chunk_time
-        records = records[mask]
+        maska = records['time'] < self.chunk_time
+        records = records[maska]
 
         records = strax.sort_by_time(records) # Do NOT remove this line
         strax.baseline(records)
         strax.integrate(records)
 
-        mask = self.truth_buffer['fill'] & (self.truth_buffer['t_first_photon'] < self.chunk_time)
-        truth = self.truth_buffer[mask]
-        self.truth_buffer[mask]['fill'] = False
+        maskb = self.truth_buffer['fill'] & (self.truth_buffer['t_first_photon'] < self.chunk_time)
+        truth = self.truth_buffer[maskb]
+        self.truth_buffer[maskb]['fill'] = False
 
         truth.sort(order='t_first_photon')
         # Return truth without 'fill' field
@@ -202,8 +202,8 @@ class ChunkRawRecords(object):
 
         yield dict(raw_records=records, truth=_truth)
         
-        self.record_buffer[:np.sum(~mask)] = records[~mask]
-        self.blevel = np.sum(~mask)
+        self.record_buffer[:np.sum(~maska)] = self.record_buffer[:self.blevel][~maska]
+        self.blevel = np.sum(~maska)
 
     def source_finished(self):
         return self.rawdata.source_finished
