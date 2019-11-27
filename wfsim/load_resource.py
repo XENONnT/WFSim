@@ -52,26 +52,26 @@ class Resource(object):
                 self.s2_per_pmt_params = get_resource(self.config['s2_per_pmt_params'], fmt='csv')
 
             if config['detector'] == 'XENONnT':
-                self.s1_light_yield =  get_resource('/Users/petergaemers/Downloads/XENONnT_s1_xyz_patterns_corrected_MCv3.0.0.json.gz',fmt = 'json.gz')
+                self.s1_light_yield =  get_resource('/dali/lgrandi/pgaemers/fax_files/XENONnT_s1_xyz_patterns_corrected_MCv3.0.0.json.gz',fmt = 'json.gz')
                 self.s1_light_yield['map'] = np.sum(self.s1_light_yield['map'][:][:][:],axis=3)
                 self.s1_light_yield_map = itp_map(self.s1_light_yield)
                 self.s1_pattern_map = itp_map(
-                '/Users/petergaemers/Downloads/XENONnT_s1_xyz_patterns_corrected_MCv3.0.0.json.gz', fmt='json.gz')
+                '/dali/lgrandi/pgaemers/fax_files/XENONnT_s1_xyz_patterns_corrected_MCv3.0.0.json.gz', fmt='json.gz')
 
                 self.s2_light_yield = get_resource(
-                    '/Users/petergaemers/Downloads/XENONnT_s2_xy_patterns_topbottom_corrected_MCv3.0.0.json.gz',
+                    '/dali/lgrandi/pgaemers/fax_files/XENONnT_s2_xy_patterns_topbottom_corrected_MCv3.0.0.json.gz',
                     fmt='json.gz')
                 self.s2_light_yield['map'] = np.sum(self.s2_light_yield['map'][:][:], axis=2)
                 self.s2_light_yield_map = itp_map(self.s2_light_yield)
                 self.s2_pattern_map = itp_map(
-                        '/Users/petergaemers/Downloads/XENONnT_s2_xy_patterns_topbottom_corrected_MCv3.0.0.json.gz',
+                        '/dali/lgrandi/pgaemers/fax_files/XENONnT_s2_xy_patterns_topbottom_corrected_MCv3.0.0.json.gz',
                         fmt='json.gz')
 
             # Electron After Pulses compressed, haven't figure out how pkl.gz works
             self.uniform_to_ele_ap = get_resource(self.config['ele_ap_pdfs'], fmt='pkl.gz')
 
             # Photon After Pulses
-            self.uniform_to_pmt_ap = get_resource('/Users/petergaemers/Desktop/python/WFSim/notebooks/xnt_pmt_afterpulse_config.pkl.gz', fmt='pkl.gz')
+            self.uniform_to_pmt_ap = get_resource('/dali/lgrandi/pgaemers/fax_files/xnt_pmt_afterpulse_config.pkl.gz', fmt='pkl.gz')
                 # get_resource(self.config['photon_ap_cdfs'], fmt='pkl.gz')
 
             # Noise sample
