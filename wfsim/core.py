@@ -1,7 +1,6 @@
 import logging
-import time
 
-from numba import int64, float64, njit
+from numba import njit
 import numpy as np
 from scipy.interpolate import interp1d
 from tqdm import tqdm
@@ -229,7 +228,11 @@ class S1(Pulse):
             np.array(v).reshape(-1) for v in zip(*instruction)]
         
         positions = np.array([x, y, z]).T  # For map interpolation
-        ly = self.resource.s1_light_yield_map(positions) * self.config['s1_detection_efficiency']
+        if self.config['detector']=='XENONnT':
+            #for some reason light yield map crashes TODO
+            ly = 1
+        else:
+            self.resource.s1_light_yield_map(positions) * self.config['s1_detection_efficiency']
         n_photons = np.random.binomial(n=n_photons, p=ly)
 
         self._photon_timings = np.array([])
@@ -319,7 +322,11 @@ class S2(Pulse):
             np.array(v).reshape(-1) for v in zip(*instruction)]
 
         positions = np.array([x, y]).T  # For map interpolation
-        sc_gain = self.resource.s2_light_yield_map(positions) * self.config['s2_secondary_sc_gain']
+        if self.config['detector'] == 'XENONnT':
+            #Light yield map crashes, but the result is 1 for all positions in the tpc
+            sc_gain = np.repeat(self.config['s2_secondary_sc_gain'], len(positions))
+        else:
+            sc_gain = self.resource.s2_light_yield_map(positions) * self.config['s2_secondary_sc_gain']
 
         # Average drift time of the electrons
         self.drift_time_mean = - z / \
@@ -434,29 +441,40 @@ class S2(Pulse):
         # A fraction of photons are given uniformally to top pmts regardless of pattern
         p_random = self.config.get('randomize_fraction_of_s2_top_array_photons', 0)
         # Use pattern to get top channel probability
-        # p_pattern = self.s2_pattern_map(points)
-        p_pattern = self.s2_pattern_map_pp(points)
-
-        # Probability of each bottom channels
-        p_per_channel_bottom = (1 - p_top) / len(self.config['channels_bottom']) \
-                               * np.ones_like(self.config['channels_bottom'])
-
-        # Randomly assign to channel given probability of each channel
-        # Sum probabilities over channels should be 1
         self._photon_channels = np.array([])
-        for u, n in zip(*np.unique(self._instruction, return_counts=True)):
-            p_per_channel_top = p_pattern[u] / np.sum(p_pattern[u]) * p_top * (1 - p_random)
-            channels = np.array(self.config['channels_in_detector']['tpc'])
-            p_per_channel = np.concatenate([p_per_channel_top, p_per_channel_bottom])
-            # p_per_channel[np.in1d(channels, self.turned_off_pmts)] = 0
+        if self.config['detector'] == 'XENON1T':
+            p_pattern = self.s2_pattern_map_pp(points)
+        # Probability of each bottom channels
+            p_per_channel_bottom = (1 - p_top) / len(self.config['channels_bottom']) \
+                                   * np.ones_like(self.config['channels_bottom'])
 
-            _photon_channels = np.random.choice(
-                channels,
-                size=n,
-                p=p_per_channel / np.sum(p_per_channel),
-                replace=True)
+            # Randomly assign to channel given probability of each channel
+            # Sum probabilities over channels should be 1
+            for u, n in zip(*np.unique(self._instruction, return_counts=True)):
+                p_per_channel_top = p_pattern[u] / np.sum(p_pattern[u]) * p_top * (1 - p_random)
+                channels = np.array(self.config['channels_in_detector']['tpc'])
+                p_per_channel = np.concatenate([p_per_channel_top, p_per_channel_bottom])
 
-            self._photon_channels = np.append(self._photon_channels, _photon_channels)
+                _photon_channels = np.random.choice(
+                    channels,
+                    size=n,
+                    p=p_per_channel / np.sum(p_per_channel),
+                    replace=True)
+
+                self._photon_channels = np.append(self._photon_channels, _photon_channels)
+
+
+        if self.config['detector'] == 'XENONnT':
+            p_pattern = self.resource.s2_pattern_map(points)[0]
+
+            for u, n in zip(*np.unique(self._instruction, return_counts=True)):
+                channels = np.array(self.config['channels_in_detector']['tpc'])
+                _photon_channels = np.random.choice(
+                    channels,
+                    size=n,
+                    p=p_pattern / np.sum(p_pattern),
+                    replace=True)
+                self._photon_channels = np.append(self._photon_channels, _photon_channels)
 
         self._photon_channels = self._photon_channels.astype(int)
 
@@ -514,7 +532,7 @@ class PhotoIonization_Electron(S2):
         instruction = np.repeat(signal_pulse_instruction[0], n_electron)
 
         instruction['type'] = 4 # pi_el
-        instruction['t'] = t_zeros
+        instruction['time'] = t_zeros
         instruction['x'], instruction['y'] = self._rand_position(n_electron)
         instruction['z'] = - (ap_delay - self.config['drift_time_gate']) * \
             self.config['drift_velocity_liquid']
@@ -630,7 +648,7 @@ class RawData(object):
         # Primary instructions must be sorted by signal time
         # int(type) by design S1-esque being odd, S2-esque being even
         # Make a list of clusters of instructions, with gap smaller then rext
-        inst_time = instructions['t'] + instructions['z']  / v * (instructions['type'] % 2 - 1)
+        inst_time = instructions['time'] + instructions['z']  / v * (instructions['type'] % 2 - 1)
         inst_queue = np.argsort(inst_time)
         inst_queue = np.split(inst_queue, np.where(np.diff(inst_time[inst_queue]) > rext)[0]+1)
 
@@ -656,7 +674,7 @@ class RawData(object):
             # B) Cluster instructions again with gap size <= rext
             instb_indx = np.where(instb_filled)[0]
             instb_type = instb[instb_indx]['type']
-            instb_time = instb[instb_indx]['t'] + instb[instb_indx]['z']  \
+            instb_time = instb[instb_indx]['time'] + instb[instb_indx]['z']  \
                 / v * (instb_type % 2 - 1)
             instb_queue = np.argsort(instb_time,  kind='stable')
             instb_queue = np.split(instb_queue, 
@@ -704,6 +722,10 @@ class RawData(object):
         return ['s1', 's2', 'unknown', 'pi_el', 'pmt_ap'][ptype - 1]
 
     def sim_data(self, instruction):
+        if len(instruction) > 8:
+            for par in instruction.dtype.names:
+                if par in self.config:
+                    self.config[par] = instruction[par]
         ptype = self.symtype(instruction['type'][0])
         self.pulses[ptype](instruction)
         self.pulses['pmt_ap'](self.pulses[ptype])
@@ -809,6 +831,8 @@ class RawData(object):
                 truth_buffer[ix]['t_first_{name}'.format(name=name)] = np.nan
                 truth_buffer[ix]['t_last_{name}'.format(name=name)] = np.nan
                 truth_buffer[ix]['t_sigma_{name}'.format(name=name)] = np.nan
+            truth_buffer[ix]['endtime'] = np.max(
+                [truth_buffer[ix]['t_last_photon'], truth_buffer[ix]['t_last_electron']]).astype(np.int64)
         # Area fraction top
         channels = getattr(self.pulses[self.symtype(instruction['type'][0])], 
             '_photon_channels', [])

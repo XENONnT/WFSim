@@ -1,6 +1,4 @@
 import logging
-import time
-import pickle
 import uproot
 import nestpy
 
@@ -15,7 +13,7 @@ from .core import RawData
 export, __all__ = strax.exporter()
 __all__ += ['instruction_dtype', 'truth_extra_dtype']
 
-instruction_dtype = [('event_number', np.int), ('type', np.int), ('t', np.int), 
+instruction_dtype = [('event_number', np.int), ('type', np.int), ('time', np.int),
     ('x', np.float32), ('y', np.float32), ('z', np.float32), 
     ('amp', np.int), ('recoil', '<U2')]
 
@@ -25,7 +23,7 @@ truth_extra_dtype = [
     ('t_first_photon', np.float), ('t_last_photon', np.float), 
     ('t_mean_photon', np.float), ('t_sigma_photon', np.float), 
     ('t_first_electron', np.float), ('t_last_electron', np.float), 
-    ('t_mean_electron', np.float), ('t_sigma_electron', np.float),]
+    ('t_mean_electron', np.float), ('t_sigma_electron', np.float), ('endtime',np.int64)]
 
 log = logging.getLogger('SimulationCore')
 
@@ -37,8 +35,8 @@ def rand_instructions(c):
 
     instructions = np.zeros(2 * n, dtype=instruction_dtype)
     uniform_times = c['total_time'] * (np.arange(n) + 0.5) / n
-    instructions['t'] = np.repeat(uniform_times, 2) * int(1e9)
-    instructions['event_number'] = np.digitize(instructions['t'], 
+    instructions['time'] = np.repeat(uniform_times, 2) * int(1e9)
+    instructions['event_number'] = np.digitize(instructions['time'],
          1e9 * np.arange(c['nchunk']) * c['chunk_size']) - 1
     instructions['type'] = np.tile([1, 2], n)
     instructions['recoil'] = ['er' for i in range(n * 2)]
@@ -96,7 +94,7 @@ def read_g4(file):
     n_instructions = len(time.flatten())
     ins = np.zeros(2*n_instructions, dtype=instruction_dtype)
 
-    e_dep, ins['x'], ins['y'], ins['z'], ins['t'] = e_dep.flatten(), \
+    e_dep, ins['x'], ins['y'], ins['z'], ins['time'] = e_dep.flatten(), \
                                                     np.repeat(xp.flatten(),2 )/ 10, \
                                                     np.repeat(yp.flatten(),2 ) / 10, \
                                                     np.repeat(zp.flatten(),2 ) / 10, \
@@ -148,7 +146,7 @@ class ChunkRawRecords(object):
         cksz = self.config['chunk_size'] * 1e9
         
         self.blevel = buffer_filled_level = 0
-        self.chunk_time = np.min(instructions['t']) + cksz # Starting chunk
+        self.chunk_time = np.min(instructions['time']) + cksz # Starting chunk
 
         for channel, left, right, data in self.rawdata(instructions, self.truth_buffer):
             pulse_length = right - left + 1
@@ -201,7 +199,6 @@ class ChunkRawRecords(object):
             _truth[name] = truth[name]
 
         yield dict(raw_records=records, truth=_truth)
-        
         self.record_buffer[:np.sum(~maska)] = self.record_buffer[:self.blevel][~maska]
         self.blevel = np.sum(~maska)
 
@@ -227,9 +224,10 @@ class ChunkRawRecords(object):
                  default=2),
     strax.Option('samples_to_store_after',
                  default=20),
-    strax.Option('right_raw_extension', default=10000),
+    strax.Option('right_raw_extension', default=50000),
     strax.Option('trigger_window', default=50),
-    strax.Option('zle_threshold', default=0))
+    strax.Option('zle_threshold', default=0),
+    strax.Option('detector',default='XENON1T', track=True))
 class FaxSimulatorPlugin(strax.Plugin):
     depends_on = tuple()
 
@@ -311,5 +309,5 @@ class RawRecordsFromFax(FaxSimulatorPlugin):
             result = next(self.sim_iter)
         except StopIteration:
             raise RuntimeError("Bug in chunk count computation")
-        # self._sort_check(result['raw_records'])
+        self._sort_check(result['raw_records'])
         return result
