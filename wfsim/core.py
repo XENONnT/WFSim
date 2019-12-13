@@ -756,7 +756,7 @@ class RawData(object):
 
             self.left = np.min([p['left'] for p in self._pulses_cache]) - self.config['trigger_window']
             self.right = np.max([p['right'] for p in self._pulses_cache]) + self.config['trigger_window']
-            assert self.right - self.left < 100000, "Pulse cache too long"
+            assert self.right - self.left < 200000, "Pulse cache too long"
 
             if self.left % 2 != 0: self.left -= 1 # Seems like a digizier effect
 
@@ -831,8 +831,7 @@ class RawData(object):
                 truth_buffer[ix]['t_first_{name}'.format(name=name)] = np.nan
                 truth_buffer[ix]['t_last_{name}'.format(name=name)] = np.nan
                 truth_buffer[ix]['t_sigma_{name}'.format(name=name)] = np.nan
-            truth_buffer[ix]['endtime'] = np.max(
-                [truth_buffer[ix]['t_last_photon'], truth_buffer[ix]['t_last_electron']]).astype(np.int64)
+            truth_buffer[ix]['endtime'] = truth_buffer[ix]['t_last_photon'].astype(np.int64)
         # Area fraction top
         channels = getattr(self.pulses[self.symtype(instruction['type'][0])], 
             '_photon_channels', [])

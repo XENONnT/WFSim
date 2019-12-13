@@ -147,6 +147,7 @@ class ChunkRawRecords(object):
         
         self.blevel = buffer_filled_level = 0
         self.chunk_time = np.min(instructions['time']) + cksz # Starting chunk
+        self.last_digitized_right = 0
 
         for channel, left, right, data in self.rawdata(instructions, self.truth_buffer):
             pulse_length = right - left + 1
@@ -177,18 +178,22 @@ class ChunkRawRecords(object):
                 (0, records_needed * samples_per_record - pulse_length), 'constant').reshape((-1, samples_per_record))
             self.blevel += records_needed
 
+            if self.rawdata.right != self.last_digitized_right:
+                self.last_digitized_right = self.rawdata.right
+
         yield from self.final_results()
 
     def final_results(self):
         records = self.record_buffer[:self.blevel] # No copying the records from buffer
-        maska = records['time'] < self.chunk_time
+        maska = records['time'] < self.last_digitized_right * self.config['sample_duration']
         records = records[maska]
 
         records = strax.sort_by_time(records) # Do NOT remove this line
         strax.baseline(records)
         strax.integrate(records)
 
-        maskb = self.truth_buffer['fill'] & (self.truth_buffer['t_first_photon'] < self.chunk_time)
+        maskb = self.truth_buffer['fill'] & \
+        (self.truth_buffer['t_first_photon'] < self.last_digitized_right * self.config['sample_duration'])
         truth = self.truth_buffer[maskb]
         self.truth_buffer[maskb]['fill'] = False
 
