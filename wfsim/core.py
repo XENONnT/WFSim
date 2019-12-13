@@ -65,7 +65,7 @@ class Pulse(object):
             # Sample from spe scaling factor distribution and to individual gain
             # In contrast to pmt afterpulse that should have gain determined before this step
             if '_photon_gains' not in self.__dict__:
-                if self.config['detector'] == 'XENON1T:
+                if self.config['detector'] == 'XENON1T':
                     _channel_photon_gains = self.config['gains'][channel] \
                     * self.uniform_to_pe_arr[channel](np.random.random(len(_channel_photon_timings)))
 
@@ -82,7 +82,7 @@ class Pulse(object):
 
                 _dpe_index = np.random.choice(np.arange(len(_channel_photon_timings)),
                                               size=n_double_pe, replace=False)
-                if self.config['detector'] == 'XENON1T:
+                if self.config['detector'] == 'XENON1T':
                     _channel_photon_gains[_dpe_index] += self.config['gains'][channel] \
                     * self.uniform_to_pe_arr[channel](np.random.random(n_double_pe))
                 else:
