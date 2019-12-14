@@ -241,7 +241,7 @@ class S1(Pulse):
             #for some reason light yield map crashes TODO
             ly = 1
         else:
-            self.resource.s1_light_yield_map(positions) * self.config['s1_detection_efficiency']
+            ly = self.resource.s1_light_yield_map(positions) * self.config['s1_detection_efficiency']
         n_photons = np.random.binomial(n=n_photons, p=ly)
 
         self._photon_timings = np.array([])
