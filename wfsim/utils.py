@@ -211,7 +211,10 @@ class InterpolatingMap(object):
                     'name', 'irregular']
     def __init__(self, data, fmt):
         self.log = logging.getLogger('InterpolatingMap')
-        self.data = get_resource(data, fmt)
+        if fmt !=None:
+            self.data = get_resource(data, fmt)
+        else:
+            self.data = data
 
         self.coordinate_system = cs = self.data['coordinate_system']
         if not len(cs):
