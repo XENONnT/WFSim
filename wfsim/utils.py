@@ -209,9 +209,9 @@ class InterpolatingMap(object):
     """
     data_field_names = ['timestamp', 'description', 'coordinate_system',
                     'name', 'irregular']
-    def __init__(self, data, fmt):
+    def __init__(self, data, fmt = None):
         self.log = logging.getLogger('InterpolatingMap')
-        if fmt !=None:
+        if fmt is not None:
             self.data = get_resource(data, fmt)
         else:
             self.data = data
