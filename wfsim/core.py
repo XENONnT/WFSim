@@ -5,7 +5,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 from tqdm import tqdm
 
-from .load_resource import Resource
+from .load_resource import load_config
 from strax import exporter
 from . import units
 from .utils import find_intervals_above_threshold
@@ -21,7 +21,7 @@ class Pulse(object):
     def __init__(self, config):
         self.config = config
         self.config.update(getattr(self.config, self.__class__.__name__, {}))
-        self.resource = Resource(config)
+        self.resource = load_config(config)
 
         self.init_pmt_current_templates()
         self.init_spe_scaling_factor_distributions()
@@ -638,7 +638,7 @@ class RawData(object):
             pi_el=PhotoIonization_Electron(config),
             pmt_ap=PMT_Afterpulse(config),
         )
-        self.resource = Resource(self.config)
+        self.resource = load_config(self.config)
 
     def __call__(self, instructions, truth_buffer=[]):
 
