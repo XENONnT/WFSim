@@ -53,7 +53,7 @@ class Resource:
         else:
             raise ValueError(f"Unsupported detector {config['detector']}")
 
-        commit = 'e5f24805490f32d3b681ace6e7b7b3e5eef8500b'
+        commit = 'master'   # Replace this by a commit hash if you feel solid and responsible
         url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/fax_files'
         for k, v in files.items():
             if v.startswith('/'):
