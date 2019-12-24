@@ -6,8 +6,9 @@ from scipy.interpolate import interp1d
 from tqdm import tqdm
 
 from .load_resource import Resource
-from .utils import find_intervals_below_threshold, exporter
+from strax import exporter
 from . import units
+from .utils import find_intervals_above_threshold
 
 export, __all__ = exporter()
 
@@ -805,7 +806,7 @@ class RawData(object):
             else:
                 threshold = self.config['digitizer_reference_baseline'] - self.config['zle_threshold'] - 1
 
-            n_itvs_found = find_intervals_below_threshold(
+            n_itvs_found = find_intervals_above_threshold(
                 data,
                 threshold=threshold,
                 holdoff=self.config['trigger_window'] + self.config['trigger_window'] + 1,
