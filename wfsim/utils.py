@@ -33,14 +33,14 @@ def init_spe_scaling_factor_distributions(file):
 @export
 @numba.jit(numba.int32(numba.int64[:], numba.int64, numba.int64, numba.int64[:, :]),
            nopython=True)
-def find_intervals_above_threshold(w, threshold, holdoff, result_buffer):
-    """Fills result_buffer with l, r bounds of intervals in w > threshold.
+def find_intervals_below_threshold(w, threshold, holdoff, result_buffer):
+    """Fills result_buffer with l, r bounds of intervals in w < threshold.
     :param w: Waveform to do hitfinding in
     :param threshold: Threshold for including an interval
     :param result_buffer: numpy N*2 array of ints, will be filled by function.
                           if more than N intervals are found, none past the first N will be processed.
     :returns : number of intervals processed
-    Boundary indices are inclusive, i.e. the right boundary is the last index which was > threshold
+    Boundary indices are inclusive, i.e. the right boundary is the last index which was < threshold
     """
     result_buffer_size = len(result_buffer)
     last_index_in_w = len(w) - 1
