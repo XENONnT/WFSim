@@ -106,8 +106,8 @@ def read_g4(file):
                                                     np.repeat(yp.flatten(),2 ) / 10, \
                                                     np.repeat(zp.flatten(),2 ) / 10, \
                                                     1e9*np.repeat(time.flatten(),2 )
-    
-    
+
+
     
     ins['event_number'] = np.repeat(event_number,2)
     ins['type'] = np.tile((1, 2), n_instructions)
@@ -132,6 +132,7 @@ def read_g4(file):
     
     return ins
 
+
 @export
 def instruction_from_csv(filename):
     """Return wfsim instructions from a csv
@@ -152,7 +153,7 @@ def instruction_from_csv(filename):
     recs = df.to_records(index=False, column_dtypes=dtype_dict)
     expected_dtype = np.dtype(instruction_dtype)
     assert recs.dtype == expected_dtype, \
-        f"CSV {file} produced wrong dtype. Got {recs.dtype}, expected {expected_dtype}."
+        f"CSV {filename} produced wrong dtype. Got {recs.dtype}, expected {expected_dtype}."
     return recs
 
 
@@ -296,14 +297,12 @@ class FaxSimulatorPlugin(strax.Plugin):
         assert np.all(self.instructions['z'] < 0) & np.all(self.instructions['z']>-100), "Interation is outside the TPC"
         assert np.all(self.instructions['amp']>0), "Interaction has zero size"
 
-
     def _sort_check(self, result):
         if result['time'][0] < self.last_chunk_time + 5000:
             raise RuntimeError(
                 "Simulator returned chunks with insufficient spacing. "
-                "Last chunk's max time was {timeA}, "
-                "this chunk's first time is {timeB}.".format(timeA=self.last_chunk_time, 
-        timeB=result['time'][0]))
+                f"Last chunk's max time was {self.last_chunk_time}, "
+                f"this chunk's first time is {result['time'][0]}.")
         if np.diff(result['time']).min() < 0:
             raise RuntimeError("Simulator returned non-sorted records!")
         self.last_chunk_time = result['time'].max()
