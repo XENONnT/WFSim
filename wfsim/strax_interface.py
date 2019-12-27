@@ -13,9 +13,15 @@ from .core import RawData
 export, __all__ = strax.exporter()
 __all__ += ['instruction_dtype', 'truth_extra_dtype']
 
-instruction_dtype = [('event_number', np.int), ('type', np.int), ('time', np.int),
-    ('x', np.float32), ('y', np.float32), ('z', np.float32), 
-    ('amp', np.int), ('recoil', '<U2')]
+instruction_dtype = [
+    ('event_number', np.int32),
+    ('type', np.int8),
+    ('time', np.int64),
+    ('x', np.float32),
+    ('y', np.float32),
+    ('z', np.float32),
+    ('amp', np.int32),
+    ('recoil', '<U2')]
 
 truth_extra_dtype = [
     ('n_electron', np.float),
@@ -52,6 +58,7 @@ def rand_instructions(c):
     instructions['amp'] = np.vstack([nphotons, nelectrons]).T.flatten().astype(int)
 
     return instructions
+
 
 @export
 def read_g4(file):
@@ -126,8 +133,28 @@ def read_g4(file):
     return ins
 
 @export
-def instruction_from_csv(file):
-    return pd.read_csv(file).to_records(index=False)
+def instruction_from_csv(filename):
+    """Return wfsim instructions from a csv
+
+    :param filename: Path to csv file
+    """
+    # Pandas does not grok the <U2 field 'recoil' correctly.
+    # Probably it loads it as some kind of string instead...
+    # we'll get it into the right format in the next step.
+    dtype_dict = dict(instruction_dtype)
+    df = pd.read_csv(filename,
+                     names=list(dtype_dict.keys()),
+                     skiprows=1,
+                     dtype={k: v for k, v in dtype_dict.items()
+                            if k != 'recoil'})
+
+    # Convert to records and check format
+    recs = df.to_records(index=False, column_dtypes=dtype_dict)
+    expected_dtype = np.dtype(instruction_dtype)
+    assert recs.dtype == expected_dtype, \
+        f"CSV {file} produced wrong dtype. Got {recs.dtype}, expected {expected_dtype}."
+    return recs
+
 
 @export
 class ChunkRawRecords(object):
@@ -280,6 +307,7 @@ class FaxSimulatorPlugin(strax.Plugin):
         if np.diff(result['time']).min() < 0:
             raise RuntimeError("Simulator returned non-sorted records!")
         self.last_chunk_time = result['time'].max()
+
 
 @export
 class RawRecordsFromFax(FaxSimulatorPlugin):
