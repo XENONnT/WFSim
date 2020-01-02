@@ -39,6 +39,18 @@ def test_sim():
         p = st.get_array(run_id, 'peaks')
         _sanity_check(rr, p)
 
+        # Test simulation config override
+        # We'll set the extraction yield to 0, then check that the
+        # total simulated area is much less than before
+        # TODO: it would be nicer to do this without random instructions...
+        st.set_config(dict(fax_config_override=dict(
+            electron_extraction_yield=0)))
+        rr2 = st.get_array(run_id, 'raw_records')
+        p2 = st.get_array(run_id, 'peaks')
+        _sanity_check(rr2, p2)
+
+        assert p2['area'].sum() < 0.1 * p['area'].sum()
+
 
 def _sanity_check(raw_records, peaks):
     assert len(raw_records) > 0

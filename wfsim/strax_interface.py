@@ -242,8 +242,8 @@ class ChunkRawRecords(object):
 @strax.takes_config(
     strax.Option('fax_file', default=None, track=True,
                  help="Directory with fax instructions"),
-    strax.Option('experiment', default='XENON1T', track=True,
-                 help="Directory with fax instructions"),
+    strax.Option('fax_config_override', default=None,
+                 help="Dictionary with configuration option overrides"),
     strax.Option('event_rate', default=5, track=False,
                  help="Average number of events per second"),
     strax.Option('chunk_size', default=5, track=False,
@@ -281,6 +281,10 @@ class FaxSimulatorPlugin(strax.Plugin):
     def setup(self):
         c = self.config
         c.update(get_resource(c['fax_config'], fmt='json'))
+
+        overrides = self.config['fax_config_override']
+        if overrides is not None:
+            c.update(overrides)
 
         if c['fax_file']:
             if c['fax_file'][-5:] == '.root':
