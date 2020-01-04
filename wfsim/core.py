@@ -639,7 +639,9 @@ class RawData(object):
         )
         self.resource = Resource(self.config)
 
-    def __call__(self, instructions, truth_buffer=[]):
+    def __call__(self, instructions, truth_buffer=None):
+        if truth_buffer is None:
+            truth_buffer = []
 
         # Pre-load some constents from config
         v = self.config['drift_velocity_liquid']
@@ -801,7 +803,7 @@ class RawData(object):
             # Operating directly on digitized downward waveform        
             if ix in self.config.get('special_thresholds', {}):
                 threshold = self.config['digitizer_reference_baseline'] \
-                    - self.config['special_thresholds'][str(pulse.channel)] - 1
+                    - self.config['special_thresholds'][str(ix)] - 1
             else:
                 threshold = self.config['digitizer_reference_baseline'] - self.config['zle_threshold'] - 1
 
@@ -823,41 +825,56 @@ class RawData(object):
                 yield ix, self.left + itv[0], self.left + itv[1], data[itv[0]:itv[1]+1]
 
     def get_truth(self, instruction, truth_buffer):
-        ix = np.argmin(truth_buffer['fill']) # Index of the first line not filled
-        pulse = self.pulses[self.symtype(instruction['type'][0])]
-        for name in 'photon', 'electron':
-            times = getattr(pulse, '_{name}_timings'.format(name=name), [])
-            if len(times) != 0:
-                truth_buffer[ix]['n_{name}'.format(name=name)] = len(times)
-                truth_buffer[ix]['t_mean_{name}'.format(name=name)] = np.mean(times)
-                truth_buffer[ix]['t_first_{name}'.format(name=name)] = np.min(times)
-                truth_buffer[ix]['t_last_{name}'.format(name=name)] = np.max(times)
-                truth_buffer[ix]['t_sigma_{name}'.format(name=name)] = np.std(times)
+        """Write truth in the first empty row of truth_buffer
+
+        :param instruction: Array of instructions that were simulated as a
+        single cluster, and should thus get one line in the truth info.
+        :param truth_buffer: Truth buffer to write in.
+        """
+        ix = np.argmin(truth_buffer['fill'])
+        tb = truth_buffer[ix]
+
+        peak_type = self.symtype(instruction['type'][0])
+        pulse = self.pulses[peak_type]
+
+        for quantum in 'photon', 'electron':
+            times = getattr(pulse, f'_{quantum}_timings', [])
+            if times:
+                tb[f'n_{quantum}'] = len(times)
+                tb[f't_mean_{quantum}'] = np.mean(times)
+                tb[f't_first_{quantum}'] = np.min(times)
+                tb[f't_last_{quantum}'] = np.max(times)
+                tb[f't_sigma_{quantum}'] = np.std(times)
             else:
-                if self.symtype(instruction['type'][0]) not in ['s1', 's2']: return
-                truth_buffer[ix]['n_{name}'.format(name=name)] = 0
-                truth_buffer[ix]['t_mean_{name}'.format(name=name)] = np.nan
-                truth_buffer[ix]['t_first_{name}'.format(name=name)] = np.nan
-                truth_buffer[ix]['t_last_{name}'.format(name=name)] = np.nan
-                truth_buffer[ix]['t_sigma_{name}'.format(name=name)] = np.nan
-            truth_buffer[ix]['endtime'] = truth_buffer[ix]['t_last_photon'].astype(np.int64)
-        # Area fraction top
-        channels = getattr(self.pulses[self.symtype(instruction['type'][0])], 
-            '_photon_channels', [])
+                # Peak does not have photons / electrons
+                tb[f'n_{quantum}'] = 0
+                tb[f't_mean_{quantum}'] = np.nan
+                tb[f't_first_{quantum}'] = np.nan
+                tb[f't_last_{quantum}'] = np.nan
+                tb[f't_sigma_{quantum}'] = np.nan
+            tb['endtime'] = tb['t_last_photon'].astype(np.int64)
+
+        channels = getattr(pulse, '_photon_channels', [])
         n_dpe = getattr(pulse, '_n_double_pe', 0)
         n_dpe_bot = getattr(pulse, '_n_double_pe_bot', 0)
-        truth_buffer[ix]['n_photon'] += n_dpe
-        truth_buffer[ix]['n_photon_bottom'] = np.sum(np.isin(channels, self.config['channels_bottom'])) \
-            + n_dpe_bot
-        # Copy-pasting instruction
-        for name in instruction.dtype.names:
-            if len(instruction) > 1 and name in 'txyz':
-                truth_buffer[ix][name] = np.average(instruction[name])
-            elif len(instruction) > 1 and name == 'amp':
-                truth_buffer[ix][name] = np.sum(instruction[name])
+        tb['n_photon'] += n_dpe
+        tb['n_photon_bottom'] = (
+            np.sum(np.isin(channels, self.config['channels_bottom']))
+            + n_dpe_bot)
+
+        # Summarize the instruction cluster in one row of the truth file
+        for field in instruction.dtype.names:
+            value = instruction[field]
+            if len(instruction) > 1 and field in 'txyz':
+                tb[field] = np.mean(value)
+            elif len(instruction) > 1 and field == 'amp':
+                tb[field] = np.sum(value)
             else:
-                truth_buffer[ix][name] = instruction[name][0]
-        truth_buffer[ix]['fill'] = True
+                # Cannot summarize intelligently: just take the first value
+                tb[field] = value[0]
+
+        # Signal this row is now filled, so it won't be overwritten
+        tb['fill'] = True
 
     def get_real_noise(self, length):
         """
