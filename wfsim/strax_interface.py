@@ -163,7 +163,7 @@ class ChunkRawRecords(object):
         self.config = config
         self.rawdata = RawData(self.config)
         self.record_buffer = np.zeros(5000000, dtype=strax.record_dtype()) # 2*250 ms buffer
-        self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)]) # 500 s1 + 500 s2
+        self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)])
 
     def __call__(self, instructions):
         # Save the constants as privates
@@ -220,10 +220,20 @@ class ChunkRawRecords(object):
         strax.baseline(records)
         strax.integrate(records)
 
-        maskb = self.truth_buffer['fill'] & \
-        (self.truth_buffer['t_first_photon'] < self.last_digitized_right * self.config['sample_duration'])
-        truth = self.truth_buffer[maskb]
-        self.truth_buffer[maskb]['fill'] = False
+        # Yield an appropriate amount of stuff from the truth buffer
+        # and mark it as available for writing again
+        maskb = (
+            self.truth_buffer['fill'] &
+            (self.truth_buffer['t_first_photon']
+             < self.last_digitized_right * self.config['sample_duration']))
+        truth = self.truth_buffer[maskb]   # This is a copy, not a view!
+
+        # Careful here: [maskb]['fill'] = ... does not work
+        # numpy creates a copy of the array on the first index.
+        # The assignment then goes to the (unused) copy.
+        # ['fill'][maskb] leads to a view first, then the advanced
+        # assignment works into the original array as expected.
+        self.truth_buffer['fill'][maskb] = False
 
         truth.sort(order='t_first_photon')
         # Return truth without 'fill' field

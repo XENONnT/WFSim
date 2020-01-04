@@ -862,7 +862,7 @@ class RawData(object):
 
         for quantum in 'photon', 'electron':
             times = getattr(pulse, f'_{quantum}_timings', [])
-            if times:
+            if len(times):
                 tb[f'n_{quantum}'] = len(times)
                 tb[f't_mean_{quantum}'] = np.mean(times)
                 tb[f't_first_{quantum}'] = np.min(times)
