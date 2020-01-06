@@ -870,6 +870,9 @@ class RawData(object):
                 tb[f't_sigma_{quantum}'] = np.std(times)
             else:
                 # Peak does not have photons / electrons
+                # zero-photon afterpulses can be removed from truth info
+                if peak_type not in ['s1', 's2'] and quantum == 'photon':
+                    return
                 tb[f'n_{quantum}'] = 0
                 tb[f't_mean_{quantum}'] = np.nan
                 tb[f't_first_{quantum}'] = np.nan
