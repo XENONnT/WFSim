@@ -824,7 +824,7 @@ class RawData(object):
         for ix, data in enumerate(self._raw_data):
             # For simulated data taking reference baseline as baseline
             # Operating directly on digitized downward waveform        
-            if ix in self.config.get('special_thresholds', {}):
+            if str(ix) in self.config.get('special_thresholds', {}):
                 threshold = self.config['digitizer_reference_baseline'] \
                     - self.config['special_thresholds'][str(ix)] - 1
             else:
