@@ -12,7 +12,7 @@ import pandas as pd
 from .core import RawData
 from .pax_datastructure import datastructure
 from .strax_interface import *
-from .utils import exporter
+from strax import exporter
 from straxen.common import get_resource
 
 export, __all__ = exporter()

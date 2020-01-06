@@ -5,13 +5,18 @@ import numpy as np
 from scipy.interpolate import interp1d
 from tqdm import tqdm
 
-from .load_resource import Resource
-from .utils import find_intervals_below_threshold, exporter
+from .load_resource import load_config
+from strax import exporter
 from . import units
+from .utils import find_intervals_below_threshold
 
 export, __all__ = exporter()
+__all__.append('PULSE_TYPE_NAMES')
 
 log = logging.getLogger('SimulationCore')
+
+PULSE_TYPE_NAMES = ('RESERVED', 's1', 's2', 'unknown', 'pi_el', 'pmt_ap')
+
 
 @export
 class Pulse(object):
@@ -20,7 +25,7 @@ class Pulse(object):
     def __init__(self, config):
         self.config = config
         self.config.update(getattr(self.config, self.__class__.__name__, {}))
-        self.resource = Resource(config)
+        self.resource = load_config(config)
 
         self.init_pmt_current_templates()
         self.init_spe_scaling_factor_distributions()
@@ -637,7 +642,7 @@ class RawData(object):
             pi_el=PhotoIonization_Electron(config),
             pmt_ap=PMT_Afterpulse(config),
         )
-        self.resource = Resource(self.config)
+        self.resource = load_config(self.config)
 
     def __call__(self, instructions, truth_buffer=[]):
 
@@ -728,28 +733,46 @@ class RawData(object):
 
     @staticmethod
     def symtype(ptype):
-        return ['s1', 's2', 'unknown', 'pi_el', 'pmt_ap'][ptype - 1]
+        return PULSE_TYPE_NAMES[ptype]
 
     def sim_data(self, instruction):
+        """Simulate a pulse according to instruction, and yield any additional instructions
+        for secondary electron afterpulses.
+        """
+        # Any additional fields in instruction correspond to temporary
+        # configuration overrides. No need to restore the old config:
+        # next instruction cannot but contain the same fields.
         if len(instruction) > 8:
             for par in instruction.dtype.names:
                 if par in self.config:
                     self.config[par] = instruction[par]
-        ptype = self.symtype(instruction['type'][0])
-        self.pulses[ptype](instruction)
-        self.pulses['pmt_ap'](self.pulses[ptype])
-        
-        for pt in [ptype, 'pmt_ap']:
+
+        # Simulate the primary pulse
+        primary_pulse = self.symtype(instruction['type'][0])
+        self.pulses[primary_pulse](instruction)
+
+        # Add PMT afterpulses, if requested
+        do_pmt_ap = self.config.get('enable_pmt_afterpulses', True)
+        if do_pmt_ap:
+            self.pulses['pmt_ap'](self.pulses[primary_pulse])
+
+        # Append pulses we just simulated to our cache
+        for pt in [primary_pulse, 'pmt_ap']:
+            if pt == 'pmt_ap' and not do_pmt_ap:
+                continue
+
             _pulses = getattr(self.pulses[pt], '_pulses')
             if len(_pulses) > 0:
                 self._pulses_cache += _pulses
-                self.last_pulse_end_time = max(self.last_pulse_end_time,
+                self.last_pulse_end_time = max(
+                    self.last_pulse_end_time,
                     np.max([p['right'] for p in _pulses]) * 10)
 
-        if ptype in ['s1', 's2']:
-            yield self.pulses['pi_el'].generate_instruction(
-                self.pulses[ptype], instruction)
-
+        # Make new instructions for electron afterpulses, if requested
+        if primary_pulse in ['s1', 's2']:
+            if self.config.get('enable_electron_afterpulses', True):
+                yield self.pulses['pi_el'].generate_instruction(
+                    self.pulses[primary_pulse], instruction)
             self.instruction_event_number = instruction['event_number'][0]
         
     def digitize_pulse_cache(self):

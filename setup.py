@@ -1,7 +1,9 @@
 import setuptools
 
 with open('requirements.txt') as f:
-    requires = f.read().splitlines()
+    requires = [
+        r.split('/')[-1] if r.startswith('git+') else r
+        for r in f.read().splitlines()]
 
 with open('README.md') as file:
     readme = file.read()

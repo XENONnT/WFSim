@@ -13,9 +13,15 @@ from .core import RawData
 export, __all__ = strax.exporter()
 __all__ += ['instruction_dtype', 'truth_extra_dtype']
 
-instruction_dtype = [('event_number', np.int), ('type', np.int), ('time', np.int),
-    ('x', np.float32), ('y', np.float32), ('z', np.float32), 
-    ('amp', np.int), ('recoil', '<U2')]
+instruction_dtype = [
+    ('event_number', np.int32),
+    ('type', np.int8),
+    ('time', np.int64),
+    ('x', np.float32),
+    ('y', np.float32),
+    ('z', np.float32),
+    ('amp', np.int32),
+    ('recoil', '<U2')]
 
 truth_extra_dtype = [
     ('n_electron', np.float),
@@ -52,6 +58,7 @@ def rand_instructions(c):
     instructions['amp'] = np.vstack([nphotons, nelectrons]).T.flatten().astype(int)
 
     return instructions
+
 
 @export
 def read_g4(file):
@@ -99,8 +106,8 @@ def read_g4(file):
                                                     np.repeat(yp.flatten(),2 ) / 10, \
                                                     np.repeat(zp.flatten(),2 ) / 10, \
                                                     1e9*np.repeat(time.flatten(),2 )
-    
-    
+
+
     
     ins['event_number'] = np.repeat(event_number,2)
     ins['type'] = np.tile((1, 2), n_instructions)
@@ -125,9 +132,30 @@ def read_g4(file):
     
     return ins
 
+
 @export
-def instruction_from_csv(file):
-    return pd.read_csv(file).to_records(index=False)
+def instruction_from_csv(filename):
+    """Return wfsim instructions from a csv
+
+    :param filename: Path to csv file
+    """
+    # Pandas does not grok the <U2 field 'recoil' correctly.
+    # Probably it loads it as some kind of string instead...
+    # we'll get it into the right format in the next step.
+    dtype_dict = dict(instruction_dtype)
+    df = pd.read_csv(filename,
+                     names=list(dtype_dict.keys()),
+                     skiprows=1,
+                     dtype={k: v for k, v in dtype_dict.items()
+                            if k != 'recoil'})
+
+    # Convert to records and check format
+    recs = df.to_records(index=False, column_dtypes=dtype_dict)
+    expected_dtype = np.dtype(instruction_dtype)
+    assert recs.dtype == expected_dtype, \
+        f"CSV {filename} produced wrong dtype. Got {recs.dtype}, expected {expected_dtype}."
+    return recs
+
 
 @export
 class ChunkRawRecords(object):
@@ -214,8 +242,8 @@ class ChunkRawRecords(object):
 @strax.takes_config(
     strax.Option('fax_file', default=None, track=True,
                  help="Directory with fax instructions"),
-    strax.Option('experiment', default='XENON1T', track=True,
-                 help="Directory with fax instructions"),
+    strax.Option('fax_config_override', default=None,
+                 help="Dictionary with configuration option overrides"),
     strax.Option('event_rate', default=5, track=False,
                  help="Average number of events per second"),
     strax.Option('chunk_size', default=5, track=False,
@@ -254,6 +282,10 @@ class FaxSimulatorPlugin(strax.Plugin):
         c = self.config
         c.update(get_resource(c['fax_config'], fmt='json'))
 
+        overrides = self.config['fax_config_override']
+        if overrides is not None:
+            c.update(overrides)
+
         if c['fax_file']:
             if c['fax_file'][-5:] == '.root':
                 self.instructions = read_g4(c['fax_file'])
@@ -269,17 +301,16 @@ class FaxSimulatorPlugin(strax.Plugin):
         assert np.all(self.instructions['z'] < 0) & np.all(self.instructions['z']>-100), "Interation is outside the TPC"
         assert np.all(self.instructions['amp']>0), "Interaction has zero size"
 
-
     def _sort_check(self, result):
         if result['time'][0] < self.last_chunk_time + 5000:
             raise RuntimeError(
                 "Simulator returned chunks with insufficient spacing. "
-                "Last chunk's max time was {timeA}, "
-                "this chunk's first time is {timeB}.".format(timeA=self.last_chunk_time, 
-        timeB=result['time'][0]))
+                f"Last chunk's max time was {self.last_chunk_time}, "
+                f"this chunk's first time is {result['time'][0]}.")
         if np.diff(result['time']).min() < 0:
             raise RuntimeError("Simulator returned non-sorted records!")
         self.last_chunk_time = result['time'].max()
+
 
 @export
 class RawRecordsFromFax(FaxSimulatorPlugin):
