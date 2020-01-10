@@ -222,10 +222,16 @@ class ChunkRawRecords(object):
 
         # Yield an appropriate amount of stuff from the truth buffer
         # and mark it as available for writing again
+
         maskb = (
             self.truth_buffer['fill'] &
-            (self.truth_buffer['t_first_photon']
-             < self.last_digitized_right * self.config['sample_duration']))
+            # This condition will always be false if self.truth_buffer['t_first_photon'] == np.nan
+            ((self.truth_buffer['t_first_photon']
+             < self.last_digitized_right * self.config['sample_duration']) |
+             # Hence, we need to use this trick to also save these cases (this
+             # is what we set the end time to for np.nans)
+            (self.truth_buffer['time'] == self.truth_buffer['endtime'])
+            ))
         truth = self.truth_buffer[maskb]   # This is a copy, not a view!
 
         # Careful here: [maskb]['fill'] = ... does not work
@@ -235,7 +241,7 @@ class ChunkRawRecords(object):
         # assignment works into the original array as expected.
         self.truth_buffer['fill'][maskb] = False
 
-        truth.sort(order='t_first_photon')
+        truth.sort(order='time')
         # Return truth without 'fill' field
         _truth = np.zeros(len(truth), dtype=instruction_dtype + truth_extra_dtype)
         for name in _truth.dtype.names:

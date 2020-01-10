@@ -856,18 +856,20 @@ class RawData(object):
         """
         ix = np.argmin(truth_buffer['fill'])
         tb = truth_buffer[ix]
-
         peak_type = self.symtype(instruction['type'][0])
         pulse = self.pulses[peak_type]
 
         for quantum in 'photon', 'electron':
             times = getattr(pulse, f'_{quantum}_timings', [])
+            # Set an endtime (if times has no length)
+            tb['endtime'] = np.mean(instruction['time'])
             if len(times):
                 tb[f'n_{quantum}'] = len(times)
                 tb[f't_mean_{quantum}'] = np.mean(times)
                 tb[f't_first_{quantum}'] = np.min(times)
                 tb[f't_last_{quantum}'] = np.max(times)
                 tb[f't_sigma_{quantum}'] = np.std(times)
+                tb['endtime'] = tb['t_last_photon']
             else:
                 # Peak does not have photons / electrons
                 # zero-photon afterpulses can be removed from truth info
@@ -878,7 +880,6 @@ class RawData(object):
                 tb[f't_first_{quantum}'] = np.nan
                 tb[f't_last_{quantum}'] = np.nan
                 tb[f't_sigma_{quantum}'] = np.nan
-            tb['endtime'] = tb['t_last_photon'].astype(np.int64)
 
         channels = getattr(pulse, '_photon_channels', [])
         n_dpe = getattr(pulse, '_n_double_pe', 0)
