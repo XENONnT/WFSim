@@ -33,8 +33,7 @@ class Resource:
             'ele_ap_cdfs': 'ele_after_pulse.npy',
             'noise_file': 'x1t_noise_170203_0850_00_small.npz',
         }
-        if config['detector'] == 'XENON1T':
-            files.update({
+        XENON1T_default_files = {
                 'photon_area_distribution': 'XENON1T_spe_distributions.csv',
                 's1_light_yield_map': 'XENON1T_s1_xyz_ly_kr83m_SR1_pax-680_fdc-3d_v0.json',
                 's1_pattern_map': 'XENON1T_s1_xyz_patterns_interp_corrected_MCv2.1.0.json.gz',
@@ -42,14 +41,21 @@ class Resource:
                 's2_pattern_map': 'XENON1T_s2_xy_patterns_top_corrected_MCv2.1.0.json.gz',
                 's2_per_pmt_params': 'Kr83m_Ddriven_per_pmt_params_dataframe.csv',
                 'photon_ap_cdfs': 'x1t_pmt_afterpulse_config.pkl.gz',
-            })
-        elif config['detector'] == 'XENONnT':
-            files.update({
+        }
+        XENONnT_default_files = {
                 'photon_area_distribution': 'XENONnT_spe_distributions.csv',
                 's1_pattern_map': 'XENONnT_s1_xyz_patterns_corrected_MCv3.0.0.pkl',
                 's2_pattern_map': 'XENONnT_s2_xy_patterns_topbottom_corrected_MCv3.0.0.pkl',
                 'photon_ap_cdfs': 'xnt_pmt_afterpulse_config.pkl.gz',
-            })
+        }
+        if config['detector'] == 'XENON1T':
+            files.update(
+                {key: config.get(key, val) for (key, val) in XENON1T_default_files.items()}
+            )
+        elif config['detector'] == 'XENONnT':
+            files.update(
+                {key: config.get(key, val) for (key, val) in XENONnT_default_files.items()}
+            )
         else:
             raise ValueError(f"Unsupported detector {config['detector']}")
 
