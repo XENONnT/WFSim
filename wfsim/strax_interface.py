@@ -175,7 +175,7 @@ class ChunkRawRecords(object):
         
         self.blevel = buffer_filled_level = 0
         self.chunk_time = np.min(instructions['time']) + cksz # Starting chunk
-        self.last_digitized_right = 0
+        self.current_digitized_right = self.last_digitized_right = 0
 
         for channel, left, right, data in self.rawdata(instructions, self.truth_buffer):
             pulse_length = right - left + 1
@@ -206,8 +206,9 @@ class ChunkRawRecords(object):
                 (0, records_needed * samples_per_record - pulse_length), 'constant').reshape((-1, samples_per_record))
             self.blevel += records_needed
 
-            if self.rawdata.right != self.last_digitized_right:
-                self.last_digitized_right = self.rawdata.right
+            if self.rawdata.right != self.current_digitized_right:
+                self.last_digitized_right = self.current_digitized_right
+                self.current_digitized_right = self.rawdata.right
 
         yield from self.final_results()
 
