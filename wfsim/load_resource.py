@@ -53,7 +53,8 @@ class Resource:
         else:
             raise ValueError(f"Unsupported detector {config['detector']}")
 
-        files.update(config)    # Allowing user to replace default with specified files
+        for k in set(config).intersection(files):
+            files[k] = config[k] # Allowing user to replace default with specified files
         commit = 'master'   # Replace this by a commit hash if you feel solid and responsible
         url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/fax_files'
         for k, v in files.items():
