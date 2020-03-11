@@ -319,12 +319,12 @@ class FaxSimulatorPlugin(strax.Plugin):
         else:
             self.instructions = rand_instructions(c)
 
-        assert (np.all(self.instructions['x']**2 + self.instructions['y']**2 < 2500),
-                "Interation is outside the TPC")
-        assert (np.all(self.instructions['z'] < 0.25) & np.all(self.instructions['z'] > -100),
-                "Interation is outside the TPC")
-        assert (np.all(self.instructions['amp'] > 0),
-                "Interaction has zero size")
+        assert np.all(self.instructions['x']**2 + self.instructions['y']**2 < 2500), \
+                "Interation is outside the TPC"
+        assert np.all(self.instructions['z'] < 0.25) & np.all(self.instructions['z'] > -100), \
+                "Interation is outside the TPC"
+        assert np.all(self.instructions['amp'] > 0), \
+                "Interaction has zero size"
 
     def _sort_check(self, result):
         if result['time'][0] < self.last_chunk_time + 1000:
