@@ -61,7 +61,7 @@ EventProxy = namedtuple('EventProxy', ['data', 'event_number', 'block_id'])
 
 default_config = {
     'fax_file':None,
-    'experiment':'XENON1T',
+    'detector':'XENON1T',
     'event_rate':1, # Must set to one so chunk can be interpret as an event
     'chunk_size':1, # Must set to one so chunk can be interpret as an event
     'nchunk':200, # Number of events
@@ -69,7 +69,7 @@ default_config = {
         'strax_auxiliary_files/master/fax_files/fax_config.json'),
     'samples_to_store_before':2,
     'samples_to_store_after':20,
-    'right_raw_extension':10000,
+    'right_raw_extension':50000,
     'trigger_window':50,
     'zle_threshold':0,
     'run_number':10000, # Change run_number to prevent overwritting
@@ -136,7 +136,7 @@ class PaxEventSimulator(object):
             self.last_event_written = None
             
             self.output_dir = os.path.join(self.config['output_name'], 
-                '%s_MC_%d' % (self.config['experiment'], self.config['run_number']))
+                '%s_MC_%d' % (self.config['detector'], self.config['run_number']))
             os.makedirs(self.output_dir, exist_ok=True)
             
             # Start the temporary file. Events will first be written here, until events_per_file is reached
@@ -172,7 +172,7 @@ class PaxEventSimulator(object):
             # Rename the temporary file to reflect the events we've written to it
             os.rename(self.tempfile,
                       os.path.join(self.output_dir,
-                            '%s-%d-%09d-%09d-%09d.%s' % (self.config['experiment'],
+                            '%s-%d-%09d-%09d-%09d.%s' % (self.config['detector'],
                                                          self.config['run_number'],
                                                          self.first_event_in_current_file,
                                                          self.last_event_written,
@@ -187,7 +187,7 @@ class PaxEventSimulator(object):
 
         # Save truth file as well
         truth_file_path = os.path.join(self.output_plugin.output_dir,
-                '%s-%d-truth.csv' % (self.config['experiment'], self.config['run_number']))
+                '%s-%d-truth.csv' % (self.config['detector'], self.config['run_number']))
         truth = pd.DataFrame(self.pax_event.truth_buffer[self.pax_event.truth_buffer['fill']])
         truth.drop(columns='fill', inplace=True)
         truth.to_csv(truth_file_path, index=False)
