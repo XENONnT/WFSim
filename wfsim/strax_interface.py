@@ -7,6 +7,7 @@ import pandas as pd
 
 import strax
 from straxen.common import get_resource
+from straxen import get_to_pe
 
 from .core import RawData
 
@@ -170,11 +171,12 @@ class ChunkRawRecords(object):
         samples_per_record = strax.DEFAULT_RECORD_LENGTH
         buffer_length = len(self.record_buffer)
         dt = self.config['sample_duration']
-        rext = self.config['right_raw_extension']
-        cksz = self.config['chunk_size'] * 1e9
-        
+        rext = int(self.config['right_raw_extension'])
+        cksz = int(self.config['chunk_size'] * 1e9)
+
         self.blevel = buffer_filled_level = 0
-        self.chunk_time = np.min(instructions['time']) + cksz # Starting chunk
+        self.chunk_time_pre = np.min(instructions['time']) - rext
+        self.chunk_time = self.chunk_time_pre + cksz # Starting chunk
         self.current_digitized_right = self.last_digitized_right = 0
 
         for channel, left, right, data in self.rawdata(instructions, self.truth_buffer):
@@ -183,6 +185,7 @@ class ChunkRawRecords(object):
 
             if left * 10 > self.chunk_time + 2 * rext:    
                 yield from self.final_results()
+                self.chunk_time_pre = self.chunk_time
                 self.chunk_time += cksz
 
             if self.blevel + records_needed > buffer_length:
@@ -214,7 +217,7 @@ class ChunkRawRecords(object):
 
     def final_results(self):
         records = self.record_buffer[:self.blevel] # No copying the records from buffer
-        maska = records['time'] < self.last_digitized_right * self.config['sample_duration']
+        maska = records['time'] <= self.last_digitized_right * self.config['sample_duration']
         records = records[maska]
 
         records = strax.sort_by_time(records) # Do NOT remove this line
@@ -228,7 +231,7 @@ class ChunkRawRecords(object):
             self.truth_buffer['fill'] &
             # This condition will always be false if self.truth_buffer['t_first_photon'] == np.nan
             ((self.truth_buffer['t_first_photon']
-             < self.last_digitized_right * self.config['sample_duration']) |
+             <= self.last_digitized_right * self.config['sample_duration']) |
              # Hence, we need to use this trick to also save these cases (this
              # is what we set the end time to for np.nans)
             (self.truth_buffer['time'] == self.truth_buffer['endtime'])
@@ -270,12 +273,10 @@ class ChunkRawRecords(object):
     strax.Option('fax_config', 
                  default='https://raw.githubusercontent.com/XENONnT/'
                  'strax_auxiliary_files/master/fax_files/fax_config.json'),
-    strax.Option('samples_to_store_before',
-                 default=2),
-    strax.Option('samples_to_store_after',
-                 default=20),
+    strax.Option('to_pe_file', 
+                 default='https://raw.githubusercontent.com/XENONnT/'
+                 'strax_auxiliary_files/master/to_pe.npy'),
     strax.Option('right_raw_extension', default=50000),
-    strax.Option('trigger_window', default=50),
     strax.Option('zle_threshold', default=0),
     strax.Option('detector',default='XENON1T', track=True))
 class FaxSimulatorPlugin(strax.Plugin):
@@ -298,6 +299,10 @@ class FaxSimulatorPlugin(strax.Plugin):
     def setup(self):
         c = self.config
         c.update(get_resource(c['fax_config'], fmt='json'))
+        # Update gains to the nT defaults
+        self.to_pe = get_to_pe(self.run_id, self.config['to_pe_file'])
+        c['gains'] = 1 / self.to_pe * (1e-8 * 2.25 / 2**14) / (1.6e-19 * 10 * 50)
+        c['gains'][self.to_pe==0] = 0
 
         overrides = self.config['fax_config_override']
         if overrides is not None:
@@ -314,12 +319,15 @@ class FaxSimulatorPlugin(strax.Plugin):
         else:
             self.instructions = rand_instructions(c)
 
-        assert np.all(self.instructions['x']**2+self.instructions['y']**2 < 2500), "Interation is outside the TPC"
-        assert np.all(self.instructions['z'] < 0) & np.all(self.instructions['z']>-100), "Interation is outside the TPC"
-        assert np.all(self.instructions['amp']>0), "Interaction has zero size"
+        assert (np.all(self.instructions['x']**2 + self.instructions['y']**2 < 2500),
+                "Interation is outside the TPC")
+        assert (np.all(self.instructions['z'] < 0.25) & np.all(self.instructions['z'] > -100),
+                "Interation is outside the TPC")
+        assert (np.all(self.instructions['amp'] > 0),
+                "Interaction has zero size")
 
     def _sort_check(self, result):
-        if result['time'][0] < self.last_chunk_time + 5000:
+        if result['time'][0] < self.last_chunk_time + 1000:
             raise RuntimeError(
                 "Simulator returned chunks with insufficient spacing. "
                 f"Last chunk's max time was {self.last_chunk_time}, "
@@ -363,4 +371,11 @@ class RawRecordsFromFax(FaxSimulatorPlugin):
         except StopIteration:
             raise RuntimeError("Bug in chunk count computation")
         self._sort_check(result['raw_records'])
-        return result
+        if strax.__version__ >= '0.9.0':
+            return {data_type:self.chunk(
+                start=self.sim.chunk_time_pre,
+                end=self.sim.chunk_time,
+                data=result[data_type],
+                data_type=data_type) for data_type in self.provides}
+        else:
+            return result
