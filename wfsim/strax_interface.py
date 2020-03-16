@@ -183,7 +183,8 @@ class ChunkRawRecords(object):
             pulse_length = right - left + 1
             records_needed = int(np.ceil(pulse_length / samples_per_record))
 
-            if left * 10 > self.chunk_time + 2 * rext:    
+            if self.rawdata.left * self.config['sample_duration'] > self.chunk_time:
+                self.chunk_time = self.last_digitized_right * self.config['sample_duration']
                 yield from self.final_results()
                 self.chunk_time_pre = self.chunk_time
                 self.chunk_time += cksz
@@ -234,8 +235,10 @@ class ChunkRawRecords(object):
              <= self.last_digitized_right * self.config['sample_duration']) |
              # Hence, we need to use this trick to also save these cases (this
              # is what we set the end time to for np.nans)
-            (self.truth_buffer['time'] == self.truth_buffer['endtime'])
-            ))
+            (np.isnan(self.truth_buffer['t_first_photon']) &
+             (self.truth_buffer['time']
+              <= self.last_digitized_right * self.config['sample_duration'])
+            )))
         truth = self.truth_buffer[maskb]   # This is a copy, not a view!
 
         # Careful here: [maskb]['fill'] = ... does not work
@@ -250,7 +253,8 @@ class ChunkRawRecords(object):
         _truth = np.zeros(len(truth), dtype=instruction_dtype + truth_extra_dtype)
         for name in _truth.dtype.names:
             _truth[name] = truth[name]
-
+        _truth['time'][~np.isnan(_truth['t_first_photon'])] = \
+            _truth['t_first_photon'][~np.isnan(_truth['t_first_photon'])].astype(int)
         yield dict(raw_records=records, truth=_truth)
         self.record_buffer[:np.sum(~maska)] = self.record_buffer[:self.blevel][~maska]
         self.blevel = np.sum(~maska)
@@ -278,7 +282,10 @@ class ChunkRawRecords(object):
                  'strax_auxiliary_files/master/to_pe.npy'),
     strax.Option('right_raw_extension', default=50000),
     strax.Option('zle_threshold', default=0),
-    strax.Option('detector',default='XENON1T', track=True))
+    strax.Option('detector',default='XENON1T', track=True),
+    strax.Option('timeout', default=1800,
+                 help="Terminate processing if any one mailbox receives "
+                      "no result for more than this many seconds"))
 class FaxSimulatorPlugin(strax.Plugin):
     depends_on = tuple()
 
@@ -327,6 +334,7 @@ class FaxSimulatorPlugin(strax.Plugin):
                 "Interaction has zero size"
 
     def _sort_check(self, result):
+        if len(result) == 0: return
         if result['time'][0] < self.last_chunk_time + 1000:
             raise RuntimeError(
                 "Simulator returned chunks with insufficient spacing. "
@@ -371,6 +379,7 @@ class RawRecordsFromFax(FaxSimulatorPlugin):
         except StopIteration:
             raise RuntimeError("Bug in chunk count computation")
         self._sort_check(result['raw_records'])
+
         if strax.__version__ >= '0.9.0':
             return {data_type:self.chunk(
                 start=self.sim.chunk_time_pre,
