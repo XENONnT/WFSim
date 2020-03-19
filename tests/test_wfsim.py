@@ -17,8 +17,14 @@ def test_sim_nt():
             register=wfsim.RawRecordsFromFax,
             config=dict(nchunk=1, event_rate=1, chunk_size=10,
                         detector='XENONnT',
-                        fax_config='https://raw.githubusercontent.com/XENONnT/'
-                                   'strax_auxiliary_files/master/fax_files/fax_config_nt.json'),
+                        n_tpc_pmts=494,
+                fax_config='https://raw.githubusercontent.com/XENONnT/'
+                           'strax_auxiliary_files/master/fax_files/fax_config_nt.json',
+                to_pe_file='https://raw.githubusercontent.com/XENONnT/'
+                           'strax_auxiliary_files/master/fax_files/to_pe_nt.npy',
+                gain_model=('to_pe_per_run',
+                            'https://raw.githubusercontent.com/XENONnT/'
+                            'strax_auxiliary_files/master/fax_files/to_pe_nt.npy'),),
             **straxen.contexts.common_opts)
 
         rr = st.get_array(run_id, 'raw_records')

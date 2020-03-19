@@ -280,6 +280,11 @@ class ChunkRawRecords(object):
     strax.Option('to_pe_file', 
                  default='https://raw.githubusercontent.com/XENONnT/'
                  'strax_auxiliary_files/master/to_pe.npy'),
+    strax.Option('gain_model',
+                 default=('to_pe_per_run',
+                 'https://raw.githubusercontent.com/XENONnT/'
+                 'strax_auxiliary_files/master/to_pe.npy'),
+                 help='PMT gain model. Specify as (model_type, model_config)'),
     strax.Option('right_raw_extension', default=50000),
     strax.Option('zle_threshold', default=0),
     strax.Option('detector',default='XENON1T', track=True),
