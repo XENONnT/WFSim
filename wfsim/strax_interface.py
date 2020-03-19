@@ -381,11 +381,8 @@ class RawRecordsFromFax(FaxSimulatorPlugin):
             raise RuntimeError("Bug in chunk count computation")
         self._sort_check(result['raw_records'])
 
-        if strax.__version__ >= '0.9.0':
-            return {data_type:self.chunk(
-                start=self.sim.chunk_time_pre,
-                end=self.sim.chunk_time,
-                data=result[data_type],
-                data_type=data_type) for data_type in self.provides}
-        else:
-            return result
+        return {data_type:self.chunk(
+            start=self.sim.chunk_time_pre,
+            end=self.sim.chunk_time,
+            data=result[data_type],
+            data_type=data_type) for data_type in self.provides}
