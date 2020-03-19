@@ -307,7 +307,7 @@ class FaxSimulatorPlugin(strax.Plugin):
         c = self.config
         c.update(get_resource(c['fax_config'], fmt='json'))
         # Update gains to the nT defaults
-        self.to_pe = get_to_pe(self.run_id, self.config['to_pe_file'],
+        self.to_pe = get_to_pe(self.run_id, ('to_pe_per_run',self.config['to_pe_file']),
                               len(c['channels_in_detector']['tpc']))
         c['gains'] = 1 / self.to_pe * (1e-8 * 2.25 / 2**14) / (1.6e-19 * 10 * 50)
         c['gains'][self.to_pe==0] = 0
