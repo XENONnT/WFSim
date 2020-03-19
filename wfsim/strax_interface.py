@@ -276,7 +276,7 @@ class ChunkRawRecords(object):
                  help="Number of chunks to simulate"),
     strax.Option('fax_config', 
                  default='https://raw.githubusercontent.com/XENONnT/'
-                 'strax_auxiliary_files/master/fax_files/fax_config.json'),
+                 'strax_auxiliary_files/master/fax_files/fax_config_1t.json'),
     strax.Option('to_pe_file', 
                  default='https://raw.githubusercontent.com/XENONnT/'
                  'strax_auxiliary_files/master/to_pe.npy'),
