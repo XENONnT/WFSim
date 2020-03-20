@@ -16,10 +16,10 @@ def test_sim_nt():
             storage=tempdir,
             register=wfsim.RawRecordsFromFax,
             config=dict(nchunk=1, event_rate=1, chunk_size=10,
-                        n_tpc_pmts = 493,
                         detector='XENONnT',
                         fax_config='https://raw.githubusercontent.com/XENONnT/'
-                                   'strax_auxiliary_files/master/fax_files/fax_config_nt.json'),
+                                   'strax_auxiliary_files/master/fax_files/fax_config_nt.json',
+                        **xnt_common_config),
             **straxen.contexts.common_opts)
 
         rr = st.get_array(run_id, 'raw_records')
@@ -33,8 +33,10 @@ def test_sim():
             storage=tempdir,
             register=wfsim.RawRecordsFromFax,
             config=dict(nchunk=1, event_rate=1, chunk_size=10,
-                        detector='XENON1T'),
-            **straxen.contexts.common_opts)
+                        detector='XENON1T',
+                        **straxen.context.x1t_common_config),
+            **straxen.contexts.common_opts,
+)
 
         rr = st.get_array(run_id, 'raw_records')
         p = st.get_array(run_id, 'peaks')
