@@ -46,8 +46,8 @@ class Resource:
         elif config['detector'] == 'XENONnT':
             files.update({
                 'photon_area_distribution': 'XENONnT_spe_distributions.csv',
-                's1_pattern_map': 'XENONnT_s1_xyz_patterns_corrected_MCv3.0.0.pkl',
-                's2_pattern_map': 'XENONnT_s2_xy_patterns_topbottom_corrected_MCv3.0.0.pkl',
+                's1_pattern_map': 'XENONnT_s1_xyz_patterns_corrected_MCv3.1.0.pkl',
+                's2_pattern_map': 'XENONnT_s2_xy_patterns_topbottom_corrected_MCv3.1.0.pkl',
                 'photon_ap_cdfs': 'xnt_pmt_afterpulse_config.pkl.gz',
             })
         else:
