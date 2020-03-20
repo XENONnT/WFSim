@@ -19,7 +19,7 @@ def test_sim_nt():
                         detector='XENONnT',
                         fax_config='https://raw.githubusercontent.com/XENONnT/'
                                    'strax_auxiliary_files/master/fax_files/fax_config_nt.json',
-                        **xnt_common_config),
+                        **straxen.contexts.xnt_common_config),
             **straxen.contexts.common_opts)
 
         rr = st.get_array(run_id, 'raw_records')
