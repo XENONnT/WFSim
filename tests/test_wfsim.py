@@ -16,6 +16,7 @@ def test_sim_nt():
             storage=tempdir,
             register=wfsim.RawRecordsFromFax,
             config=dict(nchunk=1, event_rate=1, chunk_size=10,
+                        n_tpc_pmts = 493
                         detector='XENONnT',
                         fax_config='https://raw.githubusercontent.com/XENONnT/'
                                    'strax_auxiliary_files/master/fax_files/fax_config_nt.json'),
