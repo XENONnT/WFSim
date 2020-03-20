@@ -34,7 +34,7 @@ def test_sim():
             register=wfsim.RawRecordsFromFax,
             config=dict(nchunk=1, event_rate=1, chunk_size=10,
                         detector='XENON1T',
-                        **straxen.context.x1t_common_config),
+                        **straxen.contexts.x1t_common_config),
             **straxen.contexts.common_opts)
 
         rr = st.get_array(run_id, 'raw_records')
