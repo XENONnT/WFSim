@@ -55,7 +55,7 @@ def rand_instructions(c):
     instructions['z'] = np.repeat(np.random.uniform(-100, 0, n), 2)
 
     nphotons = np.random.uniform(2000, 2050, n)
-    nelectrons = 10 ** (np.random.uniform(1, 4, n))
+    nelectrons = 10 ** (np.random.uniform(3, 4, n))
     instructions['amp'] = np.vstack([nphotons, nelectrons]).T.flatten().astype(int)
 
     return instructions
