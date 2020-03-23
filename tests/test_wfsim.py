@@ -18,12 +18,11 @@ def test_sim_nt():
             config=dict(nchunk=1, event_rate=1, chunk_size=10,
                         detector='XENONnT',
                         to_pe_file= 'https://raw.githubusercontent.com/XENONnT/'
-                                       'strax_auxiliary_files/master/to_pe_nt.npy'),
+                                       'strax_auxiliary_files/master/to_pe_nt.npy',
                         fax_config='https://raw.githubusercontent.com/XENONnT/'
                                    'strax_auxiliary_files/master/fax_files/fax_config_nt.json',
                         **straxen.contexts.xnt_common_config),
             **straxen.contexts.common_opts)
-
         rr = st.get_array(run_id, 'raw_records')
         p = st.get_array(run_id, 'peaks')
         _sanity_check(rr, p)
