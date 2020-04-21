@@ -801,10 +801,10 @@ class RawData(object):
         # Any additional fields in instruction correspond to temporary
         # configuration overrides. No need to restore the old config:
         # next instruction cannot but contain the same fields.
-        if len(instruction) > 8:
+        if len(instruction.dtype.names) > 8:
             for par in instruction.dtype.names:
                 if par in self.config:
-                    self.config[par] = instruction[par]
+                    self.config[par] = instruction[par][0]
 
         # Simulate the primary pulse
         primary_pulse = self.symtype(instruction['type'][0])

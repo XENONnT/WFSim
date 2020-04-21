@@ -23,7 +23,7 @@ class PaxEvents(object):
         self.config = config
         self.rawdata = RawData(self.config)
         
-        self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)]) # 500 s1 + 500 s2
+        self.truth_buffer = np.zeros(100000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)]) # 500 s1 + 500 s2
 
     def __call__(self, instructions):
         event_i = 0 # Indices of event
