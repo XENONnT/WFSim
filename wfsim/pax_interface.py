@@ -62,6 +62,7 @@ EventProxy = namedtuple('EventProxy', ['data', 'event_number', 'block_id'])
 default_config = {
     'fax_file':None,
     'detector':'XENON1T',
+    'field_distortion_on':True,
     'event_rate':1, # Must set to one so chunk can be interpret as an event
     'chunk_size':1, # Must set to one so chunk can be interpret as an event
     'nchunk':200, # Number of events

@@ -338,20 +338,21 @@ class S2(Pulse):
             np.array(v).reshape(-1) for v in zip(*instruction)]
         
         # Reverse engineerring FDC
-        positions = np.array([x, y, z]).T
-        for i_iter in range(6): # 6 Seems to work
-            dr = self.resource.fdc_3d(positions)
-            if i_iter > 0: dr = 0.5 * dr + 0.5 * dr_pre # Average between iter
-            dr_pre = dr
+        if self.config['field_distortion_on']:
+            positions = np.array([x, y, z]).T
+            for i_iter in range(6): # 6 Seems to work
+                dr = self.resource.fdc_3d(positions)
+                if i_iter > 0: dr = 0.5 * dr + 0.5 * dr_pre # Average between iter
+                dr_pre = dr
 
-            r_obs = np.sqrt(x**2 + y**2) - dr
-            x_obs = x * r_obs / (r_obs + dr)
-            y_obs = y * r_obs / (r_obs + dr)
-            z_obs = - np.sqrt(z**2 + dr**2)
-            positions = np.array([x_obs, y_obs, z_obs]).T # Switch to observe pos in next iter
+                r_obs = np.sqrt(x**2 + y**2) - dr
+                x_obs = x * r_obs / (r_obs + dr)
+                y_obs = y * r_obs / (r_obs + dr)
+                z_obs = - np.sqrt(z**2 + dr**2)
+                positions = np.array([x_obs, y_obs, z_obs]).T # Switch to observe pos in next iter
 
-        positions = np.array([x_obs, y_obs]).T  # For map interpolation
-        
+            positions = np.array([x_obs, y_obs]).T  # For map interpolation
+
         if self.config['detector'] == 'XENONnT':
             #Light yield map crashes, but the result is 1 for all positions in the tpc
             sc_gain = np.repeat(self.config['s2_secondary_sc_gain'], len(positions))
