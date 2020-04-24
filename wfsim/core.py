@@ -352,7 +352,9 @@ class S2(Pulse):
                 positions = np.array([x_obs, y_obs, z_obs]).T # Switch to observe pos in next iter
 
             positions = np.array([x_obs, y_obs]).T  # For map interpolation
-            z = z_obs
+        else:
+            z_obs = z
+            positions = np.array([x, y]).T  # For map interpolation
 
         if self.config['detector'] == 'XENONnT':
             #Light yield map crashes, but the result is 1 for all positions in the tpc
@@ -361,7 +363,7 @@ class S2(Pulse):
             sc_gain = self.resource.s2_light_yield_map(positions) * self.config['s2_secondary_sc_gain']
 
         # Average drift time of the electrons
-        self.drift_time_mean = - z / \
+        self.drift_time_mean = - z_obs / \
             self.config['drift_velocity_liquid'] + self.config['drift_time_gate']
 
         # Absorb electrons during the drift
@@ -375,7 +377,7 @@ class S2(Pulse):
         n_electron = np.random.binomial(n=n_electron, p=cy)
 
         # Second generate photon timing and channel
-        self.photon_timings(t, n_electron, z, sc_gain)
+        self.photon_timings(t, n_electron, z_obs, sc_gain)
         self.photon_channels(positions)
 
         super().__call__()
