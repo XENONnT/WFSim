@@ -1,3 +1,4 @@
+git+git://github.com/AxFoundation/strax
 git+git://github.com/XENONnT/straxen
 uproot
 nestpy

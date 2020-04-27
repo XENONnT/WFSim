@@ -287,7 +287,8 @@ class ChunkRawRecords(object):
                  help='PMT gain model. Specify as (model_type, model_config)'),
     strax.Option('right_raw_extension', default=50000),
     strax.Option('zle_threshold', default=0),
-    strax.Option('detector',default='XENON1T', track=True),
+    strax.Option('detector', default='XENON1T', track=True),
+    strax.Option('field_distortion_on', default=False, track=True),
     strax.Option('timeout', default=1800,
                  help="Terminate processing if any one mailbox receives "
                       "no result for more than this many seconds"))

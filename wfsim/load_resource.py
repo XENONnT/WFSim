@@ -42,6 +42,7 @@ class Resource:
                 's2_pattern_map': 'XENON1T_s2_xy_patterns_top_corrected_MCv2.1.0.json.gz',
                 's2_per_pmt_params': 'Kr83m_Ddriven_per_pmt_params_dataframe.csv',
                 'photon_ap_cdfs': 'x1t_pmt_afterpulse_config.pkl.gz',
+                'fdc_3d': 'XENON1T_FDC_SR1_data_driven_time_dependent_3d_correction_tf_nn_part1_v1.json.gz',
             })
         elif config['detector'] == 'XENONnT':
             files.update({
@@ -70,6 +71,7 @@ class Resource:
             self.s1_light_yield_map = make_map(files['s1_light_yield_map'], fmt='json')
             self.s2_light_yield_map = make_map(files['s2_light_yield_map'], fmt='json')
             self.s2_per_pmt_params = straxen.get_resource(files['s2_per_pmt_params'], fmt='csv')
+            self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
 
         if config['detector'] == 'XENONnT':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
@@ -81,6 +83,7 @@ class Resource:
             lymap = deepcopy(self.s2_pattern_map)
             lymap.data['map'] = np.sum(lymap.data['map'][:][:], axis=2)
             self.s2_light_yield_map = lymap
+            self.fdc_3d = dummy_map(result=0)
 
         # Electron After Pulses compressed, haven't figure out how pkl.gz works
         self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
@@ -95,3 +98,9 @@ class Resource:
 def make_map(map_file: str, fmt='text'):
     map_data = straxen.get_resource(map_file, fmt)
     return straxen.InterpolatingMap(map_data)
+
+class dummy_map():
+    def __init__(self, result):
+        self.result = result
+    def __call__(self, positions):
+        return np.ones(positions.shape[0]) * self.result

@@ -336,8 +336,26 @@ class S2(Pulse):
 
         _, _, t, x, y, z, n_electron, recoil_type, *rest = [
             np.array(v).reshape(-1) for v in zip(*instruction)]
+        
+        # Reverse engineerring FDC
+        if self.config['field_distortion_on']:
+            positions = np.array([x, y, z]).T
+            for i_iter in range(6): # 6 Seems to work
+                dr = self.resource.fdc_3d(positions)
+                if i_iter > 0: dr = 0.5 * dr + 0.5 * dr_pre # Average between iter
+                dr_pre = dr
 
-        positions = np.array([x, y]).T  # For map interpolation
+                r_obs = np.sqrt(x**2 + y**2) - dr
+                x_obs = x * r_obs / (r_obs + dr)
+                y_obs = y * r_obs / (r_obs + dr)
+                z_obs = - np.sqrt(z**2 + dr**2)
+                positions = np.array([x_obs, y_obs, z_obs]).T # Switch to observe pos in next iter
+
+            positions = np.array([x_obs, y_obs]).T  # For map interpolation
+        else:
+            z_obs = z
+            positions = np.array([x, y]).T  # For map interpolation
+
         if self.config['detector'] == 'XENONnT':
             #Light yield map crashes, but the result is 1 for all positions in the tpc
             sc_gain = np.repeat(self.config['s2_secondary_sc_gain'], len(positions))
@@ -345,7 +363,7 @@ class S2(Pulse):
             sc_gain = self.resource.s2_light_yield_map(positions) * self.config['s2_secondary_sc_gain']
 
         # Average drift time of the electrons
-        self.drift_time_mean = - z / \
+        self.drift_time_mean = - z_obs / \
             self.config['drift_velocity_liquid'] + self.config['drift_time_gate']
 
         # Absorb electrons during the drift
@@ -359,7 +377,7 @@ class S2(Pulse):
         n_electron = np.random.binomial(n=n_electron, p=cy)
 
         # Second generate photon timing and channel
-        self.photon_timings(t, n_electron, z, sc_gain)
+        self.photon_timings(t, n_electron, z_obs, sc_gain)
         self.photon_channels(positions)
 
         super().__call__()
@@ -801,10 +819,10 @@ class RawData(object):
         # Any additional fields in instruction correspond to temporary
         # configuration overrides. No need to restore the old config:
         # next instruction cannot but contain the same fields.
-        if len(instruction) > 8:
+        if len(instruction.dtype.names) > 8:
             for par in instruction.dtype.names:
                 if par in self.config:
-                    self.config[par] = instruction[par]
+                    self.config[par] = instruction[par][0]
 
         # Simulate the primary pulse
         primary_pulse = self.symtype(instruction['type'][0])
