@@ -355,7 +355,7 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
 
 
 @strax.takes_config(
-    strax.Option('optical',default=True, track=True,
+    strax.Option('optical',default=False, track=True,
                  help="Flag for using optical mc for instructions"),
     strax.Option('fax_file', default=None, track=True,
                  help="Directory with fax instructions"),
