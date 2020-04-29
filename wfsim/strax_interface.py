@@ -47,11 +47,11 @@ def rand_instructions(c):
     instructions['type'] = np.tile([1, 2], n)
     instructions['recoil'] = ['er' for i in range(n * 2)]
 
-    r = np.sqrt(np.random.uniform(0, 2500, n))
+    r = np.sqrt(np.random.uniform(0, c['tpc_radius']**2, n))
     t = np.random.uniform(-np.pi, np.pi, n)
     instructions['x'] = np.repeat(r * np.cos(t), 2)
     instructions['y'] = np.repeat(r * np.sin(t), 2)
-    instructions['z'] = np.repeat(np.random.uniform(-100, 0, n), 2)
+    instructions['z'] = np.repeat(np.random.uniform(-c['tpc_length'], 0, n), 2)
 
     nphotons = np.random.uniform(2000, 2050, n)
     nelectrons = 10 ** (np.random.uniform(3, 4, n))
@@ -97,7 +97,7 @@ def read_optical(file):
 
 
 @export
-def read_g4(file):
+def read_g4(c, file):
     
     nc = nestpy.NESTcalc(nestpy.VDetector())
     A = 131.293
@@ -121,11 +121,8 @@ def read_g4(file):
     zp = e.array("zp") /10 
     e_dep = e.array('ed')
     
-    tpc_radius_square = 2500
-    z_lower = -100
-    z_upper = 0
     
-    TPC_Cut = (zp > z_lower) & (zp < z_upper) & (xp**2+yp**2 <tpc_radius_square)
+    TPC_Cut = (zp > -c['tpc_length']) & (zp < 0) & (xp**2+yp**2 < c['tpc_radius']**2)
     xp = xp[TPC_Cut]
     yp = yp[TPC_Cut]
     zp = zp[TPC_Cut]
@@ -424,7 +421,7 @@ class FaxSimulatorPlugin(strax.Plugin):
 
         elif c['fax_file']:
             if c['fax_file'][-5:] == '.root':
-                self.instructions = read_g4(c['fax_file'])
+                self.instructions = read_g4(c, c['fax_file'])
                 c['nevents'] = np.max(self.instructions['event_number'])
             else:
                 self.instructions = instruction_from_csv(c['fax_file'])
@@ -433,12 +430,12 @@ class FaxSimulatorPlugin(strax.Plugin):
         else:
             self.instructions = rand_instructions(c)
 
-        # assert np.all(self.instructions['x']**2 + self.instructions['y']**2 < 2500), \
-        #         "Interation is outside the TPC"
-        # assert np.all(self.instructions['z'] < 0.25) & np.all(self.instructions['z'] > -100), \
-        #         "Interation is outside the TPC"
-        # assert np.all(self.instructions['amp'] > 0), \
-        #         "Interaction has zero size"
+        assert np.all(self.instructions['x']**2 + self.instructions['y']**2 < c['tpc_radius']**2), \
+                "Interation is outside the TPC"
+        assert np.all(self.instructions['z'] < 0.25) & np.all(self.instructions['z'] > -c['tpc_length']), \
+                "Interation is outside the TPC"
+        assert np.all(self.instructions['amp'] > 0), \
+                "Interaction has zero size"
 
     def _sort_check(self, result):
         if len(result) == 0: return
@@ -494,12 +491,7 @@ class RawRecordsFromFax(FaxSimulatorPlugin):
             data_type=data_type) for data_type in self.provides}
 
 
-@export
-# @strax.takes_config(
-#     strax.Option('optical', default=True, track=True,
-#                  help="Flag for using optical mc for instructions"),)
 class RawRecordsFromFaxOptical(RawRecordsFromFax):
-
     def setup(self):
         super().setup()
         self.sim = ChunkRawRecordsOptical(self.config)
