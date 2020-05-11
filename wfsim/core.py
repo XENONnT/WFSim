@@ -79,7 +79,7 @@ class Pulse(object):
                 else:
                     _channel_photon_gains = self.config['gains'][channel] \
                     * self.uniform_to_pe_arr[0](np.random.random(len(_channel_photon_timings)))
-                    
+
                 # Add some double photoelectron emission by adding another sampled gain
                 n_double_pe = np.random.binomial(len(_channel_photon_timings),
                                                  p=self.config['p_double_pe_emision'])
@@ -996,3 +996,7 @@ class RawData(object):
         result = data[id_t:id_t + length]
 
         return result
+
+
+
+
