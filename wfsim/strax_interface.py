@@ -39,6 +39,9 @@ def rand_instructions(c):
     n = c['nevents'] = c['event_rate'] * c['chunk_size'] * c['nchunk']
     c['total_time'] = c['chunk_size'] * c['nchunk']
 
+    if c['seed'] != False:
+        np.random.seed(c['seed'])
+
     instructions = np.zeros(2 * n, dtype=instruction_dtype)
     uniform_times = c['total_time'] * (np.arange(n) + 0.5) / n
     instructions['time'] = np.repeat(uniform_times, 2) * int(1e9)
@@ -355,8 +358,11 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
 
 
 @strax.takes_config(
-    strax.Option('optical',default=True, track=True,
+    strax.Option('optical',default=False, track=True,
                  help="Flag for using optical mc for instructions"),
+    strax.Option('seed',default=False, track=True,
+                 help="Option for setting the seed of the random number generator used for"
+                      "generation of the instructions"),
     strax.Option('fax_file', default=None, track=True,
                  help="Directory with fax instructions"),
     strax.Option('fax_config_override', default=None,
@@ -430,12 +436,12 @@ class FaxSimulatorPlugin(strax.Plugin):
         else:
             self.instructions = rand_instructions(c)
 
-        assert np.all(self.instructions['x']**2 + self.instructions['y']**2 < c['tpc_radius']**2), \
-                "Interation is outside the TPC"
-        assert np.all(self.instructions['z'] < 0.25) & np.all(self.instructions['z'] > -c['tpc_length']), \
-                "Interation is outside the TPC"
-        assert np.all(self.instructions['amp'] > 0), \
-                "Interaction has zero size"
+        # assert np.all(self.instructions['x']**2 + self.instructions['y']**2 < c['tpc_radius']**2), \
+        #         "Interation is outside the TPC"
+        # assert np.all(self.instructions['z'] < 0.25) & np.all(self.instructions['z'] > -c['tpc_length']), \
+        #         "Interation is outside the TPC"
+        # assert np.all(self.instructions['amp'] > 0), \
+        #         "Interaction has zero size"
 
     def _sort_check(self, result):
         if len(result) == 0: return
@@ -490,7 +496,7 @@ class RawRecordsFromFax(FaxSimulatorPlugin):
             data=result[data_type],
             data_type=data_type) for data_type in self.provides}
 
-
+@export
 class RawRecordsFromFaxOptical(RawRecordsFromFax):
     def setup(self):
         super().setup()
