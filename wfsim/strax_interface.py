@@ -436,12 +436,13 @@ class FaxSimulatorPlugin(strax.Plugin):
         else:
             self.instructions = rand_instructions(c)
 
-        # assert np.all(self.instructions['x']**2 + self.instructions['y']**2 < c['tpc_radius']**2), \
-        #         "Interation is outside the TPC"
-        # assert np.all(self.instructions['z'] < 0.25) & np.all(self.instructions['z'] > -c['tpc_length']), \
-        #         "Interation is outside the TPC"
-        # assert np.all(self.instructions['amp'] > 0), \
-        #         "Interaction has zero size"
+
+        assert np.all(self.instructions['x']**2 + self.instructions['y']**2 < c['tpc_radius']**2), \
+                "Interation is outside the TPC"
+        assert np.all(self.instructions['z'] < 0.25) & np.all(self.instructions['z'] > -c['tpc_length']), \
+                "Interation is outside the TPC"
+        assert np.all(self.instructions['amp'] > 0), \
+                "Interaction has zero size"
 
     def _sort_check(self, result):
         if len(result) == 0: return
