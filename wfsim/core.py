@@ -354,9 +354,8 @@ class S2(Pulse):
             positions = np.array([x_obs, y_obs]).T  # For map interpolation
         else:
             z_obs = z
-            print(x,y)
             positions = np.array([x, y]).T  # For map interpolation
-            print(positions)
+
         if self.config['detector'] == 'XENONnT':
             #Light yield map crashes, but the result is 1 for all positions in the tpc
             sc_gain = np.repeat(self.config['s2_secondary_sc_gain'], len(positions))
@@ -502,7 +501,6 @@ class S2(Pulse):
 
         if self.config['detector'] == 'XENONnT':
             p_pattern = self.resource.s2_pattern_map(points)[0]
-            print(p_pattern)
 
             for u, n in zip(*np.unique(self._instruction, return_counts=True)):
                 channels = np.array(self.config['channels_in_detector']['tpc'])
