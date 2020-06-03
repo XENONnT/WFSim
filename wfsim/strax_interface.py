@@ -39,9 +39,6 @@ def rand_instructions(c):
     n = c['nevents'] = c['event_rate'] * c['chunk_size'] * c['nchunk']
     c['total_time'] = c['chunk_size'] * c['nchunk']
 
-    if c['seed'] != False:
-        np.random.seed(c['seed'])
-
     instructions = np.zeros(2 * n, dtype=instruction_dtype)
     uniform_times = c['total_time'] * (np.arange(n) + 0.5) / n
     instructions['time'] = np.repeat(uniform_times, 2) * int(1e9)
@@ -416,6 +413,8 @@ class FaxSimulatorPlugin(strax.Plugin):
                               len(c['channels_in_detector']['tpc']))
         c['gains'] = 1 / self.to_pe * (1e-8 * 2.25 / 2**14) / (1.6e-19 * 10 * 50)
         c['gains'][self.to_pe==0] = 0
+        if c['seed'] != False:
+            np.random.seed(c['seed'])
 
         overrides = self.config['fax_config_override']
         if overrides is not None:
