@@ -357,6 +357,9 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
 @strax.takes_config(
     strax.Option('optical',default=False, track=True,
                  help="Flag for using optical mc for instructions"),
+    strax.Option('seed',default=False, track=True,
+                 help="Option for setting the seed of the random number generator used for"
+                      "generation of the instructions"),
     strax.Option('fax_file', default=None, track=True,
                  help="Directory with fax instructions"),
     strax.Option('fax_config_override', default=None,
@@ -410,6 +413,8 @@ class FaxSimulatorPlugin(strax.Plugin):
                               len(c['channels_in_detector']['tpc']))
         c['gains'] = 1 / self.to_pe * (1e-8 * 2.25 / 2**14) / (1.6e-19 * 10 * 50)
         c['gains'][self.to_pe==0] = 0
+        if c['seed'] != False:
+            np.random.seed(c['seed'])
 
         overrides = self.config['fax_config_override']
         if overrides is not None:
@@ -437,7 +442,6 @@ class FaxSimulatorPlugin(strax.Plugin):
                 "Interation is outside the TPC"
         assert np.all(self.instructions['amp'] > 0), \
                 "Interaction has zero size"
-
 
     def _sort_check(self, result):
         if len(result) == 0: return
@@ -492,10 +496,8 @@ class RawRecordsFromFax(FaxSimulatorPlugin):
             data=result[data_type],
             data_type=data_type) for data_type in self.provides}
 
-
 @export
 class RawRecordsFromFaxOptical(RawRecordsFromFax):
-
     def setup(self):
         super().setup()
         self.sim = ChunkRawRecordsOptical(self.config)
