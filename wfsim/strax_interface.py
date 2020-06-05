@@ -9,6 +9,7 @@ import strax
 from straxen.common import get_resource
 from straxen import get_to_pe
 import wfsim
+from immutabledict import immutabledict
 
 export, __all__ = strax.exporter()
 __all__ += ['instruction_dtype', 'truth_extra_dtype']
@@ -286,7 +287,14 @@ class ChunkRawRecords(object):
             _truth[name] = truth[name]
         _truth['time'][~np.isnan(_truth['t_first_photon'])] = \
             _truth['t_first_photon'][~np.isnan(_truth['t_first_photon'])].astype(int)
-        yield dict(raw_records=records, truth=_truth)
+        if self.config['detector']=='XENON1T':
+            yield dict(raw_records=records,
+                       # raw_records_he= np.zeros(1,dtype=strax.record_dtype()),
+                       truth=_truth)
+        else:
+            yield dict(raw_records=records[records['channel'] < self.config['channels_top_high_energy'][0]],
+                       raw_records_he = records[records['channel'] >= self.config['channels_top_high_energy'][0]],
+                       truth=_truth)
         self.record_buffer[:np.sum(~maska)] = self.record_buffer[:self.blevel][~maska]
         self.blevel = np.sum(~maska)
 
@@ -370,24 +378,19 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  help="Duration of each chunk in seconds"),
     strax.Option('nchunk', default=4, track=False,
                  help="Number of chunks to simulate"),
-    strax.Option('fax_config', 
-                 default='https://raw.githubusercontent.com/XENONnT/'
-                 'strax_auxiliary_files/master/fax_files/fax_config_1t.json'),
-    strax.Option('to_pe_file', 
-                 default='https://raw.githubusercontent.com/XENONnT/'
-                 'strax_auxiliary_files/master/to_pe.npy'),
-    strax.Option('gain_model',
-                 default=('to_pe_per_run',
-                 'https://raw.githubusercontent.com/XENONnT/'
-                 'strax_auxiliary_files/master/to_pe.npy'),
-                 help='PMT gain model. Specify as (model_type, model_config)'),
     strax.Option('right_raw_extension', default=50000),
     strax.Option('zle_threshold', default=0),
-    strax.Option('detector', default='XENON1T', track=True),
     strax.Option('field_distortion_on', default=False, track=True),
     strax.Option('timeout', default=1800,
                  help="Terminate processing if any one mailbox receives "
-                      "no result for more than this many seconds"))
+                      "no result for more than this many seconds"),
+    strax.Option('fax_config',
+                 default='https://raw.githubusercontent.com/XENONnT/'
+                 'strax_auxiliary_files/master/fax_files/fax_config_nt.json'),
+    strax.Option('gain_model',
+                 default=('to_pe_constant', '1300V_20200428'),
+                 help='PMT gain model. Specify as (model_type, model_config)'),
+    strax.Option('detector', default='XENONnT', track=True),)
 class FaxSimulatorPlugin(strax.Plugin):
     depends_on = tuple()
 
@@ -456,9 +459,9 @@ class FaxSimulatorPlugin(strax.Plugin):
 
 
 @export
-class RawRecordsFromFax(FaxSimulatorPlugin):
-    provides = ('raw_records', 'truth')
-    data_kind = {k: k for k in provides}
+class RawRecordsFromFaxNT(FaxSimulatorPlugin):
+    provides = ('raw_records','raw_records_he', 'truth')
+    data_kind = immutabledict(zip(provides, provides))
 
     def setup(self):
         super().setup()
@@ -467,6 +470,7 @@ class RawRecordsFromFax(FaxSimulatorPlugin):
 
     def infer_dtype(self):
         dtype = dict(raw_records=strax.record_dtype(),
+                     raw_records_he=strax.record_dtype(),
                      truth=instruction_dtype + truth_extra_dtype)
         return dtype
 
@@ -497,7 +501,17 @@ class RawRecordsFromFax(FaxSimulatorPlugin):
             data_type=data_type) for data_type in self.provides}
 
 @export
-class RawRecordsFromFaxOptical(RawRecordsFromFax):
+class RawRecordsFromFax1T(RawRecordsFromFaxNT):
+    provides = ('raw_records', 'truth')
+    data_kind = immutabledict(zip(provides, provides))
+
+    def infer_dtype(self):
+        dtype = dict(raw_records=strax.record_dtype(),
+                     truth=instruction_dtype + truth_extra_dtype)
+        return dtype
+
+@export
+class RawRecordsFromFaxOptical(RawRecordsFromFaxNT):
     def setup(self):
         super().setup()
         self.sim = ChunkRawRecordsOptical(self.config)
