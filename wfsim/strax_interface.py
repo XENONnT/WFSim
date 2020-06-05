@@ -289,11 +289,10 @@ class ChunkRawRecords(object):
             _truth['t_first_photon'][~np.isnan(_truth['t_first_photon'])].astype(int)
         if self.config['detector']=='XENON1T':
             yield dict(raw_records=records,
-                       # raw_records_he= np.zeros(1,dtype=strax.record_dtype()),
                        truth=_truth)
         else:
             yield dict(raw_records=records[records['channel'] < self.config['channels_top_high_energy'][0]],
-                       raw_records_he = records[records['channel'] >= self.config['channels_top_high_energy'][0]],
+                       raw_records_he=records[records['channel'] >= self.config['channels_top_high_energy'][0]],
                        truth=_truth)
         self.record_buffer[:np.sum(~maska)] = self.record_buffer[:self.blevel][~maska]
         self.blevel = np.sum(~maska)
