@@ -883,12 +883,13 @@ class RawData(object):
                 self._raw_data[_pulse['channel'],
                     _pulse['left'] - self.left:_pulse['right'] - self.left + 1] += adc_wave
                 if self.config['detector'] == 'XENONnT':
+                    adc_wave_he = (adc_wave * self.config[
+                            'high_energy_deamplification_factor']).astype(int)
                     if ix in self.config['channels_top']:
                         self._raw_data[self.config['channels_top_high_energy'][ix],
-                        _pulse['left'] - self.left:_pulse['right'] - self.left + 1] += adc_wave * self.config[
-                            'high_energy_deamplification_factor']
+                        _pulse['left'] - self.left:_pulse['right'] - self.left + 1] += adc_wave_he
                     elif ix in self.config['channels_bottom']:
-                        self.sum_signal(adc_wave * self.config['high_energy_deamplification_factor'],
+                        self.sum_signal(adc_wave_he,
                                    _pulse['left'] - self.left,
                                    _pulse['right'] - self.left + 1,
                                    self._raw_data[self.config['channels_in_detector']['sum_signal']])
