@@ -14,11 +14,9 @@ def test_sim_nt():
     with tempfile.TemporaryDirectory() as tempdir:
         st = strax.Context(
             storage=tempdir,
-            register=wfsim.RawRecordsFromFax,
+            register=wfsim.RawRecordsFromFaxNT,
             config=dict(nchunk=1, event_rate=1, chunk_size=10,
                         detector='XENONnT',
-                        to_pe_file= 'https://raw.githubusercontent.com/XENONnT/'
-                                       'strax_auxiliary_files/master/fax_files/to_pe_nt.npy',
                         fax_config='https://raw.githubusercontent.com/XENONnT/'
                                    'strax_auxiliary_files/master/fax_files/fax_config_nt.json',
                         **straxen.contexts.xnt_common_config),
@@ -32,9 +30,11 @@ def test_sim():
     with tempfile.TemporaryDirectory() as tempdir:
         st = strax.Context(
             storage=tempdir,
-            register=wfsim.RawRecordsFromFax,
+            register=wfsim.RawRecordsFromFax1T,
             config=dict(nchunk=1, event_rate=1, chunk_size=10,
                         detector='XENON1T',
+                        fax_config='https://raw.githubusercontent.com/XENONnT/'
+                                   'strax_auxiliary_files/master/fax_files/fax_config_1t.json',
                         **straxen.contexts.x1t_common_config),
             **straxen.contexts.common_opts)
 
