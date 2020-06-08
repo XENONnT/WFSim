@@ -292,7 +292,9 @@ class ChunkRawRecords(object):
                        truth=_truth)
         else:
             yield dict(raw_records=records[records['channel'] < self.config['channels_top_high_energy'][0]],
-                       raw_records_he=records[records['channel'] >= self.config['channels_top_high_energy'][0]],
+                       raw_records_he=records[(records['channel'] >= self.config['channels_top_high_energy'][0]) &
+                                              (records['channel'] <= self.config['channels_top_high_energy'][-1])]
+                       aqm_pulses=records[records['channel]==800]
                        truth=_truth)
         self.record_buffer[:np.sum(~maska)] = self.record_buffer[:self.blevel][~maska]
         self.blevel = np.sum(~maska)
@@ -459,7 +461,7 @@ class FaxSimulatorPlugin(strax.Plugin):
 
 @export
 class RawRecordsFromFaxNT(FaxSimulatorPlugin):
-    provides = ('raw_records','raw_records_he', 'truth')
+    provides = ('raw_records','raw_records_he','raw_records_aqmon','truth')
     data_kind = immutabledict(zip(provides, provides))
 
     def setup(self):
@@ -470,6 +472,7 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
     def infer_dtype(self):
         dtype = dict(raw_records=strax.record_dtype(),
                      raw_records_he=strax.record_dtype(),
+                     raw_records_aqmon=strax.record_dtype(),
                      truth=instruction_dtype + truth_extra_dtype)
         return dtype
 
