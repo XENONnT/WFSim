@@ -874,7 +874,7 @@ class RawData(object):
 
             # Use noise array to pave the fundation of the pulses
             #self._raw_data = self.get_real_noise(self.right - self.left + 1)
-            self._raw_data = np.zeros((len(self.config['channels_in_detector']['tpc']),
+            self._raw_data = np.zeros((801,
                 self.right - self.left + 1), dtype=('<i8'))
 
             for ix, _pulse in enumerate(self._pulses_cache):
@@ -882,14 +882,25 @@ class RawData(object):
                 adc_wave = - np.trunc(_pulse['current'] * self.current_2_adc).astype(int)
                 self._raw_data[_pulse['channel'],
                     _pulse['left'] - self.left:_pulse['right'] - self.left + 1] += adc_wave
+                if self.config['detector'] == 'XENONnT':
+                    adc_wave_he = (adc_wave * self.config[
+                            'high_energy_deamplification_factor']).astype(int)
+                    if ix in self.config['channels_top']:
+                        self._raw_data[self.config['channels_top_high_energy'][ix],
+                        _pulse['left'] - self.left:_pulse['right'] - self.left + 1] += adc_wave_he
+                    elif ix in self.config['channels_bottom']:
+                        self.sum_signal(adc_wave_he,
+                                   _pulse['left'] - self.left,
+                                   _pulse['right'] - self.left + 1,
+                                   self._raw_data[self.config['channels_in_detector']['sum_signal']])
                 
             self._pulses_cache = [] # Memory control
 
             # Digitizers have finite number of bits per channel, so clip the signal.
             self._raw_data += self.config['digitizer_reference_baseline']
             self._raw_data[self._raw_data < 0] = 0
-            # Hopefully (peak downward) waveform won't exceed upper limit
-            # self._raw_data = np.clip(self._raw_data, 0, 2 ** (self.config['digitizer_bits']))
+
+
 
     def ZLE(self):
         """
@@ -996,6 +1007,12 @@ class RawData(object):
         result = data[id_t:id_t + length]
 
         return result
+
+    @staticmethod
+    @njit
+    def sum_signal(adc_wave, left, right, sum_template):
+        sum_template[left:right] += adc_wave
+        return sum_template
 
 
 
