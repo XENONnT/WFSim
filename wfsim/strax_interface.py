@@ -293,8 +293,8 @@ class ChunkRawRecords(object):
         else:
             yield dict(raw_records=records[records['channel'] < self.config['channels_top_high_energy'][0]],
                        raw_records_he=records[(records['channel'] >= self.config['channels_top_high_energy'][0]) &
-                                              (records['channel'] <= self.config['channels_top_high_energy'][-1])]
-                       raw_records_aqmon=records[records['channel]==800]
+                                              (records['channel'] <= self.config['channels_top_high_energy'][-1])],
+                       raw_records_aqmon=records[records['channel]==800],
                        truth=_truth)
         self.record_buffer[:np.sum(~maska)] = self.record_buffer[:self.blevel][~maska]
         self.blevel = np.sum(~maska)
