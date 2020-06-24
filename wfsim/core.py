@@ -464,6 +464,9 @@ class S2(Pulse):
 
         self._photon_timings += self.singlet_triplet_delays(
             len(self._photon_timings), self.config['singlet_fraction_gas'])
+        
+        # The timings generated is NOT randomly ordered, must do shuffle
+        np.random.shuffle(self._photon_timings)
 
     def photon_channels(self, points):
         # TODO log this
@@ -500,14 +503,14 @@ class S2(Pulse):
 
 
         if self.config['detector'] == 'XENONnT':
-            p_pattern = self.resource.s2_pattern_map(points)[0]
+            p_pattern = self.resource.s2_pattern_map(points)
 
             for u, n in zip(*np.unique(self._instruction, return_counts=True)):
                 channels = np.array(self.config['channels_in_detector']['tpc'])
                 _photon_channels = np.random.choice(
                     channels,
                     size=n,
-                    p=p_pattern / np.sum(p_pattern),
+                    p=p_pattern[u] / np.sum(p_pattern[u]),
                     replace=True)
                 self._photon_channels = np.append(self._photon_channels, _photon_channels)
 
