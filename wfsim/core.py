@@ -275,6 +275,14 @@ class S1(Pulse):
     def photon_timings(self, t, n_photons, recoil_type):
         if n_photons == 0:
             return
+
+        if (self.config.get('s1_model_type') == 'simple' and 
+           recoil_type in ['ER', 'NR']):
+            # Simple S1 model enabled: use it for ER and NR.
+            self._photon_timings = np.append(self._photon_timings,
+                t + np.random.exponential(self.config['s1_decay_time'], n_photons))
+            return
+
         try:
             self._photon_timings = np.append(self._photon_timings,
                 t + getattr(self, recoil_type.lower())(n_photons))
