@@ -67,7 +67,7 @@ default_config = {
     'chunk_size':1, # Must set to one so chunk can be interpret as an event
     'nchunk':200, # Number of events
     'fax_config':('https://raw.githubusercontent.com/XENONnT/'
-        'strax_auxiliary_files/master/fax_files/fax_config.json'),
+        'strax_auxiliary_files/master/fax_files/fax_config_1t.json'),
     'samples_to_store_before':2,
     'samples_to_store_after':20,
     'right_raw_extension':50000,
