@@ -518,3 +518,8 @@ class RawRecordsFromFaxOptical(RawRecordsFromFaxNT):
         super().setup()
         self.sim = ChunkRawRecordsOptical(self.config)
         self.sim_iter = self.sim(self.instructions, self.channels, self.timings)
+                
+           
+@export
+class RawRecordsFromFaxNveto(RawRecordsFromFaxOptical):
+    provides = ('raw_records_nv','truth')
