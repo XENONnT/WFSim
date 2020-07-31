@@ -65,7 +65,7 @@ def rand_instructions(c):
 def read_optical(file):
     data = uproot.open(file)
     all_ttrees = dict(data.allitems(filterclass=lambda cls: issubclass(cls, uproot.tree.TTreeMethods)))
-    e = all_ttrees[b'events/events;1']
+    e = all_ttrees[next(iter(all_ttrees))]
 
     n_events = len(e.array('eventid'))
     # lets separate the events in time by a constant time difference
@@ -109,7 +109,7 @@ def read_g4(c, file):
 
     data = uproot.open(file)
     all_ttrees = dict(data.allitems(filterclass=lambda cls: issubclass(cls, uproot.tree.TTreeMethods)))
-    e = all_ttrees[b'events/events;1']
+    e = all_ttrees[next(iter(all_ttrees))]
 
     time = e.array('time')
     n_events = len(e.array('time'))
