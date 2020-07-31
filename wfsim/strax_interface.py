@@ -73,8 +73,8 @@ def read_optical(file):
 
     # Events should be in the TPC
     xp = e.array("xp_pri") / 10
-    yp = e.array("xp_pri") / 10
-    zp = e.array("xp_pri") / 10
+    yp = e.array("yp_pri") / 10
+    zp = e.array("zp_pri") / 10
 
     channels = e.array("pmthitID")
     timings = e.array("pmthitTime")*1e9
