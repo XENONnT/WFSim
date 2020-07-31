@@ -57,6 +57,11 @@ class Pulse(object):
 
         counts_start = 0 # Secondary loop index for assigning channel
         for channel, counts in zip(*np.unique(self._photon_channels, return_counts=True)):
+
+            #TODO: This is temporary continue to avoid out-of-range error.
+            # It should be added a proper method for nVeto PMTs also.
+            if channel >= 2000:
+                continue
             # Use 'counts' amount of photon for this channel 
             _channel_photon_timings = self._photon_timings[counts_start:counts_start+counts]
             counts_start += counts
