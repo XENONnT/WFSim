@@ -461,7 +461,7 @@ class FaxSimulatorPlugin(strax.Plugin):
 
 @export
 class RawRecordsFromFaxNT(FaxSimulatorPlugin):
-    provides = ('raw_records','raw_records_he','raw_records_aqmon','truth')
+    provides = ('raw_records', 'raw_records_he', 'raw_records_aqmon', 'truth')
     data_kind = immutabledict(zip(provides, provides))
 
     def setup(self):

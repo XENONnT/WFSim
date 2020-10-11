@@ -495,7 +495,6 @@ class S2(Pulse):
         sum_pat = np.sum(pattern, axis=1).reshape(-1, 1)
         pattern = np.divide(pattern, sum_pat, out=np.zeros_like(pattern), where=sum_pat!=0)
 
-        assert (sum_pat > 0).sum() == len(points), 'Pattern return all zeros, check S2 positions inside TPC'
         assert pattern.shape[0] == len(points)
         assert pattern.shape[1] == len(channels)
 
@@ -503,20 +502,28 @@ class S2(Pulse):
         # Randomly assign to channel given probability of each channel
         for unique_i, count in zip(*np.unique(self._instruction, return_counts=True)):
             pat = pattern[unique_i]  # [pmt]
-    
+
             if aft > 0:  # Redistribute pattern with user specified aft
                 _aft = aft * (1 + np.random.normal(0, aft_random))
                 _aft = np.clip(_aft, 0, 1)
                 pat[top_index] = pat[top_index] / pat[top_index].sum() * _aft
                 pat[bottom_index] = pat[bottom_index] / pat[bottom_index].sum() *  (1 - _aft)
 
-            _photon_channels = np.random.choice(
-                channels,
-                size=count,
-                p=pat,
-                replace=True)
+            if np.isnan(pat).sum() > 0:  # Pattern map return zeros
+                _photon_channels = np.array([-1] * count)
+            else:
+                _photon_channels = np.random.choice(
+                    channels,
+                    size=count,
+                    p=pat,
+                    replace=True)
 
             self._photon_channels = np.append(self._photon_channels, _photon_channels)
+
+        # Remove photon with channel -1
+        mask = self._photon_channels != -1
+        self._photon_channels = self._photon_channels[mask]
+        self._photon_timings = self._photon_timings[mask]
 
 
 @export
@@ -939,15 +946,12 @@ class RawData(object):
 
         for quantum in 'photon', 'electron':
             times = getattr(pulse, f'_{quantum}_timings', [])
-            # Set an endtime (if times has no length)
-            tb['endtime'] = np.mean(instruction['time'])
             if len(times):
                 tb[f'n_{quantum}'] = len(times)
                 tb[f't_mean_{quantum}'] = np.mean(times)
                 tb[f't_first_{quantum}'] = np.min(times)
                 tb[f't_last_{quantum}'] = np.max(times)
                 tb[f't_sigma_{quantum}'] = np.std(times)
-                tb['endtime'] = tb['t_last_photon']
             else:
                 # Peak does not have photons / electrons
                 # zero-photon afterpulses can be removed from truth info
@@ -958,7 +962,8 @@ class RawData(object):
                 tb[f't_first_{quantum}'] = np.nan
                 tb[f't_last_{quantum}'] = np.nan
                 tb[f't_sigma_{quantum}'] = np.nan
-
+        
+        tb['endtime'] = np.mean(instruction['time']) if np.isnan(tb['t_last_photon']) else tb['t_last_photon']
         channels = getattr(pulse, '_photon_channels', [])
         if self.config.get('exclude_dpe_in_truth', False):
             n_dpe = n_dpe_bot = 0
@@ -1005,7 +1010,3 @@ class RawData(object):
     def sum_signal(adc_wave, left, right, sum_template):
         sum_template[left:right] += adc_wave
         return sum_template
-
-
-
-
