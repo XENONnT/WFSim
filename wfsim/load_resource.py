@@ -40,7 +40,6 @@ class Resource:
                 's1_pattern_map': 'XENON1T_s1_xyz_patterns_interp_corrected_MCv2.1.0.json.gz',
                 's2_light_yield_map': 'XENON1T_s2_xy_ly_SR1_v2.2.json',
                 's2_pattern_map': 'XENON1T_s2_xy_patterns_top_corrected_MCv2.1.0.json.gz',
-                's2_per_pmt_params': 'Kr83m_Ddriven_per_pmt_params_dataframe.csv',
                 'photon_ap_cdfs': 'x1t_pmt_afterpulse_config.pkl.gz',
                 'fdc_3d': 'XENON1T_FDC_SR1_data_driven_time_dependent_3d_correction_tf_nn_part1_v1.json.gz',
             })
@@ -70,7 +69,7 @@ class Resource:
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='json.gz')
             self.s1_light_yield_map = make_map(files['s1_light_yield_map'], fmt='json')
             self.s2_light_yield_map = make_map(files['s2_light_yield_map'], fmt='json')
-            self.s2_per_pmt_params = straxen.get_resource(files['s2_per_pmt_params'], fmt='csv')
+            self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='json.gz')
             self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
 
         if config['detector'] == 'XENONnT':

@@ -277,7 +277,7 @@ class S1(Pulse):
             return
 
         if (self.config.get('s1_model_type') == 'simple' and 
-           recoil_type in ['ER', 'NR']):
+           recoil_type.lower() in ['er', 'nr']):
             # Simple S1 model enabled: use it for ER and NR.
             self._photon_timings = np.append(self._photon_timings,
                 t + np.random.exponential(self.config['s1_decay_time'], n_photons))
@@ -472,7 +472,7 @@ class S2(Pulse):
 
         self._photon_timings += self.singlet_triplet_delays(
             len(self._photon_timings), self.config['singlet_fraction_gas'])
-        
+
         # The timings generated is NOT randomly ordered, must do shuffle
         np.random.shuffle(self._photon_timings)
 
@@ -481,64 +481,49 @@ class S2(Pulse):
         if len(self._photon_timings) == 0:
             self._photon_channels = []
             return 1
+        
+        aft = self.config['s2_mean_area_fraction_top']
+        aft_random = self.config.get('randomize_fraction_of_s2_top_array_photons', 0)
+        channels = np.array(self.config['channels_in_detector']['tpc']).astype(int)
+        top_index = np.array(self.config['channels_top'])
+        bottom_index = np.array(self.config['channels_bottom'])
 
-        # Probability of each top channel given area fraction top
-        p_top = self.config['s2_mean_area_fraction_top']
-        # A fraction of photons are given uniformally to top pmts regardless of pattern
-        p_random = self.config.get('randomize_fraction_of_s2_top_array_photons', 0)
-        # Use pattern to get top channel probability
-        self._photon_channels = np.array([])
-        if self.config['detector'] == 'XENON1T':
-            p_pattern = self.s2_pattern_map_pp(points)
-        # Probability of each bottom channels
-            p_per_channel_bottom = (1 - p_top) / len(self.config['channels_bottom']) \
-                                   * np.ones_like(self.config['channels_bottom'])
+        pattern = self.resource.s2_pattern_map(points)  # [position, pmt]
+        if pattern.shape[1] - 1 not in bottom_index:
+            pattern = np.pad(pattern, [[0, 0], [0, len(bottom_index)]], 
+                'constant', constant_values=1)
+        sum_pat = np.sum(pattern, axis=1).reshape(-1, 1)
+        pattern = np.divide(pattern, sum_pat, out=np.zeros_like(pattern), where=sum_pat!=0)
 
-            # Randomly assign to channel given probability of each channel
-            # Sum probabilities over channels should be 1
-            for u, n in zip(*np.unique(self._instruction, return_counts=True)):
-                p_per_channel_top = p_pattern[u] / np.sum(p_pattern[u]) * p_top * (1 - p_random)
-                channels = np.array(self.config['channels_in_detector']['tpc'])
-                p_per_channel = np.concatenate([p_per_channel_top, p_per_channel_bottom])
+        assert pattern.shape[0] == len(points)
+        assert pattern.shape[1] == len(channels)
 
+        self._photon_channels = np.array([], dtype=int)
+        # Randomly assign to channel given probability of each channel
+        for unique_i, count in zip(*np.unique(self._instruction, return_counts=True)):
+            pat = pattern[unique_i]  # [pmt]
+
+            if aft > 0:  # Redistribute pattern with user specified aft
+                _aft = aft * (1 + np.random.normal(0, aft_random))
+                _aft = np.clip(_aft, 0, 1)
+                pat[top_index] = pat[top_index] / pat[top_index].sum() * _aft
+                pat[bottom_index] = pat[bottom_index] / pat[bottom_index].sum() *  (1 - _aft)
+                
+            if np.isnan(pat).sum() > 0:  # Pattern map return zeros
+                _photon_channels = np.array([-1] * count)
+            else:
                 _photon_channels = np.random.choice(
                     channels,
-                    size=n,
-                    p=p_per_channel / np.sum(p_per_channel),
+                    size=count,
+                    p=pat,
                     replace=True)
 
-                self._photon_channels = np.append(self._photon_channels, _photon_channels)
+            self._photon_channels = np.append(self._photon_channels, _photon_channels)
 
-
-        if self.config['detector'] == 'XENONnT':
-            p_pattern = self.resource.s2_pattern_map(points)
-
-            for u, n in zip(*np.unique(self._instruction, return_counts=True)):
-                channels = np.array(self.config['channels_in_detector']['tpc'])
-                _photon_channels = np.random.choice(
-                    channels,
-                    size=n,
-                    p=p_pattern[u] / np.sum(p_pattern[u]),
-                    replace=True)
-                self._photon_channels = np.append(self._photon_channels, _photon_channels)
-
-        self._photon_channels = self._photon_channels.astype(int)
-
-    def s2_pattern_map_pp(self, pos):
-        if 'params' not in self.__dict__:
-            all_map_params = self.resource.s2_per_pmt_params
-            self.params = all_map_params.loc[all_map_params.kr_run_id == 10,
-                                             ['amp0', 'amp1', 'tao0', 'tao1', 'pmtx', 'pmty']].values.T
-
-        amp0, amp1, tao0, tao1, pmtx, pmty = self.params
-
-        def rms(x, y): return np.sqrt(np.square(x) + np.square(y))
-
-        distance = rms(pmtx - pos[:, 0].reshape([-1, 1]), pmty - pos[:, 1].reshape([-1, 1]))
-        frac = amp0 * np.exp(- distance / tao0) + amp1 * np.exp(- distance / tao1)
-        frac = (frac.T / np.sum(frac, axis=-1)).T
-
-        return frac
+        # Remove photon with channel -1
+        mask = self._photon_channels != -1
+        self._photon_channels = self._photon_channels[mask]
+        self._photon_timings = self._photon_timings[mask]
 
 
 @export
@@ -961,15 +946,12 @@ class RawData(object):
 
         for quantum in 'photon', 'electron':
             times = getattr(pulse, f'_{quantum}_timings', [])
-            # Set an endtime (if times has no length)
-            tb['endtime'] = np.mean(instruction['time'])
             if len(times):
                 tb[f'n_{quantum}'] = len(times)
                 tb[f't_mean_{quantum}'] = np.mean(times)
                 tb[f't_first_{quantum}'] = np.min(times)
                 tb[f't_last_{quantum}'] = np.max(times)
                 tb[f't_sigma_{quantum}'] = np.std(times)
-                tb['endtime'] = tb['t_last_photon']
             else:
                 # Peak does not have photons / electrons
                 # zero-photon afterpulses can be removed from truth info
@@ -980,15 +962,14 @@ class RawData(object):
                 tb[f't_first_{quantum}'] = np.nan
                 tb[f't_last_{quantum}'] = np.nan
                 tb[f't_sigma_{quantum}'] = np.nan
-
+        
+        tb['endtime'] = np.mean(instruction['time']) if np.isnan(tb['t_last_photon']) else tb['t_last_photon']
         channels = getattr(pulse, '_photon_channels', [])
         if self.config.get('exclude_dpe_in_truth', False):
-            n_dpe = 0
-            n_dpe_bot = 0
+            n_dpe = n_dpe_bot = 0
         else:
             n_dpe = getattr(pulse, '_n_double_pe', 0)
             n_dpe_bot = getattr(pulse, '_n_double_pe_bot', 0)
-
         tb['n_photon'] += n_dpe
         tb['n_photon'] -= np.sum(np.isin(channels, getattr(pulse, 'turned_off_pmts', [])))
 
