@@ -12,9 +12,6 @@ run_id = '180519_1902'
 
 def test_sim_nt():
     with tempfile.TemporaryDirectory() as tempdir:
-        common_opts_copy = straxen.contexts.common_opts.copy()
-        if wfsim.RawRecordsFromFaxNT not in common_opts_copy['register']:
-            common_opts_copy['register'].append(wfsim.RawRecordsFromFaxNT)
         st = strax.Context(
             storage=tempdir,
             config=dict(nchunk=1, event_rate=1, chunk_size=10,
@@ -22,7 +19,8 @@ def test_sim_nt():
                         fax_config='https://raw.githubusercontent.com/XENONnT/'
                                    'strax_auxiliary_files/master/fax_files/fax_config_nt.json',
                         **straxen.contexts.xnt_common_config),
-            **common_opts_copy)
+            **straxen.contexts.common_opts)
+        st.register(wfsim.RawRecordsFromFaxNT)
 
         rr = st.get_array(run_id, 'raw_records')
         p = st.get_array(run_id, 'peaks')
@@ -31,9 +29,6 @@ def test_sim_nt():
 
 def test_sim():
     with tempfile.TemporaryDirectory() as tempdir:
-        common_opts_copy = straxen.contexts.common_opts.copy()
-        if wfsim.RawRecordsFromFaxNT not in common_opts_copy['register']:
-            common_opts_copy['register'].append(wfsim.RawRecordsFromFax1T)
         st = strax.Context(
             storage=tempdir,
             config=dict(nchunk=1, event_rate=1, chunk_size=10,
@@ -41,7 +36,8 @@ def test_sim():
                         fax_config='https://raw.githubusercontent.com/XENONnT/'
                                    'strax_auxiliary_files/master/fax_files/fax_config_1t.json',
                         **straxen.contexts.x1t_common_config),
-            **common_opts_copy)
+            **straxen.contexts.common_opts)
+        st.register(wfsim.RawRecordsFromFax1T)
 
         rr = st.get_array(run_id, 'raw_records')
         p = st.get_array(run_id, 'peaks')
