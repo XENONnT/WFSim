@@ -65,7 +65,7 @@ def rand_instructions(c):
 def read_optical(file):
     data = uproot.open(file)
     all_ttrees = dict(data.allitems(filterclass=lambda cls: issubclass(cls, uproot.tree.TTreeMethods)))
-    e = all_ttrees[b'events/events;1']
+    e = all_ttrees[next(iter(all_ttrees))]
 
     n_events = len(e.array('eventid'))
     # lets separate the events in time by a constant time difference
@@ -73,10 +73,14 @@ def read_optical(file):
 
     # Events should be in the TPC
     xp = e.array("xp_pri") / 10
-    yp = e.array("xp_pri") / 10
-    zp = e.array("xp_pri") / 10
+    yp = e.array("yp_pri") / 10
+    zp = e.array("zp_pri") / 10
 
     channels = e.array("pmthitID")
+    # TODO: It should be fixed following PMT mapping.
+    # In our MC, TPC PMT IDs are assigned at 10000-- -> 0--
+    # nVeto ones are assigned at 20000-- -> 2000--
+    channels = [[channel - 10000 if channel < 20000 else channel - 18000 for channel in array] for array in channels]
     timings = e.array("pmthitTime")*1e9
 
     ins = np.zeros(n_events, dtype=instruction_dtype)
@@ -109,7 +113,7 @@ def read_g4(c, file):
 
     data = uproot.open(file)
     all_ttrees = dict(data.allitems(filterclass=lambda cls: issubclass(cls, uproot.tree.TTreeMethods)))
-    e = all_ttrees[b'events/events;1']
+    e = all_ttrees[next(iter(all_ttrees))]
 
     time = e.array('time')
     n_events = len(e.array('time'))
