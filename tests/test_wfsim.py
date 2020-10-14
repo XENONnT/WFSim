@@ -14,13 +14,14 @@ def test_sim_nt():
     with tempfile.TemporaryDirectory() as tempdir:
         st = strax.Context(
             storage=tempdir,
-            register=wfsim.RawRecordsFromFaxNT,
             config=dict(nchunk=1, event_rate=1, chunk_size=10,
                         detector='XENONnT',
                         fax_config='https://raw.githubusercontent.com/XENONnT/'
                                    'strax_auxiliary_files/master/fax_files/fax_config_nt.json',
                         **straxen.contexts.xnt_common_config),
             **straxen.contexts.common_opts)
+        st.register(wfsim.RawRecordsFromFaxNT)
+
         rr = st.get_array(run_id, 'raw_records')
         p = st.get_array(run_id, 'peaks')
         _sanity_check(rr, p)
@@ -30,13 +31,13 @@ def test_sim():
     with tempfile.TemporaryDirectory() as tempdir:
         st = strax.Context(
             storage=tempdir,
-            register=wfsim.RawRecordsFromFax1T,
             config=dict(nchunk=1, event_rate=1, chunk_size=10,
                         detector='XENON1T',
                         fax_config='https://raw.githubusercontent.com/XENONnT/'
                                    'strax_auxiliary_files/master/fax_files/fax_config_1t.json',
                         **straxen.contexts.x1t_common_config),
             **straxen.contexts.common_opts)
+        st.register(wfsim.RawRecordsFromFax1T)
 
         rr = st.get_array(run_id, 'raw_records')
         p = st.get_array(run_id, 'peaks')

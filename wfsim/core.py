@@ -17,7 +17,6 @@ log = logging.getLogger('SimulationCore')
 
 PULSE_TYPE_NAMES = ('RESERVED', 's1', 's2', 'unknown', 'pi_el', 'pmt_ap', 'pe_el')
 
-
 @export
 class Pulse(object):
     """Pulse building class"""
@@ -428,7 +427,7 @@ class S2(Pulse):
         probabilities = 1 - np.random.uniform(0, 1, size=shape)
         return uniform_to_emission_time(probabilities)
 
-    def electron_timings(self,t, n_electron, z, sc_gain):
+    def electron_timings(self, t, n_electron, z, sc_gain):
 
         # Diffusion model from Sorensen 2011
         drift_time_mean = - z / \
@@ -443,10 +442,12 @@ class S2(Pulse):
             _electron_timings += np.random.normal(drift_time_mean, drift_time_stdev, n_electron)
 
         self._electron_timings = np.append(self._electron_timings, _electron_timings)
+        
+        # TODO: add manual fluctuation to sc gain
         self._electron_gains = np.append(
             self._electron_gains, np.repeat(sc_gain, len(_electron_timings)))
 
-    def photon_timings(self,t, n_electron, z, sc_gain):
+    def photon_timings(self, t, n_electron, z, sc_gain):
         # First generate electron timinga
         self._electron_timings = np.array([])
         self._electron_gains = np.array([])
@@ -479,7 +480,15 @@ class S2(Pulse):
             len(self._photon_timings), self.config['singlet_fraction_gas'])
 
         # The timings generated is NOT randomly ordered, must do shuffle
-        np.random.shuffle(self._photon_timings)
+        # Shuffle within each given n_electron[i]
+        # We can do this by first finding out cumulative sum of the photons
+        cumulate_npho = np.pad(np.cumsum(threshold[:, 0]), [1, 0])[np.cumsum(n_electron)]
+        for i in range(len(cumulate_npho)):
+            if i == 0:
+                s = slice(0, cumulate_npho[i])
+            else:
+                s = slice(cumulate_npho[i-1], cumulate_npho[i])
+            np.random.shuffle(self._photon_timings[s])
 
     def photon_channels(self, points):
         # TODO log this
@@ -513,7 +522,7 @@ class S2(Pulse):
                 _aft = np.clip(_aft, 0, 1)
                 pat[top_index] = pat[top_index] / pat[top_index].sum() * _aft
                 pat[bottom_index] = pat[bottom_index] / pat[bottom_index].sum() *  (1 - _aft)
-                
+
             if np.isnan(pat).sum() > 0:  # Pattern map return zeros
                 _photon_channels = np.array([-1] * count)
             else:
@@ -1015,7 +1024,3 @@ class RawData(object):
     def sum_signal(adc_wave, left, right, sum_template):
         sum_template[left:right] += adc_wave
         return sum_template
-
-
-
-
