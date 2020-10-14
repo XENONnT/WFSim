@@ -373,7 +373,7 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
     strax.Option('seed',default=False, track=True,
                  help="Option for setting the seed of the random number generator used for"
                       "generation of the instructions"),
-    strax.Option('fax_file', default=None, track=True,
+    strax.Option('fax_file', default=None, track=False,
                  help="Directory with fax instructions"),
     strax.Option('fax_config_override', default=None,
                  help="Dictionary with configuration option overrides"),
