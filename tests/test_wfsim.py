@@ -36,7 +36,6 @@ def test_sim():
             common_opts_copy['register'].append(wfsim.RawRecordsFromFax1T)
         st = strax.Context(
             storage=tempdir,
-            register=wfsim.RawRecordsFromFax1T,
             config=dict(nchunk=1, event_rate=1, chunk_size=10,
                         detector='XENON1T',
                         fax_config='https://raw.githubusercontent.com/XENONnT/'
