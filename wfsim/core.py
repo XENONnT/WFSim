@@ -17,7 +17,6 @@ log = logging.getLogger('SimulationCore')
 
 PULSE_TYPE_NAMES = ('RESERVED', 's1', 's2', 'unknown', 'pi_el', 'pmt_ap', 'pe_el')
 
-
 @export
 class Pulse(object):
     """Pulse building class"""
@@ -484,7 +483,7 @@ class S2(Pulse):
         # Shuffle within each given n_electron[i]
         # We can do this by first finding out cumulative sum of the photons
         cumulate_npho = np.pad(np.cumsum(threshold[:, 0]), [1, 0])[np.cumsum(n_electron)]
-        for i in len(cumulate_npho):
+        for i in range(len(cumulate_npho)):
             if i == 0:
                 s = slice(0, cumulate_npho[i])
             else:
