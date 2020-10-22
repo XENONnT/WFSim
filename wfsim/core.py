@@ -933,22 +933,28 @@ class RawData(object):
             if self.left % 2 != 0: self.left -= 1 # Seems like a digizier effect
 
             # Use noise array to pave the fundation of the pulses
-            #self._raw_data = self.get_real_noise(self.right - self.left + 1)
+            # self._raw_data = self.get_real_noise(self.right - self.left + 1)
             self._raw_data = np.zeros((801,
                 self.right - self.left + 1), dtype=('<i8'))
+            # Use this mask to by pass non-activated channels
+            # Set to true when working with real noise
+            self._channel_mask = np.zeros(801, dtype=('?'))
 
             for ix, _pulse in enumerate(self._pulses_cache):
                 # Could round instead of trunc... no one cares!
+                ch = _pulse['channel']
+                self._channel_mask[ch] = True
                 adc_wave = - np.trunc(_pulse['current'] * self.current_2_adc).astype(int)
-                self._raw_data[_pulse['channel'],
+                self._raw_data[ch,
                     _pulse['left'] - self.left:_pulse['right'] - self.left + 1] += adc_wave
                 if self.config['detector'] == 'XENONnT':
                     adc_wave_he = (adc_wave * self.config[
                             'high_energy_deamplification_factor']).astype(int)
-                    if ix in self.config['channels_top']:
-                        self._raw_data[self.config['channels_top_high_energy'][ix],
+                    if ch <= self.config['channels_top'][-1]:
+                        self._raw_data[self.config['channels_top_high_energy'][ch],
                         _pulse['left'] - self.left:_pulse['right'] - self.left + 1] += adc_wave_he
-                    elif ix in self.config['channels_bottom']:
+                        self._channel_mask[self.config['channels_top_high_energy'][ch]] = True
+                    elif ch <= self.config['channels_bottom'][-1]:
                         self.sum_signal(adc_wave_he,
                                    _pulse['left'] - self.left,
                                    _pulse['right'] - self.left + 1,
@@ -957,7 +963,7 @@ class RawData(object):
             self._pulses_cache = [] # Memory control
 
             # Digitizers have finite number of bits per channel, so clip the signal.
-            self._raw_data += self.config['digitizer_reference_baseline']
+            self._raw_data[self._channel_mask] += self.config['digitizer_reference_baseline']
             self._raw_data[self._raw_data < 0] = 0
 
 
@@ -971,6 +977,8 @@ class RawData(object):
             self.zle_intervals_buffer = -1 * np.ones((50000, 2), dtype=np.int64)            
         
         for ix, data in enumerate(self._raw_data):
+            if not self._channel_mask[ix]:
+                continue
             # For simulated data taking reference baseline as baseline
             # Operating directly on digitized downward waveform        
             if str(ix) in self.config.get('special_thresholds', {}):
