@@ -938,27 +938,31 @@ class RawData(object):
                 self.right - self.left + 1), dtype=('<i8'))
             # Use this mask to by pass non-activated channels
             # Set to true when working with real noise
-            self._channel_mask = np.zeros(801, dtype=('?'))
+            self._channel_mask = np.zeros(801, dtype=[('mask', '?'), ('left', 'i8'), ('right', 'i8')])
+            self._channel_mask['left'] = int(2**63-1)
 
             for ix, _pulse in enumerate(self._pulses_cache):
                 # Could round instead of trunc... no one cares!
                 ch = _pulse['channel']
-                self._channel_mask[ch] = True
+                self._channel_mask['mask'][ch] = True
+                self._channel_mask['left'][ch] = min(_pulse['left'], self._channel_mask['left'][ch])
+                self._channel_mask['right'][ch] = max(_pulse['right'], self._channel_mask['right'][ch])
                 adc_wave = - np.trunc(_pulse['current'] * self.current_2_adc).astype(int)
-                self._raw_data[ch,
-                    _pulse['left'] - self.left:_pulse['right'] - self.left + 1] += adc_wave
+                _slice = slice(_pulse['left'] - self.left, _pulse['right'] - self.left + 1)
+                
+                self._raw_data[ch, _slice] += adc_wave
+
                 if self.config['detector'] == 'XENONnT':
-                    adc_wave_he = (adc_wave * self.config[
-                            'high_energy_deamplification_factor']).astype(int)
+                    adc_wave_he = adc_wave * int(self.config['high_energy_deamplification_factor'])
                     if ch <= self.config['channels_top'][-1]:
-                        self._raw_data[self.config['channels_top_high_energy'][ch],
-                        _pulse['left'] - self.left:_pulse['right'] - self.left + 1] += adc_wave_he
-                        self._channel_mask[self.config['channels_top_high_energy'][ch]] = True
+                        ch_he = self.config['channels_top_high_energy'][ch]
+                        self._raw_data[ch_he, _slice] += adc_wave_he
+                        self._channel_mask[ch_he] = True
+                        self._channel_mask['left'][ch_he] = self._channel_mask['left'][ch]
+                        self._channel_mask['right'][ch_he] = self._channel_mask['right'][ch]
                     elif ch <= self.config['channels_bottom'][-1]:
-                        self.sum_signal(adc_wave_he,
-                                   _pulse['left'] - self.left,
-                                   _pulse['right'] - self.left + 1,
-                                   self._raw_data[self.config['channels_in_detector']['sum_signal']])
+                        self.sum_signal(adc_wave_he, _slice[0], _slice[1] 
+                            self._raw_data[self.config['channels_in_detector']['sum_signal']])
                 
             self._pulses_cache = [] # Memory control
 
