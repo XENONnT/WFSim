@@ -961,15 +961,21 @@ class RawData(object):
                         self._channel_mask['left'][ch_he] = self._channel_mask['left'][ch]
                         self._channel_mask['right'][ch_he] = self._channel_mask['right'][ch]
                     elif ch <= self.config['channels_bottom'][-1]:
-                        self.sum_signal(adc_wave_he, _slice[0], _slice[1] 
+                        self.sum_signal(adc_wave_he,
+                            _pulse['left'] - self.left,
+                            _pulse['right'] - self.left + 1,
                             self._raw_data[self.config['channels_in_detector']['sum_signal']])
-                
+
             self._pulses_cache = [] # Memory control
 
+            self._channel_mask['left'] -= self.left
+            self._channel_mask['right'] -= self.left
             # Digitizers have finite number of bits per channel, so clip the signal.
-            self._raw_data[self._channel_mask] += self.config['digitizer_reference_baseline']
-            self._raw_data[self._raw_data < 0] = 0
-
+            self.add_baseline(self._raw_data, self._channel_mask, 
+                self.config['digitizer_reference_baseline'])
+            self.digitizer_saturation(self._raw_data, self._channel_mask)
+            # self._raw_data += self.config['digitizer_reference_baseline']
+            # self._raw_data[self._raw_data < 0] = 0
 
 
     def ZLE(self):
@@ -981,8 +987,11 @@ class RawData(object):
             self.zle_intervals_buffer = -1 * np.ones((50000, 2), dtype=np.int64)            
         
         for ix, data in enumerate(self._raw_data):
-            if not self._channel_mask[ix]:
+            if not self._channel_mask['mask'][ix]:
                 continue
+            left, right = self._channel_mask['left'][ix], self._channel_mask['right'][ix]
+            data = data[left:right+1]
+
             # For simulated data taking reference baseline as baseline
             # Operating directly on digitized downward waveform        
             if str(ix) in self.config.get('special_thresholds', {}):
@@ -1006,7 +1015,7 @@ class RawData(object):
             itvs_to_encode[:, 1] = np.floor(itvs_to_encode[:, 1] / 2.0) * 2
 
             for itv in itvs_to_encode:
-                yield ix, self.left + itv[0], self.left + itv[1], data[itv[0]:itv[1]+1]
+                yield ix, self.left + left + itv[0], self.left + left + itv[1], data[itv[0]:itv[1]+1]
 
     def get_truth(self, instruction, truth_buffer):
         """Write truth in the first empty row of truth_buffer
@@ -1086,3 +1095,24 @@ class RawData(object):
     def sum_signal(adc_wave, left, right, sum_template):
         sum_template[left:right] += adc_wave
         return sum_template
+
+    @staticmethod
+    @njit
+    def add_baseline(data, channel_mask, baseline):
+        for ch in range(data.shape[0]):
+            if not channel_mask['mask'][ch]:
+                continue
+            left, right = channel_mask['left'][ch], channel_mask['right'][ch]
+            for ix in range(left, right+1):
+                data[ch, ix] += baseline
+
+    @staticmethod
+    @njit
+    def digitizer_saturation(data, channel_mask):
+        for ch in range(data.shape[0]):
+            if not channel_mask['mask'][ch]:
+                continue
+            left, right = channel_mask['left'][ch], channel_mask['right'][ch]
+            for ix in range(left, right+1):
+                if data[ch, ix] < 0:
+                    data[ch, ix] = 0
