@@ -395,7 +395,9 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
     strax.Option('gain_model',
                  default=('to_pe_constant', '1300V_20200428'),
                  help='PMT gain model. Specify as (model_type, model_config)'),
-    strax.Option('detector', default='XENONnT', track=True),)
+    strax.Option('detector', default='XENONnT', track=True),
+    strax.Option('nv', default=False, track=True, help="Flag for nVeto optical simulation instead of TPC"),
+)
 class FaxSimulatorPlugin(strax.Plugin):
     depends_on = tuple()
 
@@ -428,6 +430,8 @@ class FaxSimulatorPlugin(strax.Plugin):
         if overrides is not None:
             c.update(overrides)
 
+        print(c['nv'])
+
         if c['optical']:
             self.instructions, self.channels, self.timings = read_optical(c['fax_file'])
             c['nevents']=len(self.instructions['event_number'])
@@ -444,10 +448,10 @@ class FaxSimulatorPlugin(strax.Plugin):
             self.instructions = rand_instructions(c)
 
 
-        assert np.all(self.instructions['x']**2 + self.instructions['y']**2 < c['tpc_radius']**2), \
-                "Interation is outside the TPC"
-        assert np.all(self.instructions['z'] < 0.25) & np.all(self.instructions['z'] > -c['tpc_length']), \
-                "Interation is outside the TPC"
+        #assert np.all(self.instructions['x']**2 + self.instructions['y']**2 < c['tpc_radius']**2), \
+        #        "Interation is outside the TPC"
+        #assert np.all(self.instructions['z'] < 0.25) & np.all(self.instructions['z'] > -c['tpc_length']), \
+        #        "Interation is outside the TPC"
         assert np.all(self.instructions['amp'] > 0), \
                 "Interaction has zero size"
 
@@ -522,3 +526,86 @@ class RawRecordsFromFaxOptical(RawRecordsFromFaxNT):
         super().setup()
         self.sim = ChunkRawRecordsOptical(self.config)
         self.sim_iter = self.sim(self.instructions, self.channels, self.timings)
+
+
+@export
+class RawRecordsFromFaxNTnV(FaxSimulatorPlugin):
+    provides = ('raw_records_nv', 'raw_records_aqmon_nv', 'truth')
+    data_kind = immutabledict(zip(provides, provides))
+
+    def setup(self):
+        super().setup()
+        self.sim = ChunkRawRecords(self.config)
+        self.sim_iter = self.sim(self.instructions)
+
+    def infer_dtype(self):
+        dtype = dict(raw_records_nv=strax.record_dtype(),
+                     raw_records_aqmon_nv=strax.record_dtype(),
+                     truth=instruction_dtype + truth_extra_dtype)
+        return dtype
+
+    def is_ready(self, chunk_i):
+        """Overwritten to mimic online input plugin.
+        Returns False to check source finished;
+        Returns True to get next chunk.
+        """
+        if 'ready' not in self.__dict__: self.ready = False
+        self.ready ^= True # Flip
+        return self.ready
+
+    def source_finished(self):
+        """Return whether all instructions has been used."""
+        return self.sim.source_finished()
+
+    def compute(self, chunk_i):
+        try:
+            result = next(self.sim_iter)
+        except StopIteration:
+            raise RuntimeError("Bug in chunk count computation")
+        self._sort_check(result['raw_records'])
+
+        return {data_type:self.chunk(
+            start=self.sim.chunk_time_pre,
+            end=self.sim.chunk_time,
+            data=result[data_type],
+            data_type=data_type) for data_type in self.provides}
+
+
+@export
+class RawRecordsFromFaxOpticalnV(RawRecordsFromFaxNTnV):
+    def setup(self):
+        super().setup()
+        self.sim = ChunkRawRecordsOptical(self.config)
+        self.sim_iter = self.sim(self.instructions, self.channels, self.timings)
+
+
+
+# For Debug
+# Finally it will be removed (mzks)
+import strax
+import straxen
+if __name__ == '__main__':
+
+
+    straxen.contexts.xnt_common_config['gain_model'] = ('to_pe_constant', '1500V_20200614')
+    st = strax.Context(
+        storage=strax.DataDirectory('/Users/mzks/xenon/tutor3/strax_data'),
+        register=wfsim.RawRecordsFromFaxOptical,
+        #register=wfsim.RawRecordsFromFaxNT,
+        config=dict(detector='XENONnT',
+                    fax_config='/Users/mzks/xenon/tutor3/fax_config_nt.json',
+                    optical=True,
+                    nv=True,
+                    **straxen.contexts.xnt_common_config,
+                    ),
+        **straxen.contexts.common_opts)
+
+    run_id = '1'
+    st.set_config(dict(nchunk=1, event_rate=5, chunk_size=10,
+                       fax_file='/Users/mzks/xenon/tutor3/output0500.root',
+                       nSort_path='/Users/mzks/xenon/tutor3/output0500_Sort.root'
+                       ))
+
+    raw_records_nv = st.get_array(run_id, 'raw_records_nv')
+    print(raw_records_nv[0])
+    print(len(raw_records_nv))
