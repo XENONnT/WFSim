@@ -522,4 +522,4 @@ class RawRecordsFromFaxOptical(RawRecordsFromFaxNT):
            
 @export
 class RawRecordsFromFaxNveto(RawRecordsFromFaxOptical):
-    provides = ('raw_records_nv','truth')
+    provides = ('raw_records_nv','truth_nt')
