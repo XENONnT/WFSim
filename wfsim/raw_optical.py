@@ -125,7 +125,7 @@ class RawDataOptical(wfsim.RawData):
             self._pulses_cache += _pulses
             self.last_pulse_end_time = max(
                 self.last_pulse_end_time,
-                np.max([p['right'] for p in _pulses]) * 10)
+                np.max([p['right'] for p in _pulses]) * self.config['dt'])
         return []
 
     def get_truth(self, instruction, truth_buffer):
