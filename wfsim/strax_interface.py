@@ -624,7 +624,7 @@ if __name__ == '__main__':
 
     straxen.contexts.xnt_common_config['gain_model'] = ('to_pe_constant', '1500V_20200614')
     st = strax.Context(
-        storage=strax.DataDirectory('/Users/mzks/xenon/tutor3/strax_data'),
+        storage=strax.DataDirectory('/Users/mzks/xenon/WFSim/bench/strax_data'),
         register=wfsim.RawRecordsFromFaxnVeto,
         config=dict(detector='XENONnT',
                     fax_config='/Users/mzks/xenon/WFSim/bench/fax_config_nt.json',
@@ -638,7 +638,7 @@ if __name__ == '__main__':
     run_id = '1'
     st.set_config(dict(nchunk=1, event_rate=5, chunk_size=10,
                        fax_file='/Users/mzks/xenon/tutor3/output0500.root',
-                       nSort_path='/Users/mzks/xenon/tutor3/output0500_Sort.root'
+                       nSort_path='/Users/mzks/xenon/tutor3/output0500_Sort.root',
                        ))
 
     raw_records_nv = st.get_array(run_id, 'raw_records_nv')
