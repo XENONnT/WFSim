@@ -61,7 +61,7 @@ def rand_instructions(c):
     return instructions
 
 @export
-def read_optical(file):
+def read_optical(file, nv=False):
     data = uproot.open(file)
     all_ttrees = dict(data.allitems(filterclass=lambda cls: issubclass(cls, uproot.tree.TTreeMethods)))
     e = all_ttrees[next(iter(all_ttrees))]
@@ -75,47 +75,12 @@ def read_optical(file):
     yp = e.array("xp_pri") / 10
     zp = e.array("xp_pri") / 10
 
-    channels = e.array("pmthitID")
-    timings = e.array("pmthitTime")*1e9
-
-    ins = np.zeros(n_events, dtype=instruction_dtype)
-
-    ins['x'], ins['y'], ins['z'], ins['time'] = xp.flatten()  / 10, \
-                                                       yp.flatten() / 10, \
-                                                       zp.flatten() / 10, \
-                                                       1e7 * time.flatten()
-
-    ins['event_number'] = np.arange(n_events)
-    ins['type'] = np.repeat(1, n_events)
-    ins['recoil'] = np.repeat('er', n_events)
-    ins['amp'] = [len(t) for t in timings]
-
-    # cut interactions without electrons or photons
-    ins = ins[ins["amp"] > 0]
-
-    return ins, channels, timings
-
-@export
-def read_optical_nV(file):
-    data = uproot.open(file)
-    all_ttrees = dict(data.allitems(filterclass=lambda cls: issubclass(cls, uproot.tree.TTreeMethods)))
-    e = all_ttrees[next(iter(all_ttrees))]
-
-    n_events = len(e.array('eventid'))
-    # lets separate the events in time by a constant time difference
-    time = np.arange(1, n_events+1)
-
-    # Events should be in the TPC
-    xp = e.array("xp_pri") / 10
-    yp = e.array("yp_pri") / 10
-    zp = e.array("zp_pri") / 10
-
-    channels = e.array("pmthitID")
-    # TODO: It should be fixed following PMT mapping.
-    # In our MC, TPC PMT IDs are assigned at 10000-- -> 0--
-    # nVeto ones are assigned at 20000-- -> 2000--
-    channels = [[channel - 20000 for channel in array] for array in channels]
-    timings = e.array("pmthitTime")*1e9
+    if nv:
+        channels = [[channel - 20000 for channel in array] for array in e.array("pmthitID")]
+        timings = e.array("pmthitTime")*1e9
+    else:
+        channels = e.array("pmthitID")
+        timings = e.array("pmthitTime")*1e9
 
     ins = np.zeros(n_events, dtype=instruction_dtype)
 
@@ -464,10 +429,8 @@ class FaxSimulatorPlugin(strax.Plugin):
         if overrides is not None:
             c.update(overrides)
 
-        print(c['nv'])
-
         if c['optical']:
-            self.instructions, self.channels, self.timings = read_optical(c['fax_file'])
+            self.instructions, self.channels, self.timings = read_optical(c['fax_file'], c['nv'])
             c['nevents']=len(self.instructions['event_number'])
 
         elif c['fax_file']:
@@ -570,6 +533,55 @@ class ChunkRawRecordsnVeto(ChunkRawRecordsOptical):
         self.record_buffer = np.zeros(5000000, dtype=strax.record_dtype()) # 2*250 ms buffer
         self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)])
 
+    def final_results(self):
+        records = self.record_buffer[:self.blevel] # No copying the records from buffer
+        maska = records['time'] <= self.last_digitized_right * self.config['sample_duration']
+        records = records[maska]
+
+        records = strax.sort_by_time(records) # Do NOT remove this line
+        # strax.baseline(records) Will be done w/ pulse processing
+        strax.integrate(records)
+
+        # Yield an appropriate amount of stuff from the truth buffer
+        # and mark it as available for writing again
+
+        maskb = (
+                self.truth_buffer['fill'] &
+                # This condition will always be false if self.truth_buffer['t_first_photon'] == np.nan
+                ((self.truth_buffer['t_first_photon']
+                  <= self.last_digitized_right * self.config['sample_duration']) |
+                 # Hence, we need to use this trick to also save these cases (this
+                 # is what we set the end time to for np.nans)
+                 (np.isnan(self.truth_buffer['t_first_photon']) &
+                  (self.truth_buffer['time']
+                   <= self.last_digitized_right * self.config['sample_duration'])
+                  )))
+        truth = self.truth_buffer[maskb]   # This is a copy, not a view!
+
+        # Careful here: [maskb]['fill'] = ... does not work
+        # numpy creates a copy of the array on the first index.
+        # The assignment then goes to the (unused) copy.
+        # ['fill'][maskb] leads to a view first, then the advanced
+        # assignment works into the original array as expected.
+        self.truth_buffer['fill'][maskb] = False
+
+        truth.sort(order='time')
+        # Return truth without 'fill' field
+        _truth = np.zeros(len(truth), dtype=instruction_dtype + truth_extra_dtype)
+        for name in _truth.dtype.names:
+            _truth[name] = truth[name]
+        _truth['time'][~np.isnan(_truth['t_first_photon'])] = \
+            _truth['t_first_photon'][~np.isnan(_truth['t_first_photon'])].astype(int)
+        if self.config['detector']=='XENON1T':
+            yield dict(raw_records_nv=records,
+                       truth=_truth)
+        else:
+            yield dict(raw_records_nv=records[records['channel'] < self.config['channels_top_high_energy'][0]],
+                       raw_records_aqmon_nv=records[records['channel']==800],
+                       truth=_truth)
+        self.record_buffer[:np.sum(~maska)] = self.record_buffer[:self.blevel][~maska]
+        self.blevel = np.sum(~maska)
+
 
 @export
 class RawRecordsFromFaxnVeto(RawRecordsFromFaxOptical):
@@ -615,7 +627,7 @@ if __name__ == '__main__':
         storage=strax.DataDirectory('/Users/mzks/xenon/tutor3/strax_data'),
         register=wfsim.RawRecordsFromFaxnVeto,
         config=dict(detector='XENONnT',
-                    fax_config='/Users/mzks/xenon/tutor3/fax_config_nt.json',
+                    fax_config='/Users/mzks/xenon/WFSim/bench/fax_config_nt.json',
                     optical=True,
                     nv=True,
 
