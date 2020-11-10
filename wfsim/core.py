@@ -102,7 +102,6 @@ class Pulse(object):
             pulse_left = int(min_timing // dt) - int(self.config['samples_to_store_before'])
             pulse_right = int(max_timing // dt) + int(self.config['samples_to_store_after'])
             pulse_current = np.zeros(pulse_right - pulse_left + 1)
-            
 
             Pulse.add_current(_channel_photon_timings.astype(int),
                               _channel_photon_gains,
@@ -420,7 +419,6 @@ class S2(Pulse):
 
         #why are there cy greater than 1? We should check this
         cy = np.clip(cy, a_min = 0, a_max = 1)
-        
         n_electron = np.random.binomial(n=n_electron, p=cy)
 
         # Second generate photon timing and channel
@@ -764,12 +762,6 @@ class PMT_Afterpulse(Pulse):
         self._photon_gain = np.array(self.config['gains'])[self._photon_channels] \
             * self._photon_amplitude
 
-
-        
-import straxen
-to_pe = straxen.get_to_pe('100000', ('to_pe_per_run',
- 'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/master/to_pe.npy'),
-    248)
 
 @export
 class RawData(object):
