@@ -102,6 +102,7 @@ class Pulse(object):
             pulse_left = int(min_timing // dt) - int(self.config['samples_to_store_before'])
             pulse_right = int(max_timing // dt) + int(self.config['samples_to_store_after'])
             pulse_current = np.zeros(pulse_right - pulse_left + 1)
+            
 
             Pulse.add_current(_channel_photon_timings.astype(int),
                               _channel_photon_gains,
@@ -221,7 +222,7 @@ class Pulse(object):
         # Convert photon_timings to int outside this function
         # photon_timings = photon_timings // 1
 
-        gain_total = photon_gains[i_photons[0]]
+        gain_total = 0
         tmp_photon_timing = photon_timings[i_photons[0]]
         for i in i_photons:
             if photon_timings[i] > tmp_photon_timing:
@@ -419,7 +420,7 @@ class S2(Pulse):
 
         #why are there cy greater than 1? We should check this
         cy = np.clip(cy, a_min = 0, a_max = 1)
-
+        
         n_electron = np.random.binomial(n=n_electron, p=cy)
 
         # Second generate photon timing and channel
@@ -764,6 +765,12 @@ class PMT_Afterpulse(Pulse):
             * self._photon_amplitude
 
 
+        
+import straxen
+to_pe = straxen.get_to_pe('100000', ('to_pe_per_run',
+ 'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/master/to_pe.npy'),
+    248)
+
 @export
 class RawData(object):
 
@@ -968,11 +975,11 @@ class RawData(object):
 
             self._pulses_cache = [] # Memory control
 
-            self._channel_mask['left'] -= self.left
-            self._channel_mask['right'] -= self.left
+            self._channel_mask['left'] -= self.left + self.config['trigger_window']
+            self._channel_mask['right'] -= self.left - self.config['trigger_window']
             # Digitizers have finite number of bits per channel, so clip the signal.
             self.add_baseline(self._raw_data, self._channel_mask, 
-                self.config['digitizer_reference_baseline'])
+                self.config['digitizer_reference_baseline'],)
             self.digitizer_saturation(self._raw_data, self._channel_mask)
             # self._raw_data += self.config['digitizer_reference_baseline']
             # self._raw_data[self._raw_data < 0] = 0
@@ -984,13 +991,13 @@ class RawData(object):
         """
         # Ask for memory allocation just once
         if 'zle_intervals_buffer' not in self.__dict__:
-            self.zle_intervals_buffer = -1 * np.ones((50000, 2), dtype=np.int64)            
-        
+            self.zle_intervals_buffer = -1 * np.ones((50000, 2), dtype=np.int64)
+
         for ix, data in enumerate(self._raw_data):
             if not self._channel_mask['mask'][ix]:
                 continue
-            left, right = self._channel_mask['left'][ix], self._channel_mask['right'][ix]
-            data = data[left:right+1]
+            channel_left, channel_right = self._channel_mask['left'][ix], self._channel_mask['right'][ix]
+            data = data[channel_left:channel_right+1]
 
             # For simulated data taking reference baseline as baseline
             # Operating directly on digitized downward waveform        
@@ -1015,7 +1022,7 @@ class RawData(object):
             itvs_to_encode[:, 1] = np.floor(itvs_to_encode[:, 1] / 2.0) * 2
 
             for itv in itvs_to_encode:
-                yield ix, self.left + left + itv[0], self.left + left + itv[1], data[itv[0]:itv[1]+1]
+                yield ix, self.left + channel_left + itv[0], self.left + channel_left + itv[1], data[itv[0]:itv[1]+1]
 
     def get_truth(self, instruction, truth_buffer):
         """Write truth in the first empty row of truth_buffer
