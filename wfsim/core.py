@@ -965,16 +965,13 @@ class RawData(object):
                             _pulse['right'] - self.left + 1,
                             self._raw_data[self.config['channels_in_detector']['sum_signal']])
 
-            self._pulses_cache = [] # Memory control
+            self._pulses_cache = []
 
             self._channel_mask['left'] -= self.left + self.config['trigger_window']
             self._channel_mask['right'] -= self.left - self.config['trigger_window']
-            # Digitizers have finite number of bits per channel, so clip the signal.
             self.add_baseline(self._raw_data, self._channel_mask, 
                 self.config['digitizer_reference_baseline'],)
             self.digitizer_saturation(self._raw_data, self._channel_mask)
-            # self._raw_data += self.config['digitizer_reference_baseline']
-            # self._raw_data[self._raw_data < 0] = 0
 
 
     def ZLE(self):
