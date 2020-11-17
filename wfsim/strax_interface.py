@@ -380,8 +380,6 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
     strax.Option('nchunk', default=4, track=False,
                  help="Number of chunks to simulate"),
     strax.Option('right_raw_extension', default=50000),
-    strax.Option('zle_threshold', default=0),
-    strax.Option('field_distortion_on', default=False, track=True),
     strax.Option('timeout', default=1800,
                  help="Terminate processing if any one mailbox receives "
                       "no result for more than this many seconds"),
@@ -439,10 +437,13 @@ class FaxSimulatorPlugin(strax.Plugin):
         else:
             self.instructions = rand_instructions(c)
 
+        # Let below cathode S1s pass but remove S2s
+        m = (self.instructions['z'] < - c['tpc_length']) & (self.instructions['type'] == 2)
+        self.instructions = self.instructions[~m]
 
         assert np.all(self.instructions['x']**2 + self.instructions['y']**2 < c['tpc_radius']**2), \
                 "Interation is outside the TPC"
-        assert np.all(self.instructions['z'] < 0.25) & np.all(self.instructions['z'] > -c['tpc_length']), \
+        assert np.all(self.instructions['z'] < 0.25), \
                 "Interation is outside the TPC"
         assert np.all(self.instructions['amp'] > 0), \
                 "Interaction has zero size"
