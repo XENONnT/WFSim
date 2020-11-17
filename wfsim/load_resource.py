@@ -91,8 +91,8 @@ class Resource:
         self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
 
         # Noise sample
-        self.noise_data = straxen.get_resource(files['noise_file'], fmt='npy')['arr_0'].flatten()
-
+        #self.noise_data = straxen.get_resource(files['noise_file'], fmt='npy')['arr_0'].flatten()
+        self.noise_data = straxen.get_resource('/Users/mzks/xenon/WFSim/bench/strax_auxiliary_files/fax_files/TEST000012_02242020121353_nV_noise.npz',fmt='npy')['arr_0'].flatten()
 
 def make_map(map_file: str, fmt='text'):
     map_data = straxen.get_resource(map_file, fmt)

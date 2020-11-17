@@ -630,7 +630,6 @@ if __name__ == '__main__':
                     fax_config='/Users/mzks/xenon/WFSim/bench/fax_config_nt.json',
                     optical=True,
                     nv=True,
-
                     **straxen.contexts.xnt_common_config,
                     ),
         **straxen.contexts.common_opts)
@@ -638,7 +637,6 @@ if __name__ == '__main__':
     run_id = '1'
     st.set_config(dict(nchunk=1, event_rate=5, chunk_size=10,
                        fax_file='/Users/mzks/xenon/tutor3/output0500.root',
-                       nSort_path='/Users/mzks/xenon/tutor3/output0500_Sort.root',
                        ))
 
     raw_records_nv = st.get_array(run_id, 'raw_records_nv')

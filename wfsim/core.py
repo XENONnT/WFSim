@@ -886,9 +886,10 @@ class RawData(object):
             if self.left % 2 != 0: self.left -= 1 # Seems like a digizier effect
 
             # Use noise array to pave the fundation of the pulses
-            #self._raw_data = self.get_real_noise(self.right - self.left + 1)
-            self._raw_data = np.zeros((801,
-                self.right - self.left + 1), dtype=('<i8'))
+            if self.config['noise']:
+                self._raw_data = self.get_real_noise(self.right - self.left + 1, 801)
+            else:
+                self._raw_data = np.zeros((801, self.right - self.left + 1), dtype=('<i8'))
 
             for ix, _pulse in enumerate(self._pulses_cache):
                 # Could round instead of trunc... no one cares!
@@ -1010,15 +1011,17 @@ class RawData(object):
         # Signal this row is now filled, so it won't be overwritten
         tb['fill'] = True
 
-    def get_real_noise(self, length):
+    def get_real_noise(self, length, total_number_channel=1):
         """
         Get chunk(s) of noise sample from real noise data
         """
         # Randomly choose where in to start copying
+        each_length = length
+        length = length * total_number_channel
         real_data_sample_size = len(self.resource.noise_data)
         id_t = np.random.randint(0, real_data_sample_size - length)
         data = self.resource.noise_data
-        result = data[id_t:id_t + length]
+        result = data[id_t:id_t + length].reshape([total_number_channel, each_length])
 
         return result
 
