@@ -80,7 +80,7 @@ def read_optical(file):
     # TODO: It should be fixed following PMT mapping.
     # In our MC, TPC PMT IDs are assigned at 10000-- -> 0--
     # nVeto ones are assigned at 20000-- -> 2000--
-    channels = [[channel - 10000 if channel < 20000 else channel - 18000 for channel in array] for array in channels]
+    channels = [[channel if channel < 20000 else channel - 18000 for channel in array] for array in channels]
     timings = e.array("pmthitTime")*1e9
 
     ins = np.zeros(n_events, dtype=instruction_dtype)
