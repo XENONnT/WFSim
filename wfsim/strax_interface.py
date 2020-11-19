@@ -1,9 +1,8 @@
 import logging
-import uproot
-import nestpy
 
 import numpy as np
 import pandas as pd
+import uproot
 
 import strax
 from straxen.common import get_resource
@@ -99,72 +98,6 @@ def read_optical(file):
     ins = ins[ins["amp"] > 0]
 
     return ins, channels, timings
-
-
-@export
-def read_g4(c, file):
-
-    nc = nestpy.NESTcalc(nestpy.VDetector())
-    A = 131.293
-    Z = 54.
-    density = 2.862  # g/cm^3   #SR1 Value
-    drift_field = 82  # V/cm    #SR1 Value
-    interaction = nestpy.INTERACTION_TYPE(7)
-
-    data = uproot.open(file)
-    all_ttrees = dict(data.allitems(filterclass=lambda cls: issubclass(cls, uproot.tree.TTreeMethods)))
-    e = all_ttrees[next(iter(all_ttrees))]
-
-    time = e.array('time')
-    n_events = len(e.array('time'))
-    #lets separate the events in time by a constant time difference
-    time = time + np.arange(n_events)
-
-    #Events should be in the TPC
-    xp = e.array("xp") / 10
-    yp = e.array("yp") / 10
-    zp = e.array("zp") / 10
-    e_dep = e.array('ed')
-
-    TPC_Cut = (zp > -c['tpc_length']) & (zp < 0) & (xp**2+yp**2 < c['tpc_radius']**2)
-    xp = xp[TPC_Cut]
-    yp = yp[TPC_Cut]
-    zp = zp[TPC_Cut]
-    e_dep = e_dep[TPC_Cut]
-    time = time[TPC_Cut]
-
-    event_number = np.repeat(e.array("eventid"),e.array("nsteps"))[TPC_Cut.flatten()]
-
-    n_instructions = len(time.flatten())
-    ins = np.zeros(2*n_instructions, dtype=instruction_dtype)
-
-    e_dep, ins['x'], ins['y'], ins['z'], ins['time'] = e_dep.flatten(), \
-                                                    np.repeat(xp.flatten(), 2)/ 10, \
-                                                    np.repeat(yp.flatten(), 2) / 10, \
-                                                    np.repeat(zp.flatten(), 2) / 10, \
-                                                    1e9 * np.repeat(time.flatten(), 2)
-
-    ins['event_number'] = np.repeat(event_number, 2)
-    ins['type'] = np.tile((1, 2), n_instructions)
-    ins['recoil'] = np.repeat('er', 2 * n_instructions)
-    quanta = []
-
-    for en in e_dep:
-        y = nc.GetYields(interaction,
-                         en,
-                         density,
-                         drift_field,
-                         A,
-                         Z,
-                         (1, 1))
-        quanta.append(nc.GetQuanta(y, density).photons)
-        quanta.append(nc.GetQuanta(y, density).electrons)
-    ins['amp'] = quanta
-
-    #cut interactions without electrons or photons
-    ins = ins[ins["amp"] > 0]
-
-    return ins
 
 
 @export
