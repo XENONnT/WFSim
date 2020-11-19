@@ -488,7 +488,8 @@ class S2(Pulse):
 
         return self.resource.s2_luminescence['t'][index]
 
-    @staticmethod  #@njit
+    @staticmethod
+    @njit
     def electron_timings(t, n_electron, z, sc_gain, timings, gains,
             drift_velocity_liquid,
             drift_time_gate,
