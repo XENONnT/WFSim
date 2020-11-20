@@ -598,7 +598,7 @@ class S2(Pulse):
         # Randomly assign to channel given probability of each channel
         for unique_i, count in zip(*np.unique(self._instruction, return_counts=True)):
             pat = pattern[unique_i]  # [pmt]
-    
+
             if aft > 0:  # Redistribute pattern with user specified aft
                 _aft = aft * (1 + np.random.normal(0, aft_random))
                 _aft = np.clip(_aft, 0, 1)
