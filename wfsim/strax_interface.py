@@ -360,12 +360,9 @@ class FaxSimulatorPlugin(strax.Plugin):
             c['nevents']=len(self.instructions['event_number'])
 
         elif c['fax_file']:
-            if c['fax_file'][-5:] == '.root':
-                self.instructions = read_g4(c, c['fax_file'])
-                c['nevents'] = np.max(self.instructions['event_number'])
-            else:
-                self.instructions = instruction_from_csv(c['fax_file'])
-                c['nevents'] = np.max(self.instructions['event_number'])
+            assert c['fax_file'][-5:] != '.root', 'None optical g4 input is deprecated use EPIX instead'
+            self.instructions = instruction_from_csv(c['fax_file'])
+            c['nevents'] = np.max(self.instructions['event_number'])
 
         else:
             self.instructions = rand_instructions(c)
