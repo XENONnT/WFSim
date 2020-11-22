@@ -282,11 +282,10 @@ class S1(Pulse):
             np.array(v).reshape(-1) for v in zip(*instruction)]
         
         positions = np.array([x, y, z]).T  # For map interpolation
-        if self.config['detector']=='XENONnT':
-            #for some reason light yield map crashes TODO
-            ly = self.config['s1_detection_efficiency']
-        else:
-            ly = self.resource.s1_light_yield_map(positions) * self.config['s1_detection_efficiency']
+        ly = np.squeeze(self.resource.s1_light_yield_map(positions),
+                       axis=-1)
+        if self.config['detector']=='XENON1T':
+            ly *= self.config['s1_detection_efficiency']
         n_photons = np.random.binomial(n=n_photons, p=ly)
 
         self._photon_timings = np.array([])
@@ -385,28 +384,12 @@ class S2(Pulse):
         
         # Reverse engineerring FDC
         if self.config['field_distortion_on']:
-            positions = np.array([x, y, z]).T
-            for i_iter in range(6): # 6 Seems to work
-                dr = self.resource.fdc_3d(positions)
-                if i_iter > 0: dr = 0.5 * dr + 0.5 * dr_pre # Average between iter
-                dr_pre = dr
-
-                r_obs = np.sqrt(x**2 + y**2) - dr
-                x_obs = x * r_obs / (r_obs + dr)
-                y_obs = y * r_obs / (r_obs + dr)
-                z_obs = - np.sqrt(z**2 + dr**2)
-                positions = np.array([x_obs, y_obs, z_obs]).T # Switch to observe pos in next iter
-
-            positions = np.array([x_obs, y_obs]).T  # For map interpolation
+            z_obs, positions = self.inverse_field_distortion(x, y, z)
         else:
-            z_obs = z
-            positions = np.array([x, y]).T  # For map interpolation
+            z_obs, positions = z, np.array([x, y]).T
 
-        if self.config['detector'] == 'XENONnT':
-            #Light yield map crashes, but the result is 1 for all positions in the tpc
-            sc_gain = np.repeat(self.config['s2_secondary_sc_gain'], len(positions))
-        else:
-            sc_gain = self.resource.s2_light_yield_map(positions) * self.config['s2_secondary_sc_gain']
+        sc_gain = np.squeeze(self.resource.s2_light_yield_map(positions), axis=-1) \
+            * self.config['s2_secondary_sc_gain']
 
         # Average drift time of the electrons
         self.drift_time_mean = - z_obs / \
@@ -422,10 +405,26 @@ class S2(Pulse):
         n_electron = np.random.binomial(n=n_electron, p=cy)
 
         # Second generate photon timing and channel
-        self.photon_timings(t, n_electron, z_obs, sc_gain)
+        self.photon_timings(t, n_electron, z_obs, positions, sc_gain)
         self.photon_channels(positions)
 
         super().__call__()
+
+    def inverse_field_distortion(self, x, y, z):
+        positions = np.array([x, y, z]).T
+        for i_iter in range(6):  # 6 iterations seems to work
+            dr = self.resource.fdc_3d(positions)
+            if i_iter > 0: dr = 0.5 * dr + 0.5 * dr_pre  # Average between iter
+            dr_pre = dr
+
+            r_obs = np.sqrt(x**2 + y**2) - dr
+            x_obs = x * r_obs / (r_obs + dr)
+            y_obs = y * r_obs / (r_obs + dr)
+            z_obs = - np.sqrt(z**2 + dr**2)
+            positions = np.array([x_obs, y_obs, z_obs]).T
+
+        positions = np.array([x_obs, y_obs]).T 
+        return z_obs, positions
 
     def luminescence_timings(self, shape):
         """
@@ -460,6 +459,35 @@ class S2(Pulse):
         probabilities = 1 - np.random.uniform(0, 1, size=shape)
         return uniform_to_emission_time(probabilities)
 
+    def luminescence_timings_garfield(self, xy, shape):
+        """
+        Luminescence time distribution computation
+        """
+        assert 's2_luminescence' in self.resource.__dict__, 's2_luminescence model not found'
+        assert shape[0] == len(xy), 'Output shape should have same length as positions'
+
+        x_grid, n_grid = np.unique(self.resource.s2_luminescence['x'], return_counts=True)
+        i_grid = (n_grid.sum() - np.cumsum(n_grid[::-1]))[::-1]
+
+        tilt = getattr(self.config, 'anode_xaxis_angle', np.pi / 4)
+        pitch = getattr(self.config, 'anode_pitch', 0.5)
+        rotation_mat = np.array(((np.cos(tilt), -np.sin(tilt)), (np.sin(tilt), np.cos(tilt))))
+
+        jagged = lambda relative_y: (relative_y + pitch / 2) % pitch - pitch / 2
+        distance = jagged(np.matmul(xy, rotation_mat)[:, 1])  # shortest distance from any wire
+
+        index = np.zeros(shape).astype(int)
+        @njit
+        def _luminescence_timings_index(distance, x_grid, n_grid, i_grid, shape, index):
+            for ix in range(shape[0]):
+                pitch_index = np.argmin(np.abs(distance[ix] - x_grid))
+                for iy in range(shape[1]):
+                    index[ix, iy] = i_grid[pitch_index] + np.random.randint(n_grid[pitch_index])
+
+        _luminescence_timings_index(distance, x_grid, n_grid, i_grid, shape, index)
+
+        return self.resource.s2_luminescence['t'][index]
+
     @staticmethod
     @njit
     def electron_timings(t, n_electron, z, sc_gain, timings, gains,
@@ -490,7 +518,7 @@ class S2(Pulse):
                 gains[i_electron] = sc_gain[i]
                 i_electron += 1
 
-    def photon_timings(self, t, n_electron, z, sc_gain):
+    def photon_timings(self, t, n_electron, z, xy, sc_gain):
         # First generate electron timinga
         self._electron_timings = np.zeros(np.sum(n_electron))
         self._electron_gains = np.zeros(np.sum(n_electron))
@@ -512,7 +540,12 @@ class S2(Pulse):
         npho = np.ceil(np.max(self._electron_gains) +
                        4 * np.sqrt(np.max(self._electron_gains))).astype(int)
 
-        self._photon_timings = self.luminescence_timings((nele, npho))
+        if self.config['s2_luminescence_model'] == 'simple':
+            self._photon_timings = self.luminescence_timings((nele, npho))
+        elif self.config['s2_luminescence_model'] == 'garfield':
+            self._photon_timings = self.luminescence_timings_garfield(
+                np.repeat(xy, n_electron, axis=0),
+                (nele, npho))
         self._photon_timings += np.repeat(self._electron_timings, npho).reshape((nele, npho))
 
         # Crop number of photons by random number generated with poisson

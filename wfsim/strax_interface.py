@@ -320,7 +320,8 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  default='https://raw.githubusercontent.com/XENONnT/'
                  'strax_auxiliary_files/master/fax_files/fax_config_nt.json'),
     strax.Option('gain_model',
-                 default=('to_pe_constant', '1300V_20200428'),
+                 default=('to_pe_per_run', 'https://raw.githubusercontent.com/XENONnT/'
+                 'strax_auxiliary_files/master/fax_files/to_pe_nt.npy'),
                  help='PMT gain model. Specify as (model_type, model_config)'),
     strax.Option('detector', default='XENONnT', track=True),)
 class FaxSimulatorPlugin(strax.Plugin):

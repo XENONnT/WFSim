@@ -49,6 +49,7 @@ class Resource:
                 's1_pattern_map': 'XENONnT_s1_xyz_patterns_corrected_MCv3.1.0_disks.pkl',
                 's2_pattern_map': 'XENONnT_s2_xy_patterns_topbottom_corrected_MCv3.1.0_disks.pkl',
                 'photon_ap_cdfs': 'xnt_pmt_afterpulse_config.pkl.gz',
+                's2_luminescence': 'XENONnT_s2_garfield_luminescence_distribution_v0.pkl.gz',
             })
         else:
             raise ValueError(f"Unsupported detector {config['detector']}")
@@ -75,13 +76,16 @@ class Resource:
         if config['detector'] == 'XENONnT':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
             lymap = deepcopy(self.s1_pattern_map)
-            lymap.data['map'] = np.sum(lymap.data['map'][:][:][:], axis=3)
+            lymap.data['map'] = np.sum(lymap.data['map'][:][:][:], axis=3, keepdims=True)
+            lymap.__init__(lymap.data)
             self.s1_light_yield_map = lymap
 
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='pkl')
             lymap = deepcopy(self.s2_pattern_map)
-            lymap.data['map'] = np.sum(lymap.data['map'][:][:], axis=2)
+            lymap.data['map'] = np.sum(lymap.data['map'][:][:], axis=2, keepdims=True)
+            lymap.__init__(lymap.data)
             self.s2_light_yield_map = lymap
+            self.s2_luminescence = straxen.get_resource(files['s2_luminescence'], fmt='pkl.gz')
             self.fdc_3d = dummy_map(result=0)
 
         # Electron After Pulses compressed, haven't figure out how pkl.gz works
