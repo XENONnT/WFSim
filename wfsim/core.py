@@ -964,17 +964,16 @@ class RawData(object):
 
             if self.left % 2 != 0: self.left -= 1 # Seems like a digizier effect
 
-            # Use noise array to pave the fundation of the pulses
-            # self._raw_data = self.get_real_noise(self.right - self.left + 1)
+
             self._raw_data = np.zeros((801,
                 self.right - self.left + 1), dtype=('<i8'))
+                                                 
             # Use this mask to by pass non-activated channels
             # Set to true when working with real noise
             self._channel_mask = np.zeros(801, dtype=[('mask', '?'), ('left', 'i8'), ('right', 'i8')])
             self._channel_mask['left'] = int(2**63-1)
 
             for ix, _pulse in enumerate(self._pulses_cache):
-                # Could round instead of trunc... no one cares!
                 ch = _pulse['channel']
                 self._channel_mask['mask'][ch] = True
                 self._channel_mask['left'][ch] = min(_pulse['left'], self._channel_mask['left'][ch])
@@ -1002,6 +1001,13 @@ class RawData(object):
 
             self._channel_mask['left'] -= self.left + self.config['trigger_window']
             self._channel_mask['right'] -= self.left - self.config['trigger_window']
+            
+            
+            # Adding noise, baseline and digitizer saturation
+            self.add_noise(data=self._raw_data,
+                           channel_mask=self._channel_mask,
+                           noise_data=self.resource.noise_data,
+                           noise_data_length=len(self.resource.noise_data))
             self.add_baseline(self._raw_data, self._channel_mask, 
                 self.config['digitizer_reference_baseline'],)
             self.digitizer_saturation(self._raw_data, self._channel_mask)
@@ -1107,23 +1113,25 @@ class RawData(object):
         # Signal this row is now filled, so it won't be overwritten
         tb['fill'] = True
 
-    def get_real_noise(self, length):
-        """
-        Get chunk(s) of noise sample from real noise data
-        """
-        # Randomly choose where in to start copying
-        real_data_sample_size = len(self.resource.noise_data)
-        id_t = np.random.randint(0, real_data_sample_size - length)
-        data = self.resource.noise_data
-        result = data[id_t:id_t + length]
-
-        return result
-
     @staticmethod
     @njit
     def sum_signal(adc_wave, left, right, sum_template):
         sum_template[left:right] += adc_wave
         return sum_template
+
+    @staticmethod
+    @njit
+    def add_noise(data, channel_mask, noise_data, noise_data_length):
+        """
+        Get chunk(s) of noise sample from real noise data
+        """
+        for ch in range(data.shape[0]):
+            if not channel_mask['mask'][ch]:
+                continue
+            left, right = channel_mask['left'][ch], channel_mask['right'][ch]
+            id_t = np.random.randint(low=0, high=noise_data_length-right+left)
+            for ix in range(left, right+1):
+                data[ch, ix] += noise_data[id_t+ix]
 
     @staticmethod
     @njit
