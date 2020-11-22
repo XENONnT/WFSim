@@ -220,6 +220,7 @@ class ChunkRawRecords(object):
             _truth[name] = truth[name]
         _truth['time'][~np.isnan(_truth['t_first_photon'])] = \
             _truth['t_first_photon'][~np.isnan(_truth['t_first_photon'])].astype(int)
+        _truth.sort(order='time')
         if self.config['detector']=='XENON1T':
             yield dict(raw_records=records,
                        truth=_truth)
