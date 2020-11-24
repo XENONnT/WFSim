@@ -1131,6 +1131,9 @@ class RawData(object):
             left, right = channel_mask['left'][ch], channel_mask['right'][ch]
             id_t = np.random.randint(low=0, high=noise_data_length-right+left)
             for ix in range(left, right+1):
+                if id_t+ix >= noise_data_length or ix >= len(data[ch]):
+                    # Don't create value-errors
+                    continue
                 data[ch, ix] += noise_data[id_t+ix]
 
     @staticmethod
