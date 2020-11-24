@@ -32,6 +32,3 @@ def _sanity_check(raw_records, peaks):
     assert len(raw_records) > 0
     assert raw_records['data'].sum() > 0
     assert peaks['data'].sum() > 0
-
-
-
