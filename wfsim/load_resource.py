@@ -28,11 +28,7 @@ class Resource:
             config = dict()
         config = deepcopy(config)
 
-        files = {
-            'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
-            'ele_ap_cdfs': 'ele_after_pulse.npy',
-            'noise_file': 'x1t_noise_170203_0850_00_small.npz',
-        }
+        files = {}
         if config['detector'] == 'XENON1T':
             files.update({
                 'photon_area_distribution': 'XENON1T_spe_distributions.csv',
@@ -40,24 +36,33 @@ class Resource:
                 's1_pattern_map': 'XENON1T_s1_xyz_patterns_interp_corrected_MCv2.1.0.json.gz',
                 's2_light_yield_map': 'XENON1T_s2_xy_ly_SR1_v2.2.json',
                 's2_pattern_map': 'XENON1T_s2_xy_patterns_top_corrected_MCv2.1.0.json.gz',
-                'photon_ap_cdfs': 'x1t_pmt_afterpulse_config.pkl.gz',
                 'fdc_3d': 'XENON1T_FDC_SR1_data_driven_time_dependent_3d_correction_tf_nn_part1_v1.json.gz',
+                'photon_ap_cdfs': 'x1t_pmt_afterpulse_config.pkl.gz',
+                'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
+                'noise_file': 'x1t_noise_170203_0850_00_small.npz',
             })
         elif config['detector'] == 'XENONnT':
             files.update({
                 'photon_area_distribution': 'XENONnT_spe_distributions.csv',
                 's1_pattern_map': 'XENONnT_s1_xyz_patterns_corrected_MCv3.1.0_disks.pkl',
                 's2_pattern_map': 'XENONnT_s2_xy_patterns_topbottom_corrected_MCv3.1.0_disks.pkl',
-                'photon_ap_cdfs': 'xnt_pmt_afterpulse_config.pkl.gz',
                 's2_luminescence': 'XENONnT_s2_garfield_luminescence_distribution_v0.pkl.gz',
+                'photon_ap_cdfs': 'xnt_pmt_afterpulse_config.pkl.gz',
+                'ele_ap_pdfs': 'xnt_se_afterpulse_delaytime.pkl.gz',
+                'noise_file': 'xnt_noise_170203_0850_00_small.npz',
             })
         else:
             raise ValueError(f"Unsupported detector {config['detector']}")
 
         for k in set(config).intersection(files):
             files[k] = config[k] # Allowing user to replace default with specified files
+
         commit = 'master'   # Replace this by a commit hash if you feel solid and responsible
-        url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/fax_files'
+        if config['detector'] == 'XENON1T':
+            url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/fax_files'
+        elif config['detector'] == 'XENONnT':
+            url_base = f'https://raw.githubusercontent.com/XENONnT/private_nt_strax_aux_files/{commit}/fax_files'
+
         for k, v in files.items():
             if v.startswith('/'):
                 print(f"WARNING: Using local file {v} for a resource. "
