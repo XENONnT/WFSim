@@ -319,10 +319,10 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                       "no result for more than this many seconds"),
     strax.Option('fax_config',
                  default='https://raw.githubusercontent.com/XENONnT/'
-                 'strax_auxiliary_files/master/fax_files/fax_config_nt.json'),
+                 'private_nt_strax_aux_files/master/fax_files/fax_config_nt.json'),
     strax.Option('gain_model',
                  default=('to_pe_per_run', 'https://raw.githubusercontent.com/XENONnT/'
-                 'strax_auxiliary_files/master/fax_files/to_pe_nt.npy'),
+                 'private_nt_strax_aux_files/master/fax_files/to_pe_nt.npy'),
                  help='PMT gain model. Specify as (model_type, model_config)'),
     strax.Option('detector', default='XENONnT', track=True),)
 class FaxSimulatorPlugin(strax.Plugin):
