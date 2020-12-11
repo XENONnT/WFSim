@@ -27,9 +27,9 @@ instruction_dtype = [
 truth_extra_dtype = [
     ('n_electron', np.float),
     ('n_photon', np.float), ('n_photon_bottom', np.float),
-    ('t_first_photon', np.float), ('t_last_photon', np.float), 
-    ('t_mean_photon', np.float), ('t_sigma_photon', np.float), 
-    ('t_first_electron', np.float), ('t_last_electron', np.float), 
+    ('t_first_photon', np.float), ('t_last_photon', np.float),
+    ('t_mean_photon', np.float), ('t_sigma_photon', np.float),
+    ('t_first_electron', np.float), ('t_last_electron', np.float),
     ('t_mean_electron', np.float), ('t_sigma_electron', np.float), ('endtime',np.int64)]
 
 log = logging.getLogger('SimulationCore')
@@ -65,6 +65,7 @@ def read_optical(file, nv=False):
     data = uproot.open(file)
     all_ttrees = dict(data.allitems(filterclass=lambda cls: issubclass(cls, uproot.tree.TTreeMethods)))
     e = all_ttrees[next(iter(all_ttrees))]
+    #e = data['events']
 
     n_events = len(e.array('eventid'))
     # lets separate the events in time by a constant time difference
@@ -102,7 +103,7 @@ def read_optical(file, nv=False):
 
 @export
 def read_g4(c, file):
-    
+
     nc = nestpy.NESTcalc(nestpy.VDetector())
     A = 131.293
     Z = 54.
@@ -118,23 +119,23 @@ def read_g4(c, file):
     n_events = len(e.array('time'))
     #lets separate the events in time by a constant time difference
     time = time+np.arange(n_events)
-        
+
     #Events should be in the TPC
     xp = e.array("xp") / 10
-    yp = e.array("yp") /10 
-    zp = e.array("zp") /10 
+    yp = e.array("yp") /10
+    zp = e.array("zp") /10
     e_dep = e.array('ed')
-    
-    
+
+
     TPC_Cut = (zp > -c['tpc_length']) & (zp < 0) & (xp**2+yp**2 < c['tpc_radius']**2)
     xp = xp[TPC_Cut]
     yp = yp[TPC_Cut]
     zp = zp[TPC_Cut]
     e_dep = e_dep[TPC_Cut]
     time = time[TPC_Cut]
-    
+
     event_number = np.repeat(e.array("eventid"),e.array("nsteps"))[TPC_Cut.flatten()]
-    
+
     n_instructions = len(time.flatten())
     ins = np.zeros(2*n_instructions, dtype=instruction_dtype)
 
@@ -145,7 +146,7 @@ def read_g4(c, file):
                                                     1e9*np.repeat(time.flatten(),2 )
 
 
-    
+
     ins['event_number'] = np.repeat(event_number,2)
     ins['type'] = np.tile((1, 2), n_instructions)
     ins['recoil'] = np.repeat('er', 2 * n_instructions)
@@ -163,10 +164,10 @@ def read_g4(c, file):
         quanta.append(nc.GetQuanta(y, density).photons)
         quanta.append(nc.GetQuanta(y, density).electrons)
     ins['amp'] = quanta
-    
+
     #cut interactions without electrons or photons
     ins = ins[ins["amp"] > 0]
-    
+
     return ins
 
 
@@ -237,11 +238,11 @@ class ChunkRawRecords(object):
             self.record_buffer[s]['channel'] = channel
             self.record_buffer[s]['dt'] = dt
             self.record_buffer[s]['time'] = dt * (left + samples_per_record * np.arange(records_needed))
-            self.record_buffer[s]['length'] = [min(pulse_length, samples_per_record * (i+1)) 
+            self.record_buffer[s]['length'] = [min(pulse_length, samples_per_record * (i+1))
                 - samples_per_record * i for i in range(records_needed)]
             self.record_buffer[s]['pulse_length'] = pulse_length
             self.record_buffer[s]['record_i'] = np.arange(records_needed)
-            self.record_buffer[s]['data'] = np.pad(data, 
+            self.record_buffer[s]['data'] = np.pad(data,
                 (0, records_needed * samples_per_record - pulse_length), 'constant').reshape((-1, samples_per_record))
             self.blevel += records_needed
 
@@ -420,7 +421,10 @@ class FaxSimulatorPlugin(strax.Plugin):
         # Update gains to the nT defaults
         self.to_pe = get_to_pe(self.run_id, c['gain_model'],
                               len(c['channels_in_detector']['tpc']))
-        c['gains'] = 1 / self.to_pe * (1e-8 * 2.25 / 2**14) / (1.6e-19 * 10 * 50)
+        # self.to_pe : Unit -> ADC * time bin
+        # 1.e-9: ns, 1.6e-19: elementary charge, 50: termination resistance (Ohm)
+        c['gains'] = 1 / self.to_pe * (c['sample_duration']*1.e-9 * c['digitizer_voltage_range']\
+                                       / 2**c['digitizer_bits']) / (1.6e-19 * c['external_amplification'] * 50)
         c['gains'][self.to_pe==0] = 0
         if c['seed'] != False:
             np.random.seed(c['seed'])
