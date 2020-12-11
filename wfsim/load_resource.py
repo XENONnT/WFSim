@@ -56,6 +56,7 @@ class Resource:
         for k in set(config).intersection(files):
             files[k] = config[k] # Allowing user to replace default with specified files
         commit = 'master'   # Replace this by a commit hash if you feel solid and responsible
+        commit = 'a38cd361602ba522f7cab336ff83998a2a608087'   # TODO Tentative solution (@mzks)
         url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/fax_files'
         for k, v in files.items():
             if v.startswith('/'):

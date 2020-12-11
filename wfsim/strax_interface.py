@@ -61,11 +61,13 @@ def rand_instructions(c):
     return instructions
 
 @export
-def read_optical(file, nv=False):
+def read_optical(file, c):
     data = uproot.open(file)
-    all_ttrees = dict(data.allitems(filterclass=lambda cls: issubclass(cls, uproot.tree.TTreeMethods)))
-    e = all_ttrees[next(iter(all_ttrees))]
-    #e = data['events']
+    if c['mc_version_above_4']:
+        e = data['events']
+    else:
+        all_ttrees = dict(data.allitems(filterclass=lambda cls: issubclass(cls, uproot.tree.TTreeMethods)))
+        e = all_ttrees[next(iter(all_ttrees))]
 
     n_events = len(e.array('eventid'))
     # lets separate the events in time by a constant time difference
@@ -76,7 +78,7 @@ def read_optical(file, nv=False):
     yp = e.array("xp_pri") / 10
     zp = e.array("xp_pri") / 10
 
-    if nv:
+    if c['nv']:
         channels = [[channel - 20000 for channel in array] for array in e.array("pmthitID")]
         timings = e.array("pmthitTime")*1e9
     else:
@@ -397,6 +399,7 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  help='PMT gain model. Specify as (model_type, model_config)'),
     strax.Option('detector', default='XENONnT', track=True),
     strax.Option('nv', default=False, track=True, help="Flag for nVeto optical simulation instead of TPC"),
+    strax.Option('mc_version_above_4', default=True, track=True, help="Flag above MC version 4. to generate optical"),
 )
 class FaxSimulatorPlugin(strax.Plugin):
     depends_on = tuple()
@@ -434,7 +437,7 @@ class FaxSimulatorPlugin(strax.Plugin):
             c.update(overrides)
 
         if c['optical']:
-            self.instructions, self.channels, self.timings = read_optical(c['fax_file'], c['nv'])
+            self.instructions, self.channels, self.timings = read_optical(c['fax_file'], c)
             c['nevents']=len(self.instructions['event_number'])
 
         elif c['fax_file']:
@@ -626,7 +629,7 @@ import straxen
 if __name__ == '__main__':
 
 
-    straxen.contexts.xnt_common_config['gain_model'] = ('to_pe_constant', '1500V_20200614')
+    straxen.contexts.xnt_common_config['gain_model'] = ('to_pe_constant', 'nv_prototype')
     st = strax.Context(
         storage=strax.DataDirectory('/Users/mzks/xenon/WFSim/bench/strax_data'),
         register=wfsim.RawRecordsFromFaxnVeto,
@@ -634,6 +637,7 @@ if __name__ == '__main__':
                     fax_config='/Users/mzks/xenon/WFSim/bench/fax_config_nt.json',
                     optical=True,
                     nv=True,
+                    mc_version_above_4=False,
                     **straxen.contexts.xnt_common_config,
                     ),
         **straxen.contexts.common_opts)
