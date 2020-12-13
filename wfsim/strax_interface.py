@@ -628,16 +628,25 @@ import strax
 import straxen
 if __name__ == '__main__':
 
+    # Template pulse
+    pe_pulse_ts = [-10, -9, -8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+                   17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41,
+                   42, 43, 44, 45, 46, 47, 48, 49]
+    pe_pulse_ys = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.004166666666666667, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                   0.004166666666666667, 0.008333333333333333, 0.041666666666666664, 0.14583333333333334, 0.2375,
+                   0.17083333333333334, 0.09166666666666666, 0.058333333333333334, 0.05, 0.0375, 0.025, 0.025,
+                   0.016666666666666666, 0.0125, 0.008333333333333333, 0.008333333333333333, 0.008333333333333333,
+                   0.004166666666666667, 0.004166666666666667, 0.004166666666666667, 0.008333333333333333,
+                   0.004166666666666667, 0.004166666666666667, 0.0, 0.0, 0.0, 0.0, 0.004166666666666667,
+                   0.004166666666666667, 0.004166666666666667, 0.0, 0.004166666666666667, 0.0, 0.0, 0.0,
+                   0.004166666666666667, 0.004166666666666667, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
     straxen.contexts.xnt_common_config['gain_model'] = ('to_pe_constant', 'nv_prototype')
     st = strax.Context(
         storage=strax.DataDirectory('/Users/mzks/xenon/WFSim/bench/strax_data'),
         register=wfsim.RawRecordsFromFaxnVeto,
         config=dict(detector='XENONnT',
-                    fax_config='/Users/mzks/xenon/WFSim/bench/fax_config_nt.json',
-                    optical=True,
-                    nv=True,
-                    mc_version_above_4=False,
+                    fax_config='/Users/mzks/xenon/WFSim/bench/strax_auxiliary_files/fax_files/fax_config_nt.json',
                     **straxen.contexts.xnt_common_config,
                     ),
         **straxen.contexts.common_opts)
@@ -645,7 +654,24 @@ if __name__ == '__main__':
     run_id = '1'
     st.set_config(dict(nchunk=1, event_rate=5, chunk_size=10,
                        fax_file='/Users/mzks/xenon/tutor3/output0500.root',
-                       ))
+                            fax_config_override=dict(
+                            sample_duration=2,
+                            digitizer_voltage_range=2.0,
+                            digitizer_bits=14,
+                            external_amplification=1,
+                            digitizer_reference_baseline=15925,
+                            pe_pulse_ts=pe_pulse_ts,
+                            pe_pulse_ys=pe_pulse_ys,
+                            pmt_transit_time_mean=46.0,
+                            pmt_transit_time_spread=2.3,
+                            zle_threshold=15,
+                            optical=True,
+                            nv=True,
+                            mc_version_above_4=False,
+                            noise=False  # This option has not prepared yet.
+                            )
+                       )
+                  )
 
     raw_records_nv = st.get_array(run_id, 'raw_records_nv')
     print(raw_records_nv[0])
