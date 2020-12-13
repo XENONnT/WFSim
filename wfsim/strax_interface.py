@@ -79,9 +79,15 @@ def read_optical(file, c):
     zp = e.array("xp_pri") / 10
 
     if c['nv']:
-        channels = [[channel - 20000 for channel in array] for array in e.array("pmthitID")]
+        if c['mc_version_above_4']:
+            nV_pmt_id_offset = 2000
+        else:
+            nV_pmt_id_offset = 20000
+
+        channels = [[channel - nV_pmt_id_offset for channel in array] for array in e.array("pmthitID")]
         timings = e.array("pmthitTime")*1e9
     else:
+        # TPC
         channels = e.array("pmthitID")
         timings = e.array("pmthitTime")*1e9
 
@@ -653,7 +659,7 @@ if __name__ == '__main__':
 
     run_id = '1'
     st.set_config(dict(nchunk=1, event_rate=5, chunk_size=10,
-                       fax_file='/Users/mzks/xenon/tutor3/output0500.root',
+                       fax_file='/Users/mzks/xenon/mc/mc/workdir/mc_test_output.root',
                             fax_config_override=dict(
                             sample_duration=2,
                             digitizer_voltage_range=2.0,
@@ -667,7 +673,7 @@ if __name__ == '__main__':
                             zle_threshold=15,
                             optical=True,
                             nv=True,
-                            mc_version_above_4=False,
+                            mc_version_above_4=True,
                             noise=False  # This option has not prepared yet.
                             )
                        )

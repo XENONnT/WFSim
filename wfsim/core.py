@@ -63,7 +63,8 @@ class Pulse(object):
                 if 0 > channel or channel >= 120:
                     continue
             else:
-                pass # TPC
+                if 0 > channel or channel >= 493:
+                    continue
             # Use 'counts' amount of photon for this channel
             _channel_photon_timings = self._photon_timings[counts_start:counts_start+counts]
             counts_start += counts
