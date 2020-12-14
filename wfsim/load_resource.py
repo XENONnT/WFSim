@@ -59,9 +59,9 @@ class Resource:
 
         commit = 'master'   # Replace this by a commit hash if you feel solid and responsible
         if config['detector'] == 'XENON1T':
-            url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/fax_files'
+            url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/sim_files'
         elif config['detector'] == 'XENONnT':
-            url_base = f'https://raw.githubusercontent.com/XENONnT/private_nt_strax_aux_files/{commit}/fax_files'
+            url_base = f'https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/{commit}/sim_files'
 
         for k, v in files.items():
             if v.startswith('/'):
