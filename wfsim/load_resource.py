@@ -29,9 +29,9 @@ class Resource:
         config = deepcopy(config)
 
         files = {
-            'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
+            'ele_ap_pdfs': 'xnt_se_afterpulse_delaytime.pkl.gz',
             'ele_ap_cdfs': 'ele_after_pulse.npy',
-            'noise_file': 'x1t_noise_170203_0850_00_small.npz',
+            'noise_file': 'xnt_noise_170203_0850_00_small.npz',
         }
         if config['detector'] == 'XENON1T':
             files.update({
@@ -55,9 +55,9 @@ class Resource:
 
         for k in set(config).intersection(files):
             files[k] = config[k] # Allowing user to replace default with specified files
-        commit = 'master'   # Replace this by a commit hash if you feel solid and responsible
-        commit = 'a38cd361602ba522f7cab336ff83998a2a608087'   # TODO Tentative solution (@mzks)
-        url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/fax_files'
+        #commit = 'master'   # Replace this by a commit hash if you feel solid and responsible
+        #url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/sim_files'
+        url_base = './private_nt_aux_files/sim_files'
         for k, v in files.items():
             if v.startswith('/'):
                 print(f"WARNING: Using local file {v} for a resource. "
@@ -65,6 +65,7 @@ class Resource:
             files[k] = osp.join(url_base, v)
 
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
+
 
         if config['detector']== 'XENON1T':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='json.gz')
@@ -92,8 +93,8 @@ class Resource:
         self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
 
         # Noise sample
-        #self.noise_data = straxen.get_resource(files['noise_file'], fmt='npy')['arr_0'].flatten()
-        self.noise_data = straxen.get_resource('/Users/mzks/xenon/WFSim/bench/strax_auxiliary_files/fax_files/TEST000012_02242020121353_nV_noise.npz',fmt='npy')['arr_0'].flatten()
+        self.noise_data = straxen.get_resource(files['noise_file'], fmt='npy')['arr_0'].flatten()
+        #self.noise_data = straxen.get_resource('/Users/mzks/xenon/WFSim/bench/strax_auxiliary_files/fax_files/TEST000012_02242020121353_nV_noise.npz',fmt='npy')['arr_0'].flatten()
 
 def make_map(map_file: str, fmt='text'):
     map_data = straxen.get_resource(map_file, fmt)

@@ -62,21 +62,33 @@ def rand_instructions(c):
 
 @export
 def read_optical(file, c):
+
+    uproot_ver4 = uproot.__version__[0] == '4'
     data = uproot.open(file)
     if c['mc_version_above_4']:
-        e = data['events']
+        e = data.get('events')
     else:
         all_ttrees = dict(data.allitems(filterclass=lambda cls: issubclass(cls, uproot.tree.TTreeMethods)))
         e = all_ttrees[next(iter(all_ttrees))]
 
-    n_events = len(e.array('eventid'))
-    # lets separate the events in time by a constant time difference
-    time = np.arange(1, n_events+1)
+    if uproot_ver4:
+        n_events = len(e['eventid'].array(library="np"))
+        # lets separate the events in time by a constant time difference
+        time = np.arange(1, n_events+1)
 
-    # Events should be in the TPC
-    xp = e.array("xp_pri") / 10
-    yp = e.array("xp_pri") / 10
-    zp = e.array("xp_pri") / 10
+        # Events should be in the TPC
+        xp = e["xp_pri"].array(library="np") / 10
+        yp = e["yp_pri"].array(library="np") / 10
+        zp = e["zp_pri"].array(library="np") / 10
+    else:
+        n_events = len(e.array('eventid'))
+        # lets separate the events in time by a constant time difference
+        time = np.arange(1, n_events+1)
+
+        # Events should be in the TPC
+        xp = e.array('xp_pri') / 10
+        yp = e.array('yp_pri') / 10
+        zp = e.array('zp_pri') / 10
 
     if c['nv']:
         if c['mc_version_above_4']:
@@ -84,19 +96,27 @@ def read_optical(file, c):
         else:
             nV_pmt_id_offset = 20000
 
-        channels = [[channel - nV_pmt_id_offset for channel in array] for array in e.array("pmthitID")]
-        timings = e.array("pmthitTime")*1e9
+        if uproot_ver4:
+            channels = [[channel - nV_pmt_id_offset for channel in array] for array in e["pmthitID"].array(library="np")]
+            timings = e["pmthitTime"].array(library="np")*1e9
+        else:
+            channels = [[channel - nV_pmt_id_offset for channel in array] for array in e.array('pmthitID')]
+            timings = e.array('pmthitTime')*1e9
     else:
         # TPC
-        channels = e.array("pmthitID")
-        timings = e.array("pmthitTime")*1e9
+        if uproot_ver4:
+            channels = e["pmthitID"].array(library="np")
+            timings = e["pmthitTime"].array(library="np")*1e9
+        else:
+            channels = e.array('pmthitID')
+            timings = e.array('pmthitTime')*1e9
 
     ins = np.zeros(n_events, dtype=instruction_dtype)
 
     ins['x'], ins['y'], ins['z'], ins['time'] = xp.flatten()  / 10, \
-                                                       yp.flatten() / 10, \
-                                                       zp.flatten() / 10, \
-                                                       1e7 * time.flatten()
+        yp.flatten() / 10, \
+        zp.flatten() / 10, \
+        1e7 * time.flatten()
 
     ins['event_number'] = np.arange(n_events)
     ins['type'] = np.repeat(1, n_events)
