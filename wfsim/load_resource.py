@@ -57,16 +57,24 @@ class Resource:
         for k in set(config).intersection(files):
             files[k] = config[k] # Allowing user to replace default with specified files
         commit = 'master'   # Replace this by a commit hash if you feel solid and responsible
-        url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/fax_files'
+        url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/sim_files'
         for k, v in files.items():
             if v.startswith('/'):
                 print(f"WARNING: Using local file {v} for a resource. "
                       f"Do not set this as a default or TravisCI tests will break")
-            files[k] = osp.join(url_base, v)
+            try:
+                # First try downloading it via
+                # https://straxen.readthedocs.io/en/latest/config_storage.html#downloading-xenonnt-files-from-the-database  # noqa
+                downloaded_file = straxen.get_resource(v)
+                files[k] = downloaded_file
+            except FileNotFoundError:
+                # We cannot download the file from the database. We need to
+                # try to get a placeholder file from a URL.
+                files[k] = osp.join(url_base, v)
 
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
 
-        if config['detector']== 'XENON1T':
+        if config['detector'] == 'XENON1T':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='json.gz')
             self.s1_light_yield_map = make_map(files['s1_light_yield_map'], fmt='json')
             self.s2_light_yield_map = make_map(files['s2_light_yield_map'], fmt='json')
