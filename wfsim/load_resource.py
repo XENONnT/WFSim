@@ -58,6 +58,7 @@ class Resource:
             files[k] = config[k] # Allowing user to replace default with specified files
         commit = 'master'   # Replace this by a commit hash if you feel solid and responsible
         url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/sim_files'
+        downloader = straxen.MongoDownloader()
         for k, v in files.items():
             if v.startswith('/'):
                 print(f"WARNING: Using local file {v} for a resource. "
@@ -65,9 +66,9 @@ class Resource:
             try:
                 # First try downloading it via
                 # https://straxen.readthedocs.io/en/latest/config_storage.html#downloading-xenonnt-files-from-the-database  # noqa
-                downloaded_file = straxen.get_resource(v)
+                downloaded_file = downloader.download_single(v)
                 files[k] = downloaded_file
-            except FileNotFoundError:
+            except (FileNotFoundError, ValueError):
                 # We cannot download the file from the database. We need to
                 # try to get a placeholder file from a URL.
                 files[k] = osp.join(url_base, v)
