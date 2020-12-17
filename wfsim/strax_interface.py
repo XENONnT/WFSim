@@ -188,8 +188,6 @@ class ChunkRawRecords(object):
         records = records[maska]
 
         records = strax.sort_by_time(records) # Do NOT remove this line
-        # strax.baseline(records) Will be done w/ pulse processing
-        strax.integrate(records)
 
         # Yield an appropriate amount of stuff from the truth buffer
         # and mark it as available for writing again
