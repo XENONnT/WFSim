@@ -129,7 +129,8 @@ class ChunkRawRecords(object):
     def __init__(self, config):
         self.config = config
         self.rawdata = wfsim.RawData(self.config)
-        self.record_buffer = np.zeros(5000000, dtype=strax.record_dtype()) # 2*250 ms buffer
+        self.record_buffer = np.zeros(5000000, dtype=strax.raw_record_dtype(
+                samples_per_record=110)) # 2*250 ms buffer
         self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)])
 
     def __call__(self, instructions):
@@ -403,9 +404,12 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
         self.sim_iter = self.sim(self.instructions)
 
     def infer_dtype(self):
-        dtype = dict(raw_records=strax.record_dtype(),
-                     raw_records_he=strax.record_dtype(),
-                     raw_records_aqmon=strax.record_dtype(),
+        dtype = dict(raw_records=strax.raw_record_dtype(
+                samples_per_record=110),
+                     raw_records_he=strax.raw_record_dtype(
+                samples_per_record=110),
+                     raw_records_aqmon=strax.raw_record_dtype(
+                samples_per_record=110),
                      truth=instruction_dtype + truth_extra_dtype)
         return dtype
 
@@ -441,7 +445,8 @@ class RawRecordsFromFax1T(RawRecordsFromFaxNT):
     data_kind = immutabledict(zip(provides, provides))
 
     def infer_dtype(self):
-        dtype = dict(raw_records=strax.record_dtype(),
+        dtype = dict(raw_records=strax.raw_record_dtype(
+                samples_per_record=110),
                      truth=instruction_dtype + truth_extra_dtype)
         return dtype
 
