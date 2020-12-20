@@ -497,6 +497,7 @@ class S2(Pulse):
             electron_trapping_time):
         assert len(timings) == np.sum(n_electron)
         assert len(gains) == np.sum(n_electron)
+        assert len(sc_gain) == len(t)
 
         i_electron = 0
         for i in np.arange(len(t)):
@@ -508,7 +509,7 @@ class S2(Pulse):
             drift_time_stdev /= drift_velocity_liquid
             # Calculate electron arrival times in the ELR region
 
-            for j in np.arange(n_electron[i]):
+            for _ in np.arange(n_electron[i]):
                 _timing = t[i] + \
                     np.random.exponential(electron_trapping_time)
                 _timing += np.random.normal(drift_time_mean, drift_time_stdev)
