@@ -280,11 +280,13 @@ class S1(Pulse):
 
         _, _, t, x, y, z, n_photons, recoil_type, *rest = [
             np.array(v).reshape(-1) for v in zip(*instruction)]
-        
+
         positions = np.array([x, y, z]).T  # For map interpolation
-        ly = np.squeeze(self.resource.s1_light_yield_map(positions),
-                       axis=-1)
-        if self.config['detector']=='XENON1T':
+        if self.config['detector']=='XENONnT':
+            ly = np.squeeze(self.resource.s1_light_yield_map(positions),
+                            axis=-1)
+        elif self.config['detector']=='XENON1T':
+            ly = self.resource.s1_light_yield_map(positions)
             ly *= self.config['s1_detection_efficiency']
         n_photons = np.random.binomial(n=n_photons, p=ly)
 
@@ -388,8 +390,12 @@ class S2(Pulse):
         else:
             z_obs, positions = z, np.array([x, y]).T
 
-        sc_gain = np.squeeze(self.resource.s2_light_yield_map(positions), axis=-1) \
-            * self.config['s2_secondary_sc_gain']
+        if self.config['detector']=='XENONnT':
+            sc_gain = np.squeeze(self.resource.s2_light_yield_map(positions), axis=-1) \
+                * self.config['s2_secondary_sc_gain']
+        elif self.config['detector']=='XENON1T':
+            sc_gain = self.resource.s2_light_yield_map(positions) \
+                * self.config['s2_secondary_sc_gain']
 
         # Average drift time of the electrons
         self.drift_time_mean = - z_obs / \
