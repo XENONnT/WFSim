@@ -563,7 +563,7 @@ class ChunkRawRecordsnVeto(ChunkRawRecordsOptical):
     def __init__(self, config):
         self.config = config
         self.rawdata = wfsim.RawDataOptical(self.config)
-        self.record_buffer = np.zeros(5000000, dtype=strax.record_dtype()) # 2*250 ms buffer
+        self.record_buffer = np.zeros(5000000, dtype=strax.raw_record_dtype()) # 2*250 ms buffer
         self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)])
 
     def final_results(self):
@@ -573,7 +573,7 @@ class ChunkRawRecordsnVeto(ChunkRawRecordsOptical):
 
         records = strax.sort_by_time(records) # Do NOT remove this line
         # strax.baseline(records) Will be done w/ pulse processing
-        strax.integrate(records)
+        # strax.integrate(records) # Remember (mzks)
 
         # Yield an appropriate amount of stuff from the truth buffer
         # and mark it as available for writing again
@@ -628,8 +628,8 @@ class RawRecordsFromFaxnVeto(RawRecordsFromFaxOptical):
 
 
     def infer_dtype(self):
-        dtype = dict(raw_records_nv=strax.record_dtype(),
-                     raw_records_aqmon_nv=strax.record_dtype(),
+        dtype = dict(raw_records_nv=strax.raw_record_dtype(),
+                     raw_records_aqmon_nv=strax.raw_record_dtype(),
                      truth=instruction_dtype + truth_extra_dtype)
         return dtype
 
