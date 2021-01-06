@@ -1,9 +1,8 @@
 import logging
-import uproot
-import nestpy
 
 import numpy as np
 import pandas as pd
+import uproot
 
 import strax
 from straxen.common import get_resource
@@ -228,7 +227,8 @@ class ChunkRawRecords(object):
     def __init__(self, config):
         self.config = config
         self.rawdata = wfsim.RawData(self.config)
-        self.record_buffer = np.zeros(5000000, dtype=strax.record_dtype()) # 2*250 ms buffer
+        self.record_buffer = np.zeros(5000000, dtype=strax.raw_record_dtype(
+                samples_per_record=110)) # 2*250 ms buffer
         self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)])
 
     def __call__(self, instructions):
@@ -287,8 +287,6 @@ class ChunkRawRecords(object):
         records = records[maska]
 
         records = strax.sort_by_time(records) # Do NOT remove this line
-        # strax.baseline(records) Will be done w/ pulse processing
-        strax.integrate(records)
 
         # Yield an appropriate amount of stuff from the truth buffer
         # and mark it as available for writing again
@@ -320,6 +318,7 @@ class ChunkRawRecords(object):
             _truth[name] = truth[name]
         _truth['time'][~np.isnan(_truth['t_first_photon'])] = \
             _truth['t_first_photon'][~np.isnan(_truth['t_first_photon'])].astype(int)
+        _truth.sort(order='time')
         if self.config['detector']=='XENON1T':
             yield dict(raw_records=records,
                        truth=_truth)
@@ -412,8 +411,6 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
     strax.Option('nchunk', default=4, track=False,
                  help="Number of chunks to simulate"),
     strax.Option('right_raw_extension', default=50000),
-    strax.Option('zle_threshold', default=0),
-    strax.Option('field_distortion_on', default=False, track=True),
     strax.Option('timeout', default=1800,
                  help="Terminate processing if any one mailbox receives "
                       "no result for more than this many seconds"),
@@ -421,7 +418,8 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  default='https://raw.githubusercontent.com/XENONnT/'
                  'strax_auxiliary_files/master/fax_files/fax_config_nt.json'),
     strax.Option('gain_model',
-                 default=('to_pe_constant', '1300V_20200428'),
+                 default=('to_pe_per_run', 'https://raw.githubusercontent.com/XENONnT/'
+                 'strax_auxiliary_files/master/fax_files/to_pe_nt.npy'),
                  help='PMT gain model. Specify as (model_type, model_config)'),
     strax.Option('detector', default='XENONnT', track=True),
     strax.Option('nv', default=False, track=True, help="Flag for nVeto optical simulation instead of TPC"),
@@ -467,16 +465,16 @@ class FaxSimulatorPlugin(strax.Plugin):
             c['nevents']=len(self.instructions['event_number'])
 
         elif c['fax_file']:
-            if c['fax_file'][-5:] == '.root':
-                self.instructions = read_g4(c, c['fax_file'])
-                c['nevents'] = np.max(self.instructions['event_number'])
-            else:
-                self.instructions = instruction_from_csv(c['fax_file'])
-                c['nevents'] = np.max(self.instructions['event_number'])
+            assert c['fax_file'][-5:] != '.root', 'None optical g4 input is deprecated use EPIX instead'
+            self.instructions = instruction_from_csv(c['fax_file'])
+            c['nevents'] = np.max(self.instructions['event_number'])
 
         else:
             self.instructions = rand_instructions(c)
 
+        # Let below cathode S1 instructions pass but remove S2 instructions
+        m = (self.instructions['z'] < -c['tpc_length']) & (self.instructions['type'] == 2)
+        self.instructions = self.instructions[~m]
 
         assert np.all(self.instructions['x']**2 + self.instructions['y']**2 < c['tpc_radius']**2), \
                 "Interation is outside the TPC"
@@ -508,9 +506,12 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
         self.sim_iter = self.sim(self.instructions)
 
     def infer_dtype(self):
-        dtype = dict(raw_records=strax.record_dtype(),
-                     raw_records_he=strax.record_dtype(),
-                     raw_records_aqmon=strax.record_dtype(),
+        dtype = dict(raw_records=strax.raw_record_dtype(
+                samples_per_record=110),
+                     raw_records_he=strax.raw_record_dtype(
+                samples_per_record=110),
+                     raw_records_aqmon=strax.raw_record_dtype(
+                samples_per_record=110),
                      truth=instruction_dtype + truth_extra_dtype)
         return dtype
 
@@ -546,7 +547,8 @@ class RawRecordsFromFax1T(RawRecordsFromFaxNT):
     data_kind = immutabledict(zip(provides, provides))
 
     def infer_dtype(self):
-        dtype = dict(raw_records=strax.record_dtype(),
+        dtype = dict(raw_records=strax.raw_record_dtype(
+                samples_per_record=110),
                      truth=instruction_dtype + truth_extra_dtype)
         return dtype
 

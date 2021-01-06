@@ -6,54 +6,26 @@ import wfsim
 
 strax.mailbox.Mailbox.DEFAULT_TIMEOUT = 60
 
-# Just some id from post-SR1, so the corrections work
-run_id = '180519_1902'
-
-
-def test_sim_nt():
-    with tempfile.TemporaryDirectory() as tempdir:
-        st = strax.Context(
-            storage=tempdir,
-            config=dict(nchunk=1, event_rate=1, chunk_size=10,
-                        detector='XENONnT',
-                        fax_config='https://raw.githubusercontent.com/XENONnT/'
-                                   'strax_auxiliary_files/master/fax_files/fax_config_nt.json',
-                        **straxen.contexts.xnt_common_config),
-            **straxen.contexts.common_opts)
-        st.register(wfsim.RawRecordsFromFaxNT)
-
-        rr = st.get_array(run_id, 'raw_records')
-        p = st.get_array(run_id, 'peaks')
-        _sanity_check(rr, p)
-
+run_id = '010000'
 
 def test_sim():
     with tempfile.TemporaryDirectory() as tempdir:
         st = strax.Context(
             storage=tempdir,
-            config=dict(nchunk=1, event_rate=1, chunk_size=10,
-                        detector='XENON1T',
-                        fax_config='https://raw.githubusercontent.com/XENONnT/'
-                                   'strax_auxiliary_files/master/fax_files/fax_config_1t.json',
-                        **straxen.contexts.x1t_common_config),
+            config=dict(
+                nchunk=1, event_rate=1, chunk_size=10,
+                detector='XENONnT',
+                fax_config='https://raw.githubusercontent.com/XENONnT/'
+                           'strax_auxiliary_files/master/fax_files/fax_config_nt.json',
+                **straxen.contexts.xnt_common_config),
             **straxen.contexts.common_opts)
-        st.register(wfsim.RawRecordsFromFax1T)
+        st.register(wfsim.RawRecordsFromFaxNT)
+        st.config['gain_model'] = ('to_pe_per_run', 'https://raw.githubusercontent.com/XENONnT/'
+            'strax_auxiliary_files/master/fax_files/to_pe_nt.npy')
 
         rr = st.get_array(run_id, 'raw_records')
         p = st.get_array(run_id, 'peaks')
         _sanity_check(rr, p)
-
-        # Test simulation config override
-        # We'll set the extraction yield to 0, then check that the
-        # total simulated area is much less than before
-        # TODO: it would be nicer to do this without random instructions...
-        st.set_config(dict(fax_config_override=dict(
-            electron_extraction_yield=0)))
-        rr2 = st.get_array(run_id, 'raw_records')
-        p2 = st.get_array(run_id, 'peaks')
-        _sanity_check(rr2, p2)
-
-        assert p2['area'].sum() < 0.1 * p['area'].sum()
 
 
 def _sanity_check(raw_records, peaks):
