@@ -298,7 +298,7 @@ class S1(Pulse):
         super().__call__()
 
     def photon_channels(self, points, n_photons):
-        channels = np.array(self.config['channels_in_detector']['tpc'])
+        channels = np.arange(len(self.config['gains']))
         p_per_channel = self.resource.s1_pattern_map(points)
         p_per_channel[:, np.in1d(channels, self.turned_off_pmts)] = 0
         

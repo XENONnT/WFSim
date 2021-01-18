@@ -5,7 +5,7 @@ import pandas as pd
 import uproot
 
 import strax
-from straxen.common import get_resource
+from straxen.common import get_resource, n_tpc_pmts, n_top_pmts
 from straxen import get_to_pe
 import wfsim
 from immutabledict import immutabledict
@@ -341,10 +341,18 @@ class FaxSimulatorPlugin(strax.Plugin):
 
     def setup(self):
         c = self.config
+        # nT default, overwrite for 1T
+        c.setdefault('channels_top', np.arange(n_top_pmts))
+        c.setdefault('channels_bottom', np.arange(n_top_pmts, n_tpc_pmts))
+        c.setdefault('channels_top_high_energy', np.arange(500, 752+1))
+        c.setdefault('channels_in_detector', {'tpc': np.arange(n_tpc_pmts),
+                                              'sum_signal': 800,
+                                             })
         c.update(get_resource(c['fax_config'], fmt='json'))
+
         # Update gains to the nT defaults
         self.to_pe = get_to_pe(self.run_id, c['gain_model'],
-                              len(c['channels_in_detector']['tpc']))
+                               len(c['channels_in_detector']['tpc']))
         c['gains'] = 1 / self.to_pe * (1e-8 * 2.25 / 2**14) / (1.6e-19 * 10 * 50)
         c['gains'][self.to_pe==0] = 0
         if c['seed'] != False:
