@@ -320,6 +320,7 @@ class S1(Pulse):
             # Simple S1 model enabled: use it for ER and NR.
             self._photon_timings = np.append(self._photon_timings,
                 t + np.random.exponential(self.config['s1_decay_time'], n_photons))
+            self._photon_timings += np.random.normal(0,self.config['s1_time_spread'],len(self._photon_timings))
             return
 
         try:
@@ -567,6 +568,8 @@ class S2(Pulse):
 
         self._photon_timings += self.singlet_triplet_delays(
             len(self._photon_timings), self.config['singlet_fraction_gas'])
+        
+        self._photon_timings += np.random.normal(0,self.config['s2_time_spread'],len(self._photon_timings)
 
         # The timings generated is NOT randomly ordered, must do shuffle
         # Shuffle within each given n_electron[i]
