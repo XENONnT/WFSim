@@ -1,4 +1,4 @@
 git+git://github.com/AxFoundation/strax
 git+git://github.com/XENONnT/utilix
 git+git://github.com/XENONnT/straxen
-uproot
+uproot>=4.0.0

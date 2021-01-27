@@ -68,7 +68,6 @@ def rand_instructions(c):
 
 def read_optical(file, c):
 
-    uproot_ver4 = uproot.__version__[0] == '4'
     data = uproot.open(file)
     if c['mc_version_above_4']:
         e = data.get('events')
@@ -76,45 +75,29 @@ def read_optical(file, c):
         all_ttrees = dict(data.allitems(filterclass=lambda cls: issubclass(cls, uproot.tree.TTreeMethods)))
         e = all_ttrees[next(iter(all_ttrees))]
 
-    if uproot_ver4:
-        n_events = len(e['eventid'].array(library="np"))
-        # lets separate the events in time by a constant time difference
-        time = np.arange(1, n_events+1)
+    
+    n_events = len(e['eventid'].array(library="np"))
+    # lets separate the events in time by a constant time difference
+    time = np.arange(1, n_events+1)
 
-        # Events should be in the TPC
-        xp = e["xp_pri"].array(library="np") / 10
-        yp = e["yp_pri"].array(library="np") / 10
-        zp = e["zp_pri"].array(library="np") / 10
-    else:
-        n_events = len(e.array('eventid'))
-        # lets separate the events in time by a constant time difference
-        time = np.arange(1, n_events+1)
-
-        # Events should be in the TPC
-        xp = e.array('xp_pri') / 10
-        yp = e.array('yp_pri') / 10
-        zp = e.array('zp_pri') / 10
+    # Events should be in the TPC
+    xp = e["xp_pri"].array(library="np") / 10
+    yp = e["yp_pri"].array(library="np") / 10
+    zp = e["zp_pri"].array(library="np") / 10
 
     if c['nv']:
         if c['mc_version_above_4']:
             nV_pmt_id_offset = 2000
         else:
             nV_pmt_id_offset = 20000
-
-        if uproot_ver4:
-            channels = [[channel - nV_pmt_id_offset for channel in array] for array in e["pmthitID"].array(library="np")]
-            timings = e["pmthitTime"].array(library="np")*1e9
-        else:
-            channels = [[channel - nV_pmt_id_offset for channel in array] for array in e.array('pmthitID')]
-            timings = e.array('pmthitTime')*1e9
+        channels = [[channel - nV_pmt_id_offset for channel in array] for array in e["pmthitID"].array(library="np")]
+        timings = e["pmthitTime"].array(library="np")*1e9
+    
     else:
         # TPC
-        if uproot_ver4:
-            channels = e["pmthitID"].array(library="np")
-            timings = e["pmthitTime"].array(library="np")*1e9
-        else:
-            channels = e.array('pmthitID')
-            timings = e.array('pmthitTime')*1e9
+    
+        channels = e["pmthitID"].array(library="np")
+        timings = e["pmthitTime"].array(library="np")*1e9
 
     ins = np.zeros(n_events, dtype=instruction_dtype)
 
@@ -181,6 +164,7 @@ class ChunkRawRecords(object):
 
     def chunk_data(self,instructions, **kwargs):
         samples_per_record = strax.DEFAULT_RECORD_LENGTH
+        dt = self.config['samples_duration']
         buffer_length = len(self.record_buffer)
         rext = int(self.config['right_raw_extension'])
         cksz = int(self.config['chunk_size'] * 1e9)
@@ -191,8 +175,8 @@ class ChunkRawRecords(object):
             pulse_length = right - left + 1
             records_needed = int(np.ceil(pulse_length / samples_per_record))
 
-            if self.rawdata.left * self.config['sample_duration'] > self.chunk_time:
-                self.chunk_time = self.last_digitized_right * self.config['sample_duration']
+            if self.rawdata.left * dt > self.chunk_time:
+                self.chunk_time = self.last_digitized_right * dt
                 yield from self.final_results()
                 self.chunk_time_pre = self.chunk_time
                 self.chunk_time += cksz
@@ -224,7 +208,7 @@ class ChunkRawRecords(object):
 
     def final_results(self):
         records = self.record_buffer[:self.blevel] # No copying the records from buffer
-        maska = records['time'] <= self.last_digitized_right * self.config['sample_duration']
+        maska = records['time'] <= self.last_digitized_right * dt
         records = records[maska]
 
         records = strax.sort_by_time(records) # Do NOT remove this line
@@ -266,7 +250,7 @@ class ChunkRawRecords(object):
             yield dict(raw_records=records,
                        truth=_truth)
         if self.config['nv']:
-            yield dict(raw_records_nv=records[records['channel'] < self.config['channels_top_high_energy'][0]],,
+            yield dict(raw_records_nv=records[records['channel'] < self.config['channels_top_high_energy'][0]],
                        truth=_truth)
         elif self.config['detector']=='XENONnT':
             yield dict(raw_records=records[records['channel'] < self.config['channels_top_high_energy'][0]],
@@ -380,11 +364,11 @@ class FaxSimulatorPlugin(strax.Plugin):
 
     def _sort_check(self, result):
         if len(result) == 0: return
-        # if result['time'][0] < self.last_chunk_time + 1000:
-        #     raise RuntimeError(
-        #         "Simulator returned chunks with insufficient spacing. "
-        #         f"Last chunk's max time was {self.last_chunk_time}, "
-        #         f"this chunk's first time is {result['time'][0]}.")
+        if result['time'][0] < self.last_chunk_time + 1000:
+            raise RuntimeError(
+                "Simulator returned chunks with insufficient spacing. "
+                f"Last chunk's max time was {self.last_chunk_time}, "
+                f"this chunk's first time is {result['time'][0]}.")
         if np.diff(result['time']).min() < 0:
             raise RuntimeError("Simulator returned non-sorted records!")
         self.last_chunk_time = result['time'].max()
@@ -481,7 +465,6 @@ class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
 @export
 class RawRecordsFromFax1T(RawRecordsFromFaxNT):
     provides = ('raw_records', 'truth')
-    data_kind = immutabledict(zip(provides, provides))
 
 
 @export
@@ -501,4 +484,3 @@ class RawRecordsFromFaxOptical(RawRecordsFromFaxNT):
 @export
 class RawRecordsFromFaxnVeto(RawRecordsFromFaxOptical):
     provides = ('raw_records_nv', 'truth')
-    data_kind = immutabledict(zip(provides, provides))
