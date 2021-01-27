@@ -435,15 +435,16 @@ class S2(Pulse):
         positions = np.array([x_obs, y_obs]).T 
         return z_obs, positions
 
-    def luminescence_timings(self, shape, x, y):
+    def luminescence_timings(self, xy, shape):
         """
         Luminescence time distribution computation
         """
+        assert shape[0] == len(xy), 'Output shape should have the same length as positions'
         number_density_gas = self.config['pressure'] / \
                              (units.boltzmannConstant * self.config['temperature'])
         alpha = self.config['gas_drift_velocity_slope'] / number_density_gas
 
-        dG = self.resource.gas_gap_length(x,y)
+        dG = self.resource.gas_gap_length(*xy[i])
         rA = self.config['anode_field_domination_distance']
         rW = self.config['anode_wire_radius']
         dL = self.config['gate_to_anode_distance'] - dG
@@ -571,7 +572,8 @@ class S2(Pulse):
         self._photon_timings += self.singlet_triplet_delays(
             len(self._photon_timings), self.config['singlet_fraction_gas'])
         
-        self._photon_timings += np.random.normal(0,self.config['s2_time_spread'],len(self._photon_timings)
+        self._photon_timings += np.random.normal(0, self.config['s2_time_spread'], 
+            len(self._photon_timings))
 
         # The timings generated is NOT randomly ordered, must do shuffle
         # Shuffle within each given n_electron[i]

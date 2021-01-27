@@ -304,11 +304,10 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
     strax.Option('detector', default='XENONnT', track=True),
     strax.Option('channel_map', track=False, type=immutabledict,
                  help="immutabledict mapping subdetector to (min, max) "
-                      "channel number. Provided by context")
+                      "channel number. Provided by context"),
     strax.Option('n_tpc_pmts', track=False,
                  help="immutabledict mapping subdetector to (min, max) "
-                      "channel number. Provided by context")
-                      )
+                      "channel number. Provided by context"),
     strax.Option('nv', default=False, track=True,
                  help="Flag for nVeto optical simulation instead of TPC"),
     strax.Option('mc_version_above_4', default=True, track=True, 
@@ -420,7 +419,7 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
     def infer_dtype(self):
         dtype = {data_type:strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH) 
                 for data_type in self.provides if data_type is not 'truth'}
-        dtype['truth']=instruction_dtype + truth_extra_dtype)
+        dtype['truth'] = instruction_dtype + truth_extra_dtype
         return dtype
 
 
