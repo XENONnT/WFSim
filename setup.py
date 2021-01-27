@@ -13,7 +13,7 @@ with open('HISTORY.md') as file:
 
 setuptools.setup(
     name='wfsim',
-    version='0.0.8',
+    version='0.0.9',
     description='XENONnT Waveform simulator',
     author='Wfsim contributors, the XENON collaboration',
     url='https://github.com/XENONnT/wfsim',
