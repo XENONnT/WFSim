@@ -15,7 +15,7 @@ class RawDataOptical(wfsim.RawData):
         self.pulses = wfsim.Pulse(config)
         self.resource = load_config(self.config)
 
-    def __call__(self, instructions, channels, timings, truth_buffer=None):
+    def __call__(self, instructions, channels, timings, truth_buffer=None, **kwargs):
         if truth_buffer is None:
             truth_buffer = []
 

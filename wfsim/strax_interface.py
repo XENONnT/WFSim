@@ -13,15 +13,20 @@ from immutabledict import immutabledict
 export, __all__ = strax.exporter()
 __all__ += ['instruction_dtype', 'truth_extra_dtype']
 
-instruction_dtype = [
-    ('event_number', np.int32),
-    ('type', np.int8),
-    ('time', np.int64),
-    ('x', np.float32),
-    ('y', np.float32),
-    ('z', np.float32),
-    ('amp', np.int32),
-    ('recoil', '<U2')]
+
+#recoil refers to 1:ER, 2=NR, 3=Alpha
+instruction_dtype = [(('Waveform simulator event number.', 'event_number'), np.int32),
+             (('Quanta type (S1 photons or S2 electrons)', 'type'), np.int8),
+             (('Time of the interaction [ns]', 'time'), np.int64),
+             (('End time of the interaction [ns]', 'endtime'), np.int64),
+             (('X position of the cluster[cm]', 'x'), np.float32),
+             (('Y position of the cluster[cm]', 'y'), np.float32),
+             (('Z position of the cluster[cm]', 'z'), np.float32),
+             (('Number of quanta', 'amp'), np.int32),
+             (('Recoil type of interaction.', 'recoil'), np.int),
+             (('Energy deposit of interaction', 'e_dep'), np.float32),
+             (('Eventid like in geant4 output rootfile', 'g4id'), np.int32)
+             ]
 
 truth_extra_dtype = [
     ('n_electron', np.float),
@@ -29,7 +34,7 @@ truth_extra_dtype = [
     ('t_first_photon', np.float), ('t_last_photon', np.float), 
     ('t_mean_photon', np.float), ('t_sigma_photon', np.float), 
     ('t_first_electron', np.float), ('t_last_electron', np.float), 
-    ('t_mean_electron', np.float), ('t_sigma_electron', np.float), ('endtime',np.int64)]
+    ('t_mean_electron', np.float), ('t_sigma_electron', np.float)]
 
 log = logging.getLogger('SimulationCore')
 
@@ -45,7 +50,7 @@ def rand_instructions(c):
     instructions['event_number'] = np.digitize(instructions['time'],
          1e9 * np.arange(c['nchunk']) * c['chunk_size']) - 1
     instructions['type'] = np.tile([1, 2], n)
-    instructions['recoil'] = ['er' for i in range(n * 2)]
+    instructions['recoil'] = [1 for i in range(n * 2)]
 
     r = np.sqrt(np.random.uniform(0, c['tpc_radius']**2, n))
     t = np.random.uniform(-np.pi, np.pi, n)
@@ -129,23 +134,31 @@ class ChunkRawRecords(object):
     def __init__(self, config):
         self.config = config
         self.rawdata = wfsim.RawData(self.config)
-        self.record_buffer = np.zeros(5000000, dtype=strax.raw_record_dtype(
-                samples_per_record=110)) # 2*250 ms buffer
+        self.record_buffer = np.zeros(5000000,
+                                      dtype=strax.raw_record_dtype(samples_per_record=110)) # 2*250 ms buffer
         self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)])
 
-    def __call__(self, instructions):
-        # Save the constants as privates
-        samples_per_record = strax.DEFAULT_RECORD_LENGTH
-        buffer_length = len(self.record_buffer)
-        dt = self.config['sample_duration']
-        rext = int(self.config['right_raw_extension'])
-        cksz = int(self.config['chunk_size'] * 1e9)
+    def __call__(self, instructions, **kwargs):
+        set_params()
+        chunk_data(instructions, **kwargs)
+        yield from self.final_results()
 
+    def set_params(self,):
+        # Save the constants as privates
         self.blevel = buffer_filled_level = 0
         self.chunk_time_pre = np.min(instructions['time']) - rext
         self.chunk_time = self.chunk_time_pre + cksz # Starting chunk
         self.current_digitized_right = self.last_digitized_right = 0
-        for channel, left, right, data in self.rawdata(instructions, self.truth_buffer):
+
+    def chunk_data(self,instructions, **kwargs):
+        samples_per_record = strax.DEFAULT_RECORD_LENGTH
+        buffer_length = len(self.record_buffer)
+        rext = int(self.config['right_raw_extension'])
+        cksz = int(self.config['chunk_size'] * 1e9)
+
+        for channel, left, right, data in self.rawdata(instructions=instructions,
+                                                       truth_buffer=self.truth_buffer,
+                                                       **kwargs):
             pulse_length = right - left + 1
             records_needed = int(np.ceil(pulse_length / samples_per_record))
 
@@ -179,8 +192,6 @@ class ChunkRawRecords(object):
             if self.rawdata.right != self.current_digitized_right:
                 self.last_digitized_right = self.current_digitized_right
                 self.current_digitized_right = self.rawdata.right
-
-        yield from self.final_results()
 
     def final_results(self):
         records = self.record_buffer[:self.blevel] # No copying the records from buffer
@@ -220,15 +231,22 @@ class ChunkRawRecords(object):
         _truth['time'][~np.isnan(_truth['t_first_photon'])] = \
             _truth['t_first_photon'][~np.isnan(_truth['t_first_photon'])].astype(int)
         _truth.sort(order='time')
+
+        #Oke this will be a bit ugly but it's easy
         if self.config['detector']=='XENON1T':
             yield dict(raw_records=records,
                        truth=_truth)
-        else:
+        if self.config['nv']:
+            yield dict(raw_records_nv=records[records['channel'] < self.config['channels_top_high_energy'][0]],,
+                       truth=_truth)
+        elif self.config['detector']=='XENONnT':
             yield dict(raw_records=records[records['channel'] < self.config['channels_top_high_energy'][0]],
                        raw_records_he=records[(records['channel'] >= self.config['channels_top_high_energy'][0]) &
                                               (records['channel'] <= self.config['channels_top_high_energy'][-1])],
                        raw_records_aqmon=records[records['channel']==800],
                        truth=_truth)
+
+
         self.record_buffer[:np.sum(~maska)] = self.record_buffer[:self.blevel][~maska]
         self.blevel = np.sum(~maska)
 
@@ -243,57 +261,6 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
         self.rawdata = wfsim.RawDataOptical(self.config)
         self.record_buffer = np.zeros(5000000, dtype=strax.record_dtype()) # 2*250 ms buffer
         self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)])
-
-    def __call__(self, instructions, channels, timings):
-        # Save the constants as privates
-        samples_per_record = strax.DEFAULT_RECORD_LENGTH
-        buffer_length = len(self.record_buffer)
-        dt = self.config['sample_duration']
-        rext = int(self.config['right_raw_extension'])
-        cksz = int(self.config['chunk_size'] * 1e9)
-
-        self.blevel = buffer_filled_level = 0
-        self.chunk_time_pre = np.min(instructions['time']) - rext
-        self.chunk_time = self.chunk_time_pre + cksz # Starting chunk
-        self.current_digitized_right = self.last_digitized_right = 0
-        for channel, left, right, data in self.rawdata(instructions, channels, timings, self.truth_buffer):
-            pulse_length = right - left + 1
-            records_needed = int(np.ceil(pulse_length / samples_per_record))
-
-            if self.rawdata.left * self.config['sample_duration'] > self.chunk_time:
-                self.chunk_time = self.last_digitized_right * self.config['sample_duration']
-                yield from self.final_results()
-                self.chunk_time_pre = self.chunk_time
-                self.chunk_time += cksz
-
-            if self.blevel + records_needed > buffer_length:
-                log.warning('Chunck size too large, insufficient record buffer')
-                yield from self.final_results()
-
-            if self.blevel + records_needed > buffer_length:
-                log.warning('Pulse length too large, insufficient record buffer, skipping pulse')
-                continue
-
-            # WARNING baseline and area fields are zeros before finish_results
-            s = slice(self.blevel, self.blevel + records_needed)
-            self.record_buffer[s]['channel'] = channel
-            self.record_buffer[s]['dt'] = dt
-            self.record_buffer[s]['time'] = dt * (left + samples_per_record * np.arange(records_needed))
-            self.record_buffer[s]['length'] = [min(pulse_length, samples_per_record * (i+1))
-                - samples_per_record * i for i in range(records_needed)]
-            self.record_buffer[s]['pulse_length'] = pulse_length
-            self.record_buffer[s]['record_i'] = np.arange(records_needed)
-            self.record_buffer[s]['data'] = np.pad(data,
-                (0, records_needed * samples_per_record - pulse_length), 'constant').reshape((-1, samples_per_record))
-            self.blevel += records_needed
-
-            if self.rawdata.right != self.current_digitized_right:
-                self.last_digitized_right = self.current_digitized_right
-                self.current_digitized_right = self.rawdata.right
-
-        yield from self.final_results()
-
-
 
 
 @strax.takes_config(
@@ -317,11 +284,23 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  help="Terminate processing if any one mailbox receives "
                       "no result for more than this many seconds"),
     strax.Option('fax_config',
-                 default='fax_config_nt.json'),
+                 default='https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/master/sim_files/fax_config_nt.json?token=AHCU5AZMPZABYSGVRLDACR3ABAZUA'),
     strax.Option('gain_model',
-                 default=('to_pe_per_run', 'to_pe_nt.npy'),
+                 default=('to_pe_per_run', 'https://github.com/XENONnT/private_nt_aux_files/blob/master/sim_files/to_pe_nt.npy?raw=true'),
                  help='PMT gain model. Specify as (model_type, model_config)'),
-    strax.Option('detector', default='XENONnT', track=True),)
+    strax.Option('detector', default='XENONnT', track=True),
+    strax.Option('channel_map', track=False, type=immutabledict,
+                 help="immutabledict mapping subdetector to (min, max) "
+                      "channel number. Provided by context")
+    strax.Option('n_tpc_pmts', track=False,
+                 help="immutabledict mapping subdetector to (min, max) "
+                      "channel number. Provided by context")
+                      )
+    strax.Option('nv', default=False, track=True,
+                 help="Flag for nVeto optical simulation instead of TPC"),
+    strax.Option('mc_version_above_4', default=True, track=True, 
+                 help="Flag above MC version 4. to generate optical"),
+)
 class FaxSimulatorPlugin(strax.Plugin):
     depends_on = tuple()
 
@@ -353,61 +332,33 @@ class FaxSimulatorPlugin(strax.Plugin):
         overrides = self.config['fax_config_override']
         if overrides is not None:
             c.update(overrides)
+        
+        self.get_instructions(config)
 
-        if c['optical']:
-            self.instructions, self.channels, self.timings = read_optical(c['fax_file'])
-            c['nevents']=len(self.instructions['event_number'])
+        self._setup()
+    
+    def _setup(self):
+        #Set in inheriting class
+        pass
 
-        elif c['fax_file']:
-            assert c['fax_file'][-5:] != '.root', 'None optical g4 input is deprecated use EPIX instead'
-            self.instructions = instruction_from_csv(c['fax_file'])
-            c['nevents'] = np.max(self.instructions['event_number'])
+    def get_instructions(self,):
+        #Set in inheriting class
+        pass
 
-        else:
-            self.instructions = rand_instructions(c)
-
-        # Let below cathode S1 instructions pass but remove S2 instructions
-        m = (self.instructions['z'] < -c['tpc_length']) & (self.instructions['type'] == 2)
-        self.instructions = self.instructions[~m]
-
-        assert np.all(self.instructions['x']**2 + self.instructions['y']**2 < c['tpc_radius']**2), \
-                "Interation is outside the TPC"
-        assert np.all(self.instructions['z'] < 0.25), \
-                "Interation is outside the TPC"
-        assert np.all(self.instructions['amp'] > 0), \
-                "Interaction has zero size"
+    def check_instructions(self):
+        #Set in inheriting class
+        pass
 
     def _sort_check(self, result):
         if len(result) == 0: return
-        if result['time'][0] < self.last_chunk_time + 1000:
-            raise RuntimeError(
-                "Simulator returned chunks with insufficient spacing. "
-                f"Last chunk's max time was {self.last_chunk_time}, "
-                f"this chunk's first time is {result['time'][0]}.")
+        # if result['time'][0] < self.last_chunk_time + 1000:
+        #     raise RuntimeError(
+        #         "Simulator returned chunks with insufficient spacing. "
+        #         f"Last chunk's max time was {self.last_chunk_time}, "
+        #         f"this chunk's first time is {result['time'][0]}.")
         if np.diff(result['time']).min() < 0:
             raise RuntimeError("Simulator returned non-sorted records!")
         self.last_chunk_time = result['time'].max()
-
-
-@export
-class RawRecordsFromFaxNT(FaxSimulatorPlugin):
-    provides = ('raw_records', 'raw_records_he', 'raw_records_aqmon', 'truth')
-    data_kind = immutabledict(zip(provides, provides))
-
-    def setup(self):
-        super().setup()
-        self.sim = ChunkRawRecords(self.config)
-        self.sim_iter = self.sim(self.instructions)
-
-    def infer_dtype(self):
-        dtype = dict(raw_records=strax.raw_record_dtype(
-                samples_per_record=110),
-                     raw_records_he=strax.raw_record_dtype(
-                samples_per_record=110),
-                     raw_records_aqmon=strax.raw_record_dtype(
-                samples_per_record=110),
-                     truth=instruction_dtype + truth_extra_dtype)
-        return dtype
 
     def is_ready(self, chunk_i):
         """Overwritten to mimic online input plugin.
@@ -421,6 +372,44 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
     def source_finished(self):
         """Return whether all instructions has been used."""
         return self.sim.source_finished()
+
+@export
+class RawRecordsFromFaxNT(FaxSimulatorPlugin):
+    provides = ('raw_records', 'raw_records_he', 'raw_records_aqmon', 'truth')
+    data_kind = immutabledict(zip(provides, provides))
+
+    def _setup(self):
+        self.sim = ChunkRawRecords(self.config)
+        self.sim_iter = self.sim(self.instructions)
+
+    def get_instructions(self):
+        if self.config['fax_file']:
+            assert self.config['fax_file'][-5:] != '.root', 'None optical g4 input is deprecated use EPIX instead'
+            self.instructions = instruction_from_csv(c['fax_file'])
+            self.config['nevents'] = np.max(self.instructions['event_number'])
+
+        else:
+            self.instructions = rand_instructions(c)
+
+    def check_instructions(self):
+        # Let below cathode S1 instructions pass but remove S2 instructions
+        m = (self.instructions['z'] < -c['tpc_length']) & (self.instructions['type'] == 2)
+        self.instructions = self.instructions[~m]
+
+        assert np.all(self.instructions['x']**2 + self.instructions['y']**2 < c['tpc_radius']**2), \
+                "Interation is outside the TPC"
+        assert np.all(self.instructions['z'] < 0.25), \
+                "Interation is outside the TPC"
+        assert np.all(self.instructions['amp'] > 0), \
+                "Interaction has zero size"
+
+
+    def infer_dtype(self):
+        dtype = {data_type:strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH) 
+                for data_type in self.provides if data_type is not 'truth'}
+        dtype['truth']=instruction_dtype + truth_extra_dtype)
+        return dtype
+
 
     def compute(self, chunk_i):
         try:
@@ -436,19 +425,51 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
             data_type=data_type) for data_type in self.provides}
 
 @export
+class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
+    depends_on = 'epix_instructions'
+
+    def _setup(self):
+        self.sim = ChunkRawRecords(self.config)
+        
+    def compute(self,wfsim_instructions, chunk_i):
+        self.sim_iter = self.sim(wfsim_instructions)
+
+        try:
+            result = next(self.sim_iter)
+        except StopIteration:
+            raise RuntimeError("Bug in chunk count computation")
+        self._sort_check(result['raw_records'])
+
+        return {data_type:result[data_type] for data_type in self.provides}
+
+    def is_ready(self, chunk_i):
+        """Overwritten to mimic online input plugin.
+        Returns False to check source finished;
+        Returns True to get next chunk.
+        """
+        return True
+
+@export
 class RawRecordsFromFax1T(RawRecordsFromFaxNT):
     provides = ('raw_records', 'truth')
     data_kind = immutabledict(zip(provides, provides))
 
-    def infer_dtype(self):
-        dtype = dict(raw_records=strax.raw_record_dtype(
-                samples_per_record=110),
-                     truth=instruction_dtype + truth_extra_dtype)
-        return dtype
 
 @export
 class RawRecordsFromFaxOptical(RawRecordsFromFaxNT):
-    def setup(self):
-        super().setup()
+
+    def _setup(self):
         self.sim = ChunkRawRecordsOptical(self.config)
-        self.sim_iter = self.sim(self.instructions, self.channels, self.timings)
+        self.sim_iter = self.sim(instructions=self.instructions, 
+                                 channels=self.channels, 
+                                 timings=self.timings)
+
+    def get_instructions(self):
+        self.instructions, self.channels, self.timings = read_optical(self.config['fax_file'])
+        self.config['nevents']=len(self.instructions['event_number'])
+
+
+@export
+class RawRecordsFromFaxnVeto(RawRecordsFromFaxOptical):
+    provides = ('raw_records_nv', 'truth')
+    data_kind = immutabledict(zip(provides, provides))

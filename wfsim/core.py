@@ -278,7 +278,7 @@ class S1(Pulse):
             # shape of recarr is a bit strange
             instruction = np.array([instruction])
 
-        _, _, t, x, y, z, n_photons, recoil_type, *rest = [
+        _, _, t, _, x, y, z, n_photons, recoil_type, *rest = [
             np.array(v).reshape(-1) for v in zip(*instruction)]
 
         positions = np.array([x, y, z]).T  # For map interpolation
@@ -298,7 +298,9 @@ class S1(Pulse):
         super().__call__()
 
     def photon_channels(self, points, n_photons):
-        channels = np.array(self.config['channels_in_detector']['tpc'])
+
+        # print(self.config)
+        channels = np.arange(self.config['n_tpc_pmts'])#+1 for the channel map
         p_per_channel = self.resource.s1_pattern_map(points)
         p_per_channel[:, np.in1d(channels, self.turned_off_pmts)] = 0
         
@@ -316,7 +318,7 @@ class S1(Pulse):
             return
 
         if (self.config.get('s1_model_type') == 'simple' and 
-           recoil_type.lower() in ['er', 'nr']):
+           recoil_type in [1, 2]):
             # Simple S1 model enabled: use it for ER and NR.
             self._photon_timings = np.append(self._photon_timings,
                 t + np.random.exponential(self.config['s1_decay_time'], n_photons))
@@ -382,7 +384,7 @@ class S2(Pulse):
             # shape of recarr is a bit strange
             instruction = np.array([instruction])
 
-        _, _, t, x, y, z, n_electron, recoil_type, *rest = [
+        _, _, t, _, x, y, z, n_electron, recoil_type, *rest = [
             np.array(v).reshape(-1) for v in zip(*instruction)]
         
         # Reverse engineerring FDC
@@ -433,7 +435,7 @@ class S2(Pulse):
         positions = np.array([x_obs, y_obs]).T 
         return z_obs, positions
 
-    def luminescence_timings(self, shape):
+    def luminescence_timings(self, shape, x, y):
         """
         Luminescence time distribution computation
         """
@@ -441,7 +443,7 @@ class S2(Pulse):
                              (units.boltzmannConstant * self.config['temperature'])
         alpha = self.config['gas_drift_velocity_slope'] / number_density_gas
 
-        dG = self.config['elr_gas_gap_length']
+        dG = self.resource.gas_gap_length(x,y)
         rA = self.config['anode_field_domination_distance']
         rW = self.config['anode_wire_radius']
         dL = self.config['gate_to_anode_distance'] - dG
@@ -549,7 +551,7 @@ class S2(Pulse):
                        4 * np.sqrt(np.max(self._electron_gains))).astype(int)
 
         if self.config['s2_luminescence_model'] == 'simple':
-            self._photon_timings = self.luminescence_timings((nele, npho))
+            self._photon_timings = self.luminescence_timings((nele, npho), **xy)
         elif self.config['s2_luminescence_model'] == 'garfield':
             self._photon_timings = self.luminescence_timings_garfield(
                 np.repeat(xy, n_electron, axis=0),
@@ -820,7 +822,7 @@ class RawData(object):
         )
         self.resource = load_config(self.config)
 
-    def __call__(self, instructions, truth_buffer=None):
+    def __call__(self, instructions, truth_buffer=None, **kwargs):
         if truth_buffer is None:
             truth_buffer = []
 
@@ -846,7 +848,7 @@ class RawData(object):
         inst_queue = np.split(inst_queue, np.where(np.diff(inst_time[inst_queue]) > rext)[0]+1)
 
         # Instruction buffer
-        instb = np.zeros(100000, dtype=instructions.dtype) # size ~ 1% of size of primary
+        instb = np.zeros(10000, dtype=instructions.dtype) # size ~ 1% of size of primary
         instb_filled = np.zeros_like(instb, dtype=bool) # Mask of where buffer is filled
 
         # ik those are illegible, messy logic. lmk if you have a better way
@@ -1014,13 +1016,15 @@ class RawData(object):
             
             
             # Adding noise, baseline and digitizer saturation
-            self.add_noise(data=self._raw_data,
-                           channel_mask=self._channel_mask,
-                           noise_data=self.resource.noise_data,
-                           noise_data_length=len(self.resource.noise_data))
-            self.add_baseline(self._raw_data, self._channel_mask, 
-                self.config['digitizer_reference_baseline'],)
-            self.digitizer_saturation(self._raw_data, self._channel_mask)
+            
+            if self.config.get('enable_noise', True):
+                self.add_noise(data=self._raw_data,
+                            channel_mask=self._channel_mask,
+                            noise_data=self.resource.noise_data,
+                            noise_data_length=len(self.resource.noise_data))
+                self.add_baseline(self._raw_data, self._channel_mask, 
+                    self.config['digitizer_reference_baseline'],)
+                self.digitizer_saturation(self._raw_data, self._channel_mask)
 
 
     def ZLE(self):
