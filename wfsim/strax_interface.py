@@ -39,8 +39,6 @@ truth_extra_dtype = [
 
 log = logging.getLogger('SimulationCore')
 
-
-@export
 def rand_instructions(c):
     n = c['nevents'] = c['event_rate'] * c['chunk_size'] * c['nchunk']
     c['total_time'] = c['chunk_size'] * c['nchunk']
@@ -64,8 +62,6 @@ def rand_instructions(c):
     instructions['amp'] = np.vstack([nphotons, nelectrons]).T.flatten().astype(int)
 
     return instructions
-
-
 
 def read_optical(file, c):
 
@@ -110,8 +106,6 @@ def read_optical(file, c):
 
     return ins, channels, timings
 
-
-@export
 def instruction_from_csv(filename):
     """Return wfsim instructions from a csv
 
@@ -297,14 +291,9 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  help="immutabledict mapping subdetector to (min, max) "
                       "channel number. Provided by context"),
     strax.Option('n_tpc_pmts', track=False,
-<<<<<<< HEAD
                  help="Number of pmts in tpc. Provided by context"),
     strax.Option('n_top_pmts', track=False,
                  help="Number of pmts in top array. Provided by context"),
-=======
-                 help="immutabledict mapping subdetector to (min, max) "
-                      "channel number. Provided by context"),
->>>>>>> aefdcb10a09bdc9cc4cd21fc277cfe29117f443a
     strax.Option('nv', default=False, track=True,
                  help="Flag for nVeto optical simulation instead of TPC"),
     strax.Option('mc_version_above_4', default=True, track=True, 
@@ -421,11 +410,7 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
     def infer_dtype(self):
         dtype = {data_type:strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH) 
                 for data_type in self.provides if data_type is not 'truth'}
-<<<<<<< HEAD
         dtype['truth']=instruction_dtype + truth_extra_dtype
-=======
-        dtype['truth'] = instruction_dtype + truth_extra_dtype
->>>>>>> aefdcb10a09bdc9cc4cd21fc277cfe29117f443a
         return dtype
 
 
@@ -466,6 +451,7 @@ class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
         Returns True to get next chunk.
         """
         return True
+
 
 @export
 class RawRecordsFromFax1T(RawRecordsFromFaxNT):
