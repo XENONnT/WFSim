@@ -435,16 +435,17 @@ class S2(Pulse):
         positions = np.array([x_obs, y_obs]).T 
         return z_obs, positions
 
-    def luminescence_timings(self, shape, x, y):
+    def luminescence_timings(self, xy, shape):
         """
         Luminescence time distribution computation
         """
+        assert shape[0] == len(xy), 'Output shape should have the same length as positions'
         number_density_gas = self.config['pressure'] / \
                              (units.boltzmannConstant * self.config['temperature'])
         alpha = self.config['gas_drift_velocity_slope'] / number_density_gas
 
         if self.config.get('enable_gas_gap_warping', True):
-            dG = self.resource.gas_gap_length(x,y)
+            dG = self.resource.gas_gap_length(*xy[i])
         else:
             dG = self.config['elr_gas_gap_length']
         rA = self.config['anode_field_domination_distance']
