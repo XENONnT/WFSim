@@ -322,7 +322,7 @@ class S1(Pulse):
             # Simple S1 model enabled: use it for ER and NR.
             self._photon_timings = np.append(self._photon_timings,
                 t + np.random.exponential(self.config['s1_decay_time'], n_photons))
-            self._photon_timings += np.random.normal(0,self.config['s1_time_spread'],len(self._photon_timings))
+            self._photon_timings += np.random.normal(0,self.config['s1_decay_spread'],len(self._photon_timings))
             return
 
         try:
@@ -443,7 +443,10 @@ class S2(Pulse):
                              (units.boltzmannConstant * self.config['temperature'])
         alpha = self.config['gas_drift_velocity_slope'] / number_density_gas
 
-        dG = self.resource.gas_gap_length(x,y)
+        if self.config.get('enable_gas_gap_warping', True):
+            dG = self.resource.gas_gap_length(x,y)
+        else:
+            dG = self.config['elr_gas_gap_length']
         rA = self.config['anode_field_domination_distance']
         rW = self.config['anode_wire_radius']
         dL = self.config['gate_to_anode_distance'] - dG
@@ -571,7 +574,7 @@ class S2(Pulse):
         self._photon_timings += self.singlet_triplet_delays(
             len(self._photon_timings), self.config['singlet_fraction_gas'])
         
-        self._photon_timings += np.random.normal(0,self.config['s2_time_spread'],len(self._photon_timings)
+        self._photon_timings += np.random.normal(0,self.config['s2_time_spread'],len(self._photon_timings))
 
         # The timings generated is NOT randomly ordered, must do shuffle
         # Shuffle within each given n_electron[i]
@@ -592,8 +595,8 @@ class S2(Pulse):
         
         aft = self.config['s2_mean_area_fraction_top']
         aft_random = self.config.get('randomize_fraction_of_s2_top_array_photons', 0)
-        channels = np.array(self.config['channels_in_detector']['tpc']).astype(int)
-        top_index = np.array(self.config['channels_top'])
+        channels = np.arange(self.config['n_tpc_pmts']).astype(int)
+        top_index = np.arange(self.config['n_top_pmts'])
         bottom_index = np.array(self.config['channels_bottom'])
 
         pattern = self.resource.s2_pattern_map(points)  # [position, pmt]
@@ -838,7 +841,6 @@ class RawData(object):
         self.source_finished = False
         self.last_pulse_end_time = - np.inf
         self.instruction_event_number = np.min(instructions['event_number'])
-
         # Primary instructions must be sorted by signal time
         # int(type) by design S1-esque being odd, S2-esque being even
         # thus type%2-1 is 0:S1-esque;  -1:S2-esque
@@ -997,8 +999,8 @@ class RawData(object):
 
                 if self.config['detector'] == 'XENONnT':
                     adc_wave_he = adc_wave * int(self.config['high_energy_deamplification_factor'])
-                    if ch <= self.config['channels_top'][-1]:
-                        ch_he = self.config['channels_top_high_energy'][ch]
+                    if ch < self.config['n_top_pmts']:
+                        ch_he = np.arange(self.config['channel_map']['he'][0],self.config['channel_map']['he'][1]+1)[ch]
                         self._raw_data[ch_he, _slice] += adc_wave_he
                         self._channel_mask[ch_he] = True
                         self._channel_mask['left'][ch_he] = self._channel_mask['left'][ch]
@@ -1007,7 +1009,7 @@ class RawData(object):
                         self.sum_signal(adc_wave_he,
                             _pulse['left'] - self.left,
                             _pulse['right'] - self.left + 1,
-                            self._raw_data[self.config['channels_in_detector']['sum_signal']])
+                            self._raw_data[self.config['channel_map']['sum_signal']])
 
             self._pulses_cache = []
 

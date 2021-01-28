@@ -25,7 +25,8 @@ instruction_dtype = [(('Waveform simulator event number.', 'event_number'), np.i
              (('Number of quanta', 'amp'), np.int32),
              (('Recoil type of interaction.', 'recoil'), np.int),
              (('Energy deposit of interaction', 'e_dep'), np.float32),
-             (('Eventid like in geant4 output rootfile', 'g4id'), np.int32)
+             (('Eventid like in geant4 output rootfile', 'g4id'), np.int32),
+             (('Volume id giving the detector subvolume', 'vol_id'), np.int32)
              ]
 
 truth_extra_dtype = [
@@ -75,15 +76,9 @@ def read_optical(file, c):
         all_ttrees = dict(data.allitems(filterclass=lambda cls: issubclass(cls, uproot.tree.TTreeMethods)))
         e = all_ttrees[next(iter(all_ttrees))]
 
-    
     n_events = len(e['eventid'].array(library="np"))
     # lets separate the events in time by a constant time difference
     time = np.arange(1, n_events+1)
-
-    # Events should be in the TPC
-    xp = e["xp_pri"].array(library="np") / 10
-    yp = e["yp_pri"].array(library="np") / 10
-    zp = e["zp_pri"].array(library="np") / 10
 
     if c['nv']:
         if c['mc_version_above_4']:
@@ -95,17 +90,16 @@ def read_optical(file, c):
     
     else:
         # TPC
-    
         channels = e["pmthitID"].array(library="np")
         timings = e["pmthitTime"].array(library="np")*1e9
 
     ins = np.zeros(n_events, dtype=instruction_dtype)
 
-    ins['x'], ins['y'], ins['z'], ins['time'] = xp.flatten()  / 10, \
-        yp.flatten() / 10, \
-        zp.flatten() / 10, \
-        1e7 * time.flatten()
-
+    # Events should be in the TPC
+    ins['x'] = e["xp_pri"].array(library="np").flatten / 10
+    ins['y'] = e["yp_pri"].array(library="np").flatten / 10
+    ins['z'] = e["zp_pri"].array(library="np").flatten / 10
+    ins['time']= 1e7 * time.flatten()
     ins['event_number'] = np.arange(n_events)
     ins['type'] = np.repeat(1, n_events)
     ins['recoil'] = np.repeat('er', n_events)
@@ -147,28 +141,23 @@ class ChunkRawRecords(object):
         self.config = config
         self.rawdata = wfsim.RawData(self.config)
         self.record_buffer = np.zeros(5000000,
-                                      dtype=strax.raw_record_dtype(samples_per_record=110)) # 2*250 ms buffer
+                                      dtype=strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH)) # 2*250 ms buffer
         self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)])
 
-    def __call__(self, instructions, **kwargs):
-        set_params()
-        chunk_data(instructions, **kwargs)
-        yield from self.final_results()
+        self.blevel = buffer_filled_level = 0
 
-    def set_params(self,):
+    def __call__(self, instructions, **kwargs):
+        samples_per_record = strax.DEFAULT_RECORD_LENGTH
+        dt = self.config['sample_duration']
+        buffer_length = len(self.record_buffer)
+        rext = int(self.config['right_raw_extension'])
+        cksz = int(self.config['chunk_size'] * 1e9)
+
         # Save the constants as privates
         self.blevel = buffer_filled_level = 0
         self.chunk_time_pre = np.min(instructions['time']) - rext
         self.chunk_time = self.chunk_time_pre + cksz # Starting chunk
         self.current_digitized_right = self.last_digitized_right = 0
-
-    def chunk_data(self,instructions, **kwargs):
-        samples_per_record = strax.DEFAULT_RECORD_LENGTH
-        dt = self.config['samples_duration']
-        buffer_length = len(self.record_buffer)
-        rext = int(self.config['right_raw_extension'])
-        cksz = int(self.config['chunk_size'] * 1e9)
-
         for channel, left, right, data in self.rawdata(instructions=instructions,
                                                        truth_buffer=self.truth_buffer,
                                                        **kwargs):
@@ -205,10 +194,12 @@ class ChunkRawRecords(object):
             if self.rawdata.right != self.current_digitized_right:
                 self.last_digitized_right = self.current_digitized_right
                 self.current_digitized_right = self.rawdata.right
+        
+        yield from self.final_results()
 
     def final_results(self):
         records = self.record_buffer[:self.blevel] # No copying the records from buffer
-        maska = records['time'] <= self.last_digitized_right * dt
+        maska = records['time'] <= self.last_digitized_right * self.config['sample_duration']
         records = records[maska]
 
         records = strax.sort_by_time(records) # Do NOT remove this line
@@ -250,12 +241,12 @@ class ChunkRawRecords(object):
             yield dict(raw_records=records,
                        truth=_truth)
         if self.config['nv']:
-            yield dict(raw_records_nv=records[records['channel'] < self.config['channels_top_high_energy'][0]],
+            yield dict(raw_records_nv=records[records['channel'] < self.config['channel_map']['he'][0]],
                        truth=_truth)
         elif self.config['detector']=='XENONnT':
-            yield dict(raw_records=records[records['channel'] < self.config['channels_top_high_energy'][0]],
-                       raw_records_he=records[(records['channel'] >= self.config['channels_top_high_energy'][0]) &
-                                              (records['channel'] <= self.config['channels_top_high_energy'][-1])],
+            yield dict(raw_records=records[records['channel'] < self.config['channel_map']['he'][0]],
+                       raw_records_he=records[(records['channel'] >= self.config['channel_map']['he'][0]) &
+                                              (records['channel'] <= self.config['channel_map']['he'][-1])],
                        raw_records_aqmon=records[records['channel']==800],
                        truth=_truth)
 
@@ -286,9 +277,9 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  help="Directory with fax instructions"),
     strax.Option('fax_config_override', default=None,
                  help="Dictionary with configuration option overrides"),
-    strax.Option('event_rate', default=5, track=False,
+    strax.Option('event_rate', default=2, track=False,
                  help="Average number of events per second"),
-    strax.Option('chunk_size', default=5, track=False,
+    strax.Option('chunk_size', default=2, track=False,
                  help="Duration of each chunk in seconds"),
     strax.Option('nchunk', default=4, track=False,
                  help="Number of chunks to simulate"),
@@ -304,11 +295,11 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
     strax.Option('detector', default='XENONnT', track=True),
     strax.Option('channel_map', track=False, type=immutabledict,
                  help="immutabledict mapping subdetector to (min, max) "
-                      "channel number. Provided by context")
+                      "channel number. Provided by context"),
     strax.Option('n_tpc_pmts', track=False,
-                 help="immutabledict mapping subdetector to (min, max) "
-                      "channel number. Provided by context")
-                      )
+                 help="Number of pmts in tpc. Provided by context"),
+    strax.Option('n_top_pmts', track=False,
+                 help="Number of pmts in top array. Provided by context"),
     strax.Option('nv', default=False, track=True,
                  help="Flag for nVeto optical simulation instead of TPC"),
     strax.Option('mc_version_above_4', default=True, track=True, 
@@ -336,7 +327,7 @@ class FaxSimulatorPlugin(strax.Plugin):
         c.update(get_resource(c['fax_config'], fmt='json'))
         # Update gains to the nT defaults
         self.to_pe = get_to_pe(self.run_id, c['gain_model'],
-                              len(c['channels_in_detector']['tpc']))
+                              c['channel_map']['tpc'][1]+1)
         c['gains'] = 1 / self.to_pe * (1e-8 * 2.25 / 2**14) / (1.6e-19 * 10 * 50)
         c['gains'][self.to_pe==0] = 0
         if c['seed'] != False:
@@ -345,16 +336,21 @@ class FaxSimulatorPlugin(strax.Plugin):
         overrides = self.config['fax_config_override']
         if overrides is not None:
             c.update(overrides)
-        
-        self.get_instructions(config)
 
+        #We hash the config to load resources. Channel map is immutable and cannot be hashed
+        self.config['channel_map'] = dict(self.config['channel_map'])
+        self.config['channel_map']['sum_signal']=800
+        self.config['channels_bottom'] = np.arange(self.config['n_top_pmts'],self.config['n_tpc_pmts'])
+        
+        self.get_instructions()
+        self.check_instructions()
         self._setup()
     
     def _setup(self):
         #Set in inheriting class
         pass
 
-    def get_instructions(self,):
+    def get_instructions(self):
         #Set in inheriting class
         pass
 
@@ -398,18 +394,18 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
     def get_instructions(self):
         if self.config['fax_file']:
             assert self.config['fax_file'][-5:] != '.root', 'None optical g4 input is deprecated use EPIX instead'
-            self.instructions = instruction_from_csv(c['fax_file'])
+            self.instructions = instruction_from_csv(self.config['fax_file'])
             self.config['nevents'] = np.max(self.instructions['event_number'])
 
         else:
-            self.instructions = rand_instructions(c)
+            self.instructions = rand_instructions(self.config)
 
     def check_instructions(self):
         # Let below cathode S1 instructions pass but remove S2 instructions
-        m = (self.instructions['z'] < -c['tpc_length']) & (self.instructions['type'] == 2)
+        m = (self.instructions['z'] < -self.config['tpc_length']) & (self.instructions['type'] == 2)
         self.instructions = self.instructions[~m]
 
-        assert np.all(self.instructions['x']**2 + self.instructions['y']**2 < c['tpc_radius']**2), \
+        assert np.all(self.instructions['x']**2 + self.instructions['y']**2 < self.config['tpc_radius']**2), \
                 "Interation is outside the TPC"
         assert np.all(self.instructions['z'] < 0.25), \
                 "Interation is outside the TPC"
@@ -420,11 +416,11 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
     def infer_dtype(self):
         dtype = {data_type:strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH) 
                 for data_type in self.provides if data_type is not 'truth'}
-        dtype['truth']=instruction_dtype + truth_extra_dtype)
+        dtype['truth']=instruction_dtype + truth_extra_dtype
         return dtype
 
 
-    def compute(self, chunk_i):
+    def compute(self):
         try:
             result = next(self.sim_iter)
         except StopIteration:
@@ -444,7 +440,7 @@ class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
     def _setup(self):
         self.sim = ChunkRawRecords(self.config)
         
-    def compute(self,wfsim_instructions, chunk_i):
+    def compute(self,wfsim_instructions):
         self.sim_iter = self.sim(wfsim_instructions)
 
         try:
@@ -455,7 +451,7 @@ class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
 
         return {data_type:result[data_type] for data_type in self.provides}
 
-    def is_ready(self, chunk_i):
+    def is_ready(self):
         """Overwritten to mimic online input plugin.
         Returns False to check source finished;
         Returns True to get next chunk.
