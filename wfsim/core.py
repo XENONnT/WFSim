@@ -439,13 +439,12 @@ class S2(Pulse):
         """
         Luminescence time distribution computation
         """
-        assert shape[0] == len(xy), 'Output shape should have the same length as positions'
         number_density_gas = self.config['pressure'] / \
                              (units.boltzmannConstant * self.config['temperature'])
         alpha = self.config['gas_drift_velocity_slope'] / number_density_gas
 
         if self.config.get('enable_gas_gap_warping', True):
-            dG = self.resource.gas_gap_length(*xy[i])
+            dG = self.resource.gas_gap_length(*xy)
         else:
             dG = self.config['elr_gas_gap_length']
         rA = self.config['anode_field_domination_distance']
@@ -555,7 +554,8 @@ class S2(Pulse):
                        4 * np.sqrt(np.max(self._electron_gains))).astype(int)
 
         if self.config['s2_luminescence_model'] == 'simple':
-            self._photon_timings = self.luminescence_timings((nele, npho), **xy)
+            print((nele, npho), xy)
+            self._photon_timings = self.luminescence_timings(xy,(nele, npho))
         elif self.config['s2_luminescence_model'] == 'garfield':
             self._photon_timings = self.luminescence_timings_garfield(
                 np.repeat(xy, n_electron, axis=0),

@@ -57,7 +57,7 @@ class Resource:
         for k in set(config).intersection(files):
             files[k] = config[k] # Allowing user to replace default with specified files
         commit = 'master'   # Replace this by a commit hash if you feel solid and responsible
-        url_base = f'https://github.com/XENONnT/private_nt_aux_files/tree/master/sim_files'
+        url_base = f'/Users/petergaemers/Desktop/python/private_nt_aux_files/sim_files/'
         for k, v in files.items():
             if v.startswith('/'):
                 print(f"WARNING: Using local file {v} for a resource. "
