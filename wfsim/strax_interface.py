@@ -63,42 +63,36 @@ def rand_instructions(c):
 
     return instructions
 
-def read_optical(file, c):
-
+def read_optical(c):
+    file = c['fax_file']
     data = uproot.open(file)
-    if c['mc_version_above_4']:
+    try:
         e = data.get('events')
-    else:
-        all_ttrees = dict(data.allitems(filterclass=lambda cls: issubclass(cls, uproot.tree.TTreeMethods)))
-        e = all_ttrees[next(iter(all_ttrees))]
+    except:
+        raise Exception("Are you using mc version >4?")
 
     n_events = len(e['eventid'].array(library="np"))
     # lets separate the events in time by a constant time difference
     time = np.arange(1, n_events+1)
 
-    if c['nv']:
-        if c['mc_version_above_4']:
-            nV_pmt_id_offset = 2000
-        else:
-            nV_pmt_id_offset = 20000
-        channels = [[channel - nV_pmt_id_offset for channel in array] for array in e["pmthitID"].array(library="np")]
+    if c['neutron_veto']:
+        nV_pmt_id_offset = 2000
+        channels = [[channel - nV_pmt_id_offset for channel in array if channel >=2000] for array in e["pmthitID"].array(library="np")]
         timings = e["pmthitTime"].array(library="np")*1e9
-    
     else:
         # TPC
         channels = e["pmthitID"].array(library="np")
         timings = e["pmthitTime"].array(library="np")*1e9
 
-    ins = np.zeros(n_events, dtype=instruction_dtype)
-
     # Events should be in the TPC
-    ins['x'] = e["xp_pri"].array(library="np").flatten / 10
-    ins['y'] = e["yp_pri"].array(library="np").flatten / 10
-    ins['z'] = e["zp_pri"].array(library="np").flatten / 10
+    ins = np.zeros(n_events, dtype=instruction_dtype)
+    ins['x'] = e["xp_pri"].array(library="np").flatten() / 10.
+    ins['y'] = e["yp_pri"].array(library="np").flatten() / 10.
+    ins['z'] = e["zp_pri"].array(library="np").flatten() / 10.
     ins['time']= 1e7 * time.flatten()
     ins['event_number'] = np.arange(n_events)
     ins['type'] = np.repeat(1, n_events)
-    ins['recoil'] = np.repeat('er', n_events)
+    ins['recoil'] = np.repeat(1, n_events)
     ins['amp'] = [len(t) for t in timings]
 
     # cut interactions without electrons or photons
@@ -234,7 +228,7 @@ class ChunkRawRecords(object):
         if self.config['detector']=='XENON1T':
             yield dict(raw_records=records,
                        truth=_truth)
-        if self.config['nv']:
+        if self.config['neutron_veto']:
             yield dict(raw_records_nv=records[records['channel'] < self.config['channel_map']['he'][0]],
                        truth=_truth)
         elif self.config['detector']=='XENONnT':
@@ -257,7 +251,7 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
     def __init__(self, config):
         self.config = config
         self.rawdata = wfsim.RawDataOptical(self.config)
-        self.record_buffer = np.zeros(5000000, dtype=strax.record_dtype()) # 2*250 ms buffer
+        self.record_buffer = np.zeros(5000000, dtype=strax.raw_record_dtype()) # 2*250 ms buffer
         self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)])
 
 
@@ -294,7 +288,7 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  help="Number of pmts in tpc. Provided by context"),
     strax.Option('n_top_pmts', track=False,
                  help="Number of pmts in top array. Provided by context"),
-    strax.Option('nv', default=False, track=True,
+    strax.Option('neutron_veto', default=False, track=True,
                  help="Flag for nVeto optical simulation instead of TPC"),
     strax.Option('mc_version_above_4', default=True, track=True, 
                  help="Flag above MC version 4. to generate optical"),
@@ -419,7 +413,7 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
             result = next(self.sim_iter)
         except StopIteration:
             raise RuntimeError("Bug in chunk count computation")
-        self._sort_check(result['raw_records'])
+        self._sort_check(result[self.provides[0]])#To accomodate nveto raw records, should be the first in provide.
 
         return {data_type:self.chunk(
             start=self.sim.chunk_time_pre,
@@ -468,10 +462,18 @@ class RawRecordsFromFaxOptical(RawRecordsFromFaxNT):
                                  timings=self.timings)
 
     def get_instructions(self):
-        self.instructions, self.channels, self.timings = read_optical(self.config['fax_file'])
+        self.instructions, self.channels, self.timings = read_optical(self.config)
         self.config['nevents']=len(self.instructions['event_number'])
 
 
 @export
 class RawRecordsFromFaxnVeto(RawRecordsFromFaxOptical):
     provides = ('raw_records_nv', 'truth')
+    data_kind = immutabledict(zip(provides, provides))
+    #Why does the data_kind need to be repeated?? So the overriding of the 
+    # provides doesn't work in the setting of the data__kind?
+
+
+    def check_instructions(self):
+        #Are there some nveto boundries we need to include?
+        pass
