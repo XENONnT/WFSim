@@ -15,7 +15,7 @@ class RawDataOptical(wfsim.RawData):
         self.pulses = wfsim.Pulse(config)
         self.resource = load_config(self.config)
 
-    def __call__(self, instructions, channels, timings, truth_buffer=None):
+    def __call__(self, instructions, channels, timings, truth_buffer=None, **kwargs):
         if truth_buffer is None:
             truth_buffer = []
 
@@ -125,7 +125,7 @@ class RawDataOptical(wfsim.RawData):
             self._pulses_cache += _pulses
             self.last_pulse_end_time = max(
                 self.last_pulse_end_time,
-                np.max([p['right'] for p in _pulses]) * self.config['dt'])
+                np.max([p['right'] for p in _pulses]) * self.config['sample_duration'])
         return []
 
     def get_truth(self, instruction, truth_buffer):

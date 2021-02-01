@@ -278,7 +278,7 @@ class S1(Pulse):
             # shape of recarr is a bit strange
             instruction = np.array([instruction])
 
-        _, _, t, x, y, z, n_photons, recoil_type, *rest = [
+        _, _, t, _, x, y, z, n_photons, recoil_type, *rest = [
             np.array(v).reshape(-1) for v in zip(*instruction)]
 
         positions = np.array([x, y, z]).T  # For map interpolation
@@ -298,7 +298,9 @@ class S1(Pulse):
         super().__call__()
 
     def photon_channels(self, points, n_photons):
-        channels = np.array(self.config['channels_in_detector']['tpc'])
+
+        # print(self.config)
+        channels = np.arange(self.config['n_tpc_pmts'])#+1 for the channel map
         p_per_channel = self.resource.s1_pattern_map(points)
         p_per_channel[:, np.in1d(channels, self.turned_off_pmts)] = 0
         
@@ -316,11 +318,11 @@ class S1(Pulse):
             return
 
         if (self.config.get('s1_model_type') == 'simple' and 
-           recoil_type.lower() in ['er', 'nr']):
+           recoil_type in [1, 2]):
             # Simple S1 model enabled: use it for ER and NR.
             self._photon_timings = np.append(self._photon_timings,
                 t + np.random.exponential(self.config['s1_decay_time'], n_photons))
-            self._photon_timings += np.random.normal(0,self.config['s1_time_spread'],len(self._photon_timings))
+            self._photon_timings += np.random.normal(0,self.config['s1_decay_spread'],len(self._photon_timings))
             return
 
         try:
@@ -382,7 +384,7 @@ class S2(Pulse):
             # shape of recarr is a bit strange
             instruction = np.array([instruction])
 
-        _, _, t, x, y, z, n_electron, recoil_type, *rest = [
+        _, _, t, _, x, y, z, n_electron, recoil_type, *rest = [
             np.array(v).reshape(-1) for v in zip(*instruction)]
         
         # Reverse engineerring FDC
@@ -433,7 +435,7 @@ class S2(Pulse):
         positions = np.array([x_obs, y_obs]).T 
         return z_obs, positions
 
-    def luminescence_timings(self, shape):
+    def luminescence_timings(self, xy, shape):
         """
         Luminescence time distribution computation
         """
@@ -441,7 +443,10 @@ class S2(Pulse):
                              (units.boltzmannConstant * self.config['temperature'])
         alpha = self.config['gas_drift_velocity_slope'] / number_density_gas
 
-        dG = self.config['elr_gas_gap_length']
+        if self.config.get('enable_gas_gap_warping', True):
+            dG = self.resource.gas_gap_length(*xy)
+        else:
+            dG = self.config['elr_gas_gap_length']
         rA = self.config['anode_field_domination_distance']
         rW = self.config['anode_wire_radius']
         dL = self.config['gate_to_anode_distance'] - dG
@@ -549,7 +554,8 @@ class S2(Pulse):
                        4 * np.sqrt(np.max(self._electron_gains))).astype(int)
 
         if self.config['s2_luminescence_model'] == 'simple':
-            self._photon_timings = self.luminescence_timings((nele, npho))
+            print((nele, npho), xy)
+            self._photon_timings = self.luminescence_timings(xy,(nele, npho))
         elif self.config['s2_luminescence_model'] == 'garfield':
             self._photon_timings = self.luminescence_timings_garfield(
                 np.repeat(xy, n_electron, axis=0),
@@ -590,8 +596,8 @@ class S2(Pulse):
         
         aft = self.config['s2_mean_area_fraction_top']
         aft_random = self.config.get('randomize_fraction_of_s2_top_array_photons', 0)
-        channels = np.array(self.config['channels_in_detector']['tpc']).astype(int)
-        top_index = np.array(self.config['channels_top'])
+        channels = np.arange(self.config['n_tpc_pmts']).astype(int)
+        top_index = np.arange(self.config['n_top_pmts'])
         bottom_index = np.array(self.config['channels_bottom'])
 
         pattern = self.resource.s2_pattern_map(points)  # [position, pmt]
@@ -820,7 +826,7 @@ class RawData(object):
         )
         self.resource = load_config(self.config)
 
-    def __call__(self, instructions, truth_buffer=None):
+    def __call__(self, instructions, truth_buffer=None, **kwargs):
         if truth_buffer is None:
             truth_buffer = []
 
@@ -836,7 +842,6 @@ class RawData(object):
         self.source_finished = False
         self.last_pulse_end_time = - np.inf
         self.instruction_event_number = np.min(instructions['event_number'])
-
         # Primary instructions must be sorted by signal time
         # int(type) by design S1-esque being odd, S2-esque being even
         # thus type%2-1 is 0:S1-esque;  -1:S2-esque
@@ -846,7 +851,7 @@ class RawData(object):
         inst_queue = np.split(inst_queue, np.where(np.diff(inst_time[inst_queue]) > rext)[0]+1)
 
         # Instruction buffer
-        instb = np.zeros(100000, dtype=instructions.dtype) # size ~ 1% of size of primary
+        instb = np.zeros(10000, dtype=instructions.dtype) # size ~ 1% of size of primary
         instb_filled = np.zeros_like(instb, dtype=bool) # Mask of where buffer is filled
 
         # ik those are illegible, messy logic. lmk if you have a better way
@@ -995,8 +1000,8 @@ class RawData(object):
 
                 if self.config['detector'] == 'XENONnT':
                     adc_wave_he = adc_wave * int(self.config['high_energy_deamplification_factor'])
-                    if ch <= self.config['channels_top'][-1]:
-                        ch_he = self.config['channels_top_high_energy'][ch]
+                    if ch < self.config['n_top_pmts']:
+                        ch_he = np.arange(self.config['channel_map']['he'][0],self.config['channel_map']['he'][1]+1)[ch]
                         self._raw_data[ch_he, _slice] += adc_wave_he
                         self._channel_mask[ch_he] = True
                         self._channel_mask['left'][ch_he] = self._channel_mask['left'][ch]
@@ -1005,7 +1010,7 @@ class RawData(object):
                         self.sum_signal(adc_wave_he,
                             _pulse['left'] - self.left,
                             _pulse['right'] - self.left + 1,
-                            self._raw_data[self.config['channels_in_detector']['sum_signal']])
+                            self._raw_data[self.config['channel_map']['sum_signal']])
 
             self._pulses_cache = []
 
@@ -1014,13 +1019,15 @@ class RawData(object):
             
             
             # Adding noise, baseline and digitizer saturation
-            self.add_noise(data=self._raw_data,
-                           channel_mask=self._channel_mask,
-                           noise_data=self.resource.noise_data,
-                           noise_data_length=len(self.resource.noise_data))
-            self.add_baseline(self._raw_data, self._channel_mask, 
-                self.config['digitizer_reference_baseline'],)
-            self.digitizer_saturation(self._raw_data, self._channel_mask)
+            
+            if self.config.get('enable_noise', True):
+                self.add_noise(data=self._raw_data,
+                            channel_mask=self._channel_mask,
+                            noise_data=self.resource.noise_data,
+                            noise_data_length=len(self.resource.noise_data))
+                self.add_baseline(self._raw_data, self._channel_mask, 
+                    self.config['digitizer_reference_baseline'],)
+                self.digitizer_saturation(self._raw_data, self._channel_mask)
 
 
     def ZLE(self):

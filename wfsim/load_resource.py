@@ -5,7 +5,6 @@ import numpy as np
 import strax
 import straxen
 
-
 _cached_configs = dict()
 
 
@@ -50,6 +49,7 @@ class Resource:
                 's2_pattern_map': 'XENONnT_s2_xy_patterns_topbottom_corrected_MCv3.1.0_disks.pkl',
                 'photon_ap_cdfs': 'xnt_pmt_afterpulse_config.pkl.gz',
                 's2_luminescence': 'XENONnT_s2_garfield_luminescence_distribution_v0.pkl.gz',
+                'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
             })
         else:
             raise ValueError(f"Unsupported detector {config['detector']}")
@@ -57,7 +57,7 @@ class Resource:
         for k in set(config).intersection(files):
             files[k] = config[k] # Allowing user to replace default with specified files
         commit = 'master'   # Replace this by a commit hash if you feel solid and responsible
-        url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/sim_files'
+        url_base = f'/Users/petergaemers/Desktop/python/private_nt_aux_files/sim_files/'
         for k, v in files.items():
             if v.startswith('/'):
                 print(f"WARNING: Using local file {v} for a resource. "
@@ -102,6 +102,8 @@ class Resource:
             self.s2_light_yield_map = lymap
             self.s2_luminescence = straxen.get_resource(files['s2_luminescence'], fmt='pkl.gz')
             self.fdc_3d = dummy_map(result=0)
+            gas_gap_map = straxen.get_resource(files['gas_gap_map'],fmt='pkl')
+            self.gas_gap_length = lambda x, y:  gas_gap_map.lookup([x], [y]).item()
 
         # Electron After Pulses compressed, haven't figure out how pkl.gz works
         self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
