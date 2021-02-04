@@ -471,6 +471,14 @@ class S2(Pulse):
         probabilities = 1 - np.random.uniform(0, 1, size=shape)
         return uniform_to_emission_time(probabilities)
 
+    @staticmethod
+    @njit
+    def _luminescence_timings_index(distance, x_grid, n_grid, i_grid, shape, index):
+            for ix in range(shape[0]):
+                pitch_index = np.argmin(np.abs(distance[ix] - x_grid))
+                for iy in range(shape[1]):
+                    index[ix, iy] = i_grid[pitch_index] + np.random.randint(n_grid[pitch_index])
+                    
     def luminescence_timings_garfield(self, xy, shape):
         """
         Luminescence time distribution computation
@@ -489,14 +497,8 @@ class S2(Pulse):
         distance = jagged(np.matmul(xy, rotation_mat)[:, 1])  # shortest distance from any wire
 
         index = np.zeros(shape).astype(int)
-        @njit
-        def _luminescence_timings_index(distance, x_grid, n_grid, i_grid, shape, index):
-            for ix in range(shape[0]):
-                pitch_index = np.argmin(np.abs(distance[ix] - x_grid))
-                for iy in range(shape[1]):
-                    index[ix, iy] = i_grid[pitch_index] + np.random.randint(n_grid[pitch_index])
 
-        _luminescence_timings_index(distance, x_grid, n_grid, i_grid, shape, index)
+        self._luminescence_timings_index(distance, x_grid, n_grid, i_grid, shape, index)
 
         return self.resource.s2_luminescence['t'][index]
 
