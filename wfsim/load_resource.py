@@ -102,8 +102,8 @@ class Resource:
             self.s2_light_yield_map = lymap
             self.s2_luminescence = straxen.get_resource(files['s2_luminescence'], fmt='pkl.gz')
             self.fdc_3d = dummy_map(result=0)
-            gas_gap_map = straxen.get_resource(files['gas_gap_map'],fmt='pkl')
-            self.gas_gap_length = lambda x, y:  gas_gap_map.lookup([x], [y]).item()
+            gas_gap_map = straxen.get_resource(files['gas_gap_map'], fmt='pkl')
+            self.gas_gap_length = lambda positions: gas_gap_map.lookup(*positions.T)
 
         # Electron After Pulses compressed, haven't figure out how pkl.gz works
         self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
