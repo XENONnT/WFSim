@@ -9,7 +9,6 @@ from .load_resource import load_config
 from strax import exporter
 from . import units
 from .utils import find_intervals_below_threshold
-from enum import IntEnum
 
 export, __all__ = exporter()
 __all__.append('PULSE_TYPE_NAMES')
