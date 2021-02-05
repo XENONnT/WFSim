@@ -100,23 +100,20 @@ def read_optical(c):
 
     return ins, channels, timings
 
-def instruction_from_csv(filename):
-    """Return wfsim instructions from a csv
-
+def instructions_from_csv(filename):
+    """
+    Return wfsim instructions from a csv
+    
     :param filename: Path to csv file
     """
-    # Pandas does not grok the <U2 field 'recoil' correctly.
-    # Probably it loads it as some kind of string instead...
-    # we'll get it into the right format in the next step.
-    dtype_dict = dict(instruction_dtype)
-    df = pd.read_csv(filename,
-                     names=list(dtype_dict.keys()),
-                     skiprows=1,
-                     dtype={k: v for k, v in dtype_dict.items()
-                            if k != 'recoil'})
-
-    # Convert to records and check format
-    recs = df.to_records(index=False, column_dtypes=dtype_dict)
+    df = pd.read_csv(filename)
+    
+    recs = np.zeros(len(df),
+                    dtype=instruction_dtype
+                   )
+    for column in df.columns:
+        recs[column]=df[column]
+        
     expected_dtype = np.dtype(instruction_dtype)
     assert recs.dtype == expected_dtype, \
         f"CSV {filename} produced wrong dtype. Got {recs.dtype}, expected {expected_dtype}."
