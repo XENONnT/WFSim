@@ -225,7 +225,7 @@ class ChunkRawRecords(object):
         _truth.sort(order='time')
 
         #Oke this will be a bit ugly but it's easy
-        if self.config['detector']=='XENON1T':
+        if self.config['detector']=='xenon1t_detector':
             yield dict(raw_records=records,
                        truth=_truth)
         if self.config['neutron_veto']:
@@ -279,7 +279,7 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  default='https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/master/sim_files/fax_config_nt.json?token=AHCU5AZMPZABYSGVRLDACR3ABAZUA'),
     strax.Option('gain_model',
                  default=('to_pe_per_run', 'https://github.com/XENONnT/private_nt_aux_files/blob/master/sim_files/to_pe_nt.npy?raw=true'),
-                 help='PMT gain model. Specify as (model_type, model_config)'),
+                 help='PMT gain model. Specify as (model_type, model_config).'),
     strax.Option('detector', default='xenonnt_detector', track=True),
     strax.Option('channel_map', track=False, type=immutabledict,
                  help="immutabledict mapping subdetector to (min, max) "
@@ -290,8 +290,6 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  help="Number of pmts in top array. Provided by context"),
     strax.Option('neutron_veto', default=False, track=True,
                  help="Flag for nVeto optical simulation instead of TPC"),
-    strax.Option('mc_version_above_4', default=True, track=True, 
-                 help="Flag above MC version 4. to generate optical"),
 )
 class FaxSimulatorPlugin(strax.Plugin):
     depends_on = tuple()
