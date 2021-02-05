@@ -22,9 +22,10 @@ PULSE_TYPE_NAMES = ('RESERVED', 's1', 's2', 'unknown', 'pi_el', 'pmt_ap', 'pe_el
 @export
 class NestId():
     """Nest ids for refering to different scintilation models, only ER is actually validated"""
-    NR = 0      
-    ALPHA = 6   
-    ER = 7, 8, 11
+    NR = [0]      
+    ALPHA = [6]   
+    ER = [7, 8, 11]
+    ALL = NR+ALPHA+ER
 
 @export
 class Pulse(object):
@@ -327,7 +328,7 @@ class S1(Pulse):
             return
 
         if (self.config.get('s1_model_type') == 'simple' and 
-           recoil_type in NestId.ER):
+           recoil_type in NestId.ALL):
             # Simple S1 model enabled: use it for ER and NR.
             self._photon_timings = np.append(self._photon_timings,
                 t + np.random.exponential(self.config['s1_decay_time'], n_photons))
@@ -564,7 +565,6 @@ class S2(Pulse):
                        4 * np.sqrt(np.max(self._electron_gains))).astype(int)
 
         if self.config['s2_luminescence_model'] == 'simple':
-            print((nele, npho), xy)
             self._photon_timings = self.luminescence_timings(xy,(nele, npho))
         elif self.config['s2_luminescence_model'] == 'garfield':
             self._photon_timings = self.luminescence_timings_garfield(
