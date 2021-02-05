@@ -100,7 +100,7 @@ def read_optical(c):
 
     return ins, channels, timings
 
-def instructions_from_csv(filename):
+def instruction_from_csv(filename):
     """
     Return wfsim instructions from a csv
     
