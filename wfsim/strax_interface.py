@@ -365,6 +365,7 @@ class FaxSimulatorPlugin(strax.Plugin):
         """Return whether all instructions has been used."""
         return self.sim.source_finished()
 
+
 @export
 class RawRecordsFromFaxNT(FaxSimulatorPlugin):
     provides = ('raw_records', 'raw_records_he', 'raw_records_aqmon', 'truth')
@@ -415,6 +416,7 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
             end=self.sim.chunk_time,
             data=result[data_type],
             data_type=data_type) for data_type in self.provides}
+
 
 @export
 class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
@@ -471,10 +473,15 @@ class RawRecordsFromFaxOptical(RawRecordsFromFaxNT):
 class RawRecordsFromFaxnVeto(RawRecordsFromFaxOptical):
     provides = ('raw_records_nv', 'truth')
     data_kind = immutabledict(zip(provides, provides))
-    #Why does the data_kind need to be repeated?? So the overriding of the 
+    # Why does the data_kind need to be repeated?? So the overriding of the 
     # provides doesn't work in the setting of the data__kind?
+
+    def compute(self):
+        result = super().compute()
+        result['raw_records_nv'].data['channel'] += 2000  # nVeto PMT ID offset
+        return result
 
 
     def check_instructions(self):
-        #Are there some nveto boundries we need to include?
+        # Are there some nveto boundries we need to include?
         pass
