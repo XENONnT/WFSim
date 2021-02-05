@@ -265,7 +265,7 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  help="Directory with fax instructions"),
     strax.Option('fax_config_override', default=None,
                  help="Dictionary with configuration option overrides"),
-    strax.Option('event_rate', track=False,
+    strax.Option('event_rate', default=2, track=False,
                  help="Average number of events per second"),
     strax.Option('chunk_size', default=2, track=False,
                  help="Duration of each chunk in seconds"),
