@@ -32,7 +32,7 @@ class Resource:
             'ele_ap_cdfs': 'ele_after_pulse.npy',
             'noise_file': 'x1t_noise_170203_0850_00_small.npz',
         }
-        if config['detector'] == 'XENON1T':
+        if config['detector'] == 'xenon1t_detector':
             files.update({
                 'photon_area_distribution': 'XENON1T_spe_distributions.csv',
                 's1_light_yield_map': 'XENON1T_s1_xyz_ly_kr83m_SR1_pax-680_fdc-3d_v0.json',
@@ -42,7 +42,7 @@ class Resource:
                 'photon_ap_cdfs': 'x1t_pmt_afterpulse_config.pkl.gz',
                 'fdc_3d': 'XENON1T_FDC_SR1_data_driven_time_dependent_3d_correction_tf_nn_part1_v1.json.gz',
             })
-        elif config['detector'] == 'XENONnT':
+        elif config['detector'] == 'xenonnt_detector':
             files.update({
                 'photon_area_distribution': 'XENONnT_spe_distributions.csv',
                 's1_pattern_map': 'XENONnT_s1_xyz_patterns_corrected_MCv3.1.0_disks.pkl',
@@ -81,14 +81,14 @@ class Resource:
 
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
 
-        if config['detector'] == 'XENON1T':
+        if config['detector'] == 'xenon1t_detector':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='json.gz')
             self.s1_light_yield_map = make_map(files['s1_light_yield_map'], fmt='json')
             self.s2_light_yield_map = make_map(files['s2_light_yield_map'], fmt='json')
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='json.gz')
             self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
 
-        if config['detector'] == 'XENONnT':
+        if config['detector'] == 'xenonnt_detector':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
             lymap = deepcopy(self.s1_pattern_map)
             lymap.data['map'] = np.sum(lymap.data['map'][:][:][:], axis=3, keepdims=True)

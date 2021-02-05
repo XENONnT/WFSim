@@ -23,7 +23,7 @@ instruction_dtype = [(('Waveform simulator event number.', 'event_number'), np.i
              (('Y position of the cluster[cm]', 'y'), np.float32),
              (('Z position of the cluster[cm]', 'z'), np.float32),
              (('Number of quanta', 'amp'), np.int32),
-             (('Recoil type of interaction.', 'recoil'), np.int),
+             (('Recoil type of interaction.', 'recoil'), np.int8),
              (('Energy deposit of interaction', 'e_dep'), np.float32),
              (('Eventid like in geant4 output rootfile', 'g4id'), np.int32),
              (('Volume id giving the detector subvolume', 'vol_id'), np.int32)
@@ -49,7 +49,7 @@ def rand_instructions(c):
     instructions['event_number'] = np.digitize(instructions['time'],
          1e9 * np.arange(c['nchunk']) * c['chunk_size']) - 1
     instructions['type'] = np.tile([1, 2], n)
-    instructions['recoil'] = [1 for i in range(n * 2)]
+    instructions['recoil'] = [7 for i in range(n * 2)] #Use nest ids for  ER
 
     r = np.sqrt(np.random.uniform(0, c['tpc_radius']**2, n))
     t = np.random.uniform(-np.pi, np.pi, n)
@@ -222,13 +222,13 @@ class ChunkRawRecords(object):
         _truth.sort(order='time')
 
         #Oke this will be a bit ugly but it's easy
-        if self.config['detector']=='XENON1T':
+        if self.config['detector']=='xenon1t_detector':
             yield dict(raw_records=records,
                        truth=_truth)
         if self.config['neutron_veto']:
             yield dict(raw_records_nv=records[records['channel'] < self.config['channel_map']['he'][0]],
                        truth=_truth)
-        elif self.config['detector']=='XENONnT':
+        elif self.config['detector']=='xenonnt_detector':
             yield dict(raw_records=records[records['channel'] < self.config['channel_map']['he'][0]],
                        raw_records_he=records[(records['channel'] >= self.config['channel_map']['he'][0]) &
                                               (records['channel'] <= self.config['channel_map']['he'][-1])],
@@ -276,8 +276,8 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  default='https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/master/sim_files/fax_config_nt.json?token=AHCU5AZMPZABYSGVRLDACR3ABAZUA'),
     strax.Option('gain_model',
                  default=('to_pe_per_run', 'https://github.com/XENONnT/private_nt_aux_files/blob/master/sim_files/to_pe_nt.npy?raw=true'),
-                 help='PMT gain model. Specify as (model_type, model_config)'),
-    strax.Option('detector', default='XENONnT', track=True),
+                 help='PMT gain model. Specify as (model_type, model_config).'),
+    strax.Option('detector', default='xenonnt_detector', track=True),
     strax.Option('channel_map', track=False, type=immutabledict,
                  help="immutabledict mapping subdetector to (min, max) "
                       "channel number. Provided by context"),
@@ -287,8 +287,6 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  help="Number of pmts in top array. Provided by context"),
     strax.Option('neutron_veto', default=False, track=True,
                  help="Flag for nVeto optical simulation instead of TPC"),
-    strax.Option('mc_version_above_4', default=True, track=True, 
-                 help="Flag above MC version 4. to generate optical"),
 )
 class FaxSimulatorPlugin(strax.Plugin):
     depends_on = tuple()
@@ -436,7 +434,13 @@ class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
 
         return {data_type:result[data_type] for data_type in self.provides}
 
-    def is_ready(self):
+    def get_instructions(self):
+        pass
+
+    def check_instructions(self):
+        pass
+
+    def is_ready(self,chuck_i):
         """Overwritten to mimic online input plugin.
         Returns False to check source finished;
         Returns True to get next chunk.
