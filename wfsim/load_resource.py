@@ -42,7 +42,7 @@ class Resource:
                 'photon_ap_cdfs': 'x1t_pmt_afterpulse_config.pkl.gz',
                 'fdc_3d': 'XENON1T_FDC_SR1_data_driven_time_dependent_3d_correction_tf_nn_part1_v1.json.gz',
             })
-        elif config['detector'] == 'XENONnT':
+        elif config['detector'] == 'xenonnt_detector':
             files.update({
                 'photon_area_distribution': 'XENONnT_spe_distributions.csv',
                 's1_pattern_map': 'XENONnT_s1_xyz_patterns_corrected_MCv3.1.0_disks.pkl',
@@ -88,7 +88,7 @@ class Resource:
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='json.gz')
             self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
 
-        if config['detector'] == 'XENONnT':
+        if config['detector'] == 'xenonnt_detector':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
             lymap = deepcopy(self.s1_pattern_map)
             lymap.data['map'] = np.sum(lymap.data['map'][:][:][:], axis=3, keepdims=True)
