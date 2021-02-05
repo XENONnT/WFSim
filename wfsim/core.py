@@ -435,41 +435,65 @@ class S2(Pulse):
         positions = np.array([x_obs, y_obs]).T 
         return z_obs, positions
 
-    def luminescence_timings(self, xy, shape):
+    @staticmethod
+    @njit
+    def _luminescence_timings_simple(n, dG, E0, r, dr, rr, alpha, uE, p, n_electron, shape):
+        emission_time = np.zeros(shape)
+
+        ci = 0
+        for i in range(n):
+            ne = n_electron[i]
+            dt = dr / (alpha * E0[i] * rr)
+            dy = E0[i] * rr / uE - 0.8 * p  # arXiv:physics/0702142
+
+            j = np.argmax(r <= dG[i])
+            t = np.cumsum(dt[j:])
+            y = np.cumsum(dy[j:])
+
+            probabilities = np.random.rand(ne, shape[1])
+            emission_time[ci:ci+ne, :] = np.interp(probabilities, y / y[-1], t)
+            ci += ne
+
+        return emission_time
+
+    def luminescence_timings_simple(self, xy, n_electron, shape):
         """
         Luminescence time distribution computation
         """
+        assert len(n_electron) == len(xy), 'Input number of n_electron should have same length as positions'
+        assert np.sum(n_electron) == shape[0], 'Total number of electron does not agree with shape[0]'
+
         number_density_gas = self.config['pressure'] / \
                              (units.boltzmannConstant * self.config['temperature'])
         alpha = self.config['gas_drift_velocity_slope'] / number_density_gas
+        uE = units.kV / units.cm
+        pressure = self.config['pressure'] / units.bar
 
         if self.config.get('enable_gas_gap_warping', True):
-            dG = self.resource.gas_gap_length(*xy)
+            dG = self.resource.gas_gap_length(xy)
         else:
-            dG = self.config['elr_gas_gap_length']
+            dG = np.ones(shape[0]) * self.config['elr_gas_gap_length']
         rA = self.config['anode_field_domination_distance']
         rW = self.config['anode_wire_radius']
         dL = self.config['gate_to_anode_distance'] - dG
 
         VG = self.config['anode_voltage'] / (1 + dL / dG / self.config['lxe_dielectric_constant'])
-        E0 = VG / ((dG - rA) / rA + np.log(rA / rW))
+        E0 = VG / ((dG - rA) / rA + np.log(rA / rW))  # V / cm
 
-        def Efield_r(r): return np.clip(E0 / r, E0 / rA, E0 / rW)
+        dr = 0.0001  # cm
+        r = np.arange(np.max(dG), rW, -dr)
+        rr = np.clip(1 / r, 1 / rA, 1 / rW)
 
-        def velosity_r(r): return alpha * Efield_r(r)
+        return self._luminescence_timings_simple(len(xy), dG, E0, 
+            r, dr, rr, alpha, uE, pressure, n_electron, shape)
 
-        def Yield_r(r): return Efield_r(r) / (units.kV / units.cm) - \
-                               0.8 * self.config['pressure'] / units.bar
-
-        r = np.linspace(dG, rW, 1000)
-        dt = - np.diff(r)[0] / velosity_r(r)
-        dy = Yield_r(r) / np.sum(Yield_r(r))
-
-        uniform_to_emission_time = interp1d(np.cumsum(dy), np.cumsum(dt),
-                                            bounds_error=False, fill_value=(0, sum(dt)))
-
-        probabilities = 1 - np.random.uniform(0, 1, size=shape)
-        return uniform_to_emission_time(probabilities)
+    @staticmethod
+    @njit
+    def _luminescence_timings_garfield(distance, x_grid, n_grid, i_grid, shape, index):
+        for ix in range(shape[0]):
+            pitch_index = np.argmin(np.abs(distance[ix] - x_grid))
+            for iy in range(shape[1]):
+                index[ix, iy] = i_grid[pitch_index] + np.random.randint(n_grid[pitch_index])
 
     def luminescence_timings_garfield(self, xy, shape):
         """
@@ -489,14 +513,8 @@ class S2(Pulse):
         distance = jagged(np.matmul(xy, rotation_mat)[:, 1])  # shortest distance from any wire
 
         index = np.zeros(shape).astype(int)
-        @njit
-        def _luminescence_timings_index(distance, x_grid, n_grid, i_grid, shape, index):
-            for ix in range(shape[0]):
-                pitch_index = np.argmin(np.abs(distance[ix] - x_grid))
-                for iy in range(shape[1]):
-                    index[ix, iy] = i_grid[pitch_index] + np.random.randint(n_grid[pitch_index])
 
-        _luminescence_timings_index(distance, x_grid, n_grid, i_grid, shape, index)
+        self._luminescence_timings_garfield(distance, x_grid, n_grid, i_grid, shape, index)
 
         return self.resource.s2_luminescence['t'][index]
 
@@ -554,8 +572,7 @@ class S2(Pulse):
                        4 * np.sqrt(np.max(self._electron_gains))).astype(int)
 
         if self.config['s2_luminescence_model'] == 'simple':
-            print((nele, npho), xy)
-            self._photon_timings = self.luminescence_timings(xy,(nele, npho))
+            self._photon_timings = self.luminescence_timings_simple(xy, n_electron, (nele, npho))
         elif self.config['s2_luminescence_model'] == 'garfield':
             self._photon_timings = self.luminescence_timings_garfield(
                 np.repeat(xy, n_electron, axis=0),
