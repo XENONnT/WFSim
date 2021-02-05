@@ -473,6 +473,11 @@ class RawRecordsFromFaxnVeto(RawRecordsFromFaxOptical):
     #Why does the data_kind need to be repeated?? So the overriding of the 
     # provides doesn't work in the setting of the data__kind?
 
+    def compute(self):
+        result = super().compute()
+        result['raw_records_nv'].data['channel'] += 2000#nVeto PMT ID offset
+        return result
+
 
     def check_instructions(self):
         #Are there some nveto boundries we need to include?
