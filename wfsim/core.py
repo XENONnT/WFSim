@@ -17,6 +17,15 @@ log = logging.getLogger('SimulationCore')
 
 PULSE_TYPE_NAMES = ('RESERVED', 's1', 's2', 'unknown', 'pi_el', 'pmt_ap', 'pe_el')
 
+
+@export
+class NestId():
+    """Nest ids for refering to different scintilation models, only ER is actually validated"""
+    NR = [0]      
+    ALPHA = [6]   
+    ER = [7, 8, 11]
+    ALL = NR+ALPHA+ER
+
 @export
 class Pulse(object):
     """Pulse building class"""
@@ -282,7 +291,7 @@ class S1(Pulse):
             np.array(v).reshape(-1) for v in zip(*instruction)]
 
         positions = np.array([x, y, z]).T  # For map interpolation
-        if self.config['detector']=='XENONnT':
+        if self.config['detector']=='xenonnt_detector':
             ly = np.squeeze(self.resource.s1_light_yield_map(positions),
                             axis=-1)
         elif self.config['detector']=='XENON1T':
@@ -318,13 +327,14 @@ class S1(Pulse):
             return
 
         if (self.config.get('s1_model_type') == 'simple' and 
-           recoil_type in [1, 2]):
+           recoil_type in NestId.ALL):
             # Simple S1 model enabled: use it for ER and NR.
             self._photon_timings = np.append(self._photon_timings,
                 t + np.random.exponential(self.config['s1_decay_time'], n_photons))
             self._photon_timings += np.random.normal(0,self.config['s1_decay_spread'],len(self._photon_timings))
             return
 
+        #TODO Fix the other recoil types to refer to the numbers
         try:
             self._photon_timings = np.append(self._photon_timings,
                 t + getattr(self, recoil_type.lower())(n_photons))
@@ -393,7 +403,7 @@ class S2(Pulse):
         else:
             z_obs, positions = z, np.array([x, y]).T
 
-        if self.config['detector']=='XENONnT':
+        if self.config['detector']=='xenonnt_detector':
             sc_gain = np.squeeze(self.resource.s2_light_yield_map(positions), axis=-1) \
                 * self.config['s2_secondary_sc_gain']
         elif self.config['detector']=='XENON1T':
@@ -1046,7 +1056,7 @@ class RawData(object):
                 
                 self._raw_data[ch, _slice] += adc_wave
 
-                if self.config['detector'] == 'XENONnT':
+                if self.config['detector'] == 'xenonnt_detector':
                     adc_wave_he = adc_wave * int(self.config['high_energy_deamplification_factor'])
                     if ch < self.config['n_top_pmts']:
                         ch_he = np.arange(self.config['channel_map']['he'][0],self.config['channel_map']['he'][1]+1)[ch]
