@@ -17,15 +17,6 @@ log = logging.getLogger('SimulationCore')
 
 PULSE_TYPE_NAMES = ('RESERVED', 's1', 's2', 'unknown', 'pi_el', 'pmt_ap', 'pe_el')
 
-
-@export
-class NestId():
-    """Nest ids for refering to different scintilation models, only ER is actually validated"""
-    NR = [0]      
-    ALPHA = [6]   
-    ER = [7, 8, 11]
-    ALL = NR+ALPHA+ER
-
 @export
 class Pulse(object):
     """Pulse building class"""
@@ -291,7 +282,7 @@ class S1(Pulse):
             np.array(v).reshape(-1) for v in zip(*instruction)]
 
         positions = np.array([x, y, z]).T  # For map interpolation
-        if self.config['detector']=='xenonnt_detector':
+        if self.config['detector']=='XENONnT':
             ly = np.squeeze(self.resource.s1_light_yield_map(positions),
                             axis=-1)
         elif self.config['detector']=='XENON1T':
@@ -327,14 +318,13 @@ class S1(Pulse):
             return
 
         if (self.config.get('s1_model_type') == 'simple' and 
-           recoil_type in NestId.ALL):
+           recoil_type in [1, 2]):
             # Simple S1 model enabled: use it for ER and NR.
             self._photon_timings = np.append(self._photon_timings,
                 t + np.random.exponential(self.config['s1_decay_time'], n_photons))
             self._photon_timings += np.random.normal(0,self.config['s1_decay_spread'],len(self._photon_timings))
             return
 
-        #TODO Fix the other recoil types to refer to the numbers
         try:
             self._photon_timings = np.append(self._photon_timings,
                 t + getattr(self, recoil_type.lower())(n_photons))
@@ -403,7 +393,7 @@ class S2(Pulse):
         else:
             z_obs, positions = z, np.array([x, y]).T
 
-        if self.config['detector']=='xenonnt_detector':
+        if self.config['detector']=='XENONnT':
             sc_gain = np.squeeze(self.resource.s2_light_yield_map(positions), axis=-1) \
                 * self.config['s2_secondary_sc_gain']
         elif self.config['detector']=='XENON1T':
@@ -425,7 +415,7 @@ class S2(Pulse):
 
         # Second generate photon timing and channel
         self.photon_timings(t, n_electron, z_obs, positions, sc_gain)
-        self.photon_channels(positions)
+        self.photon_channels(n_electron, z_obs, positions)
 
         super().__call__()
 
@@ -594,7 +584,7 @@ class S2(Pulse):
         threshold = np.repeat(np.random.poisson(self._electron_gains), npho).reshape((nele, npho))
         self._photon_timings = self._photon_timings[probability < threshold]
 
-        # Special index for match photon to original electron poistion
+        # Index to match photon with poistion input
         self._instruction = np.repeat(
             np.repeat(np.arange(len(t)), n_electron), npho).reshape((nele, npho))
         self._instruction = self._instruction[probability < threshold]
@@ -602,7 +592,8 @@ class S2(Pulse):
         self._photon_timings += self.singlet_triplet_delays(
             len(self._photon_timings), self.config['singlet_fraction_gas'])
         
-        self._photon_timings += np.random.normal(0,self.config['s2_time_spread'],len(self._photon_timings))
+        self._photon_timings += np.random.normal(0, 
+            self.config['s2_time_spread'], len(self._photon_timings))
 
         # The timings generated is NOT randomly ordered, must do shuffle
         # Shuffle within each given n_electron[i]
@@ -615,7 +606,34 @@ class S2(Pulse):
                 s = slice(cumulate_npho[i-1], cumulate_npho[i])
             np.random.shuffle(self._photon_timings[s])
 
-    def photon_channels(self, points):
+    def s2_pattern_map_hdiff(self, n_electron, z, xy):
+        drift_time_gate = self.config['drift_time_gate']
+        drift_velocity_liquid = self.config['drift_velocity_liquid']
+        diffusion_constant_liquid_horizontal = getattr(self.config, 'diffusion_constant_liquid_horizontal', 0)
+
+        assert all(z < 0), 'All S2 in liquid should have z < 0'
+
+        drift_time_mean = - z / drift_velocity_liquid + drift_time_gate  # Add gate time for consistancy?
+        hdiff_stdev = np.sqrt(2 * diffusion_constant_liquid_horizontal * drift_time_mean)
+
+        hdiff = np.random.normal(0, 1, (np.sum(n_electron), 2)) * np.repeat(hdiff_stdev, n_electron, axis=0).reshape((-1, 1))
+        # Should we also output this xy position in truth?
+        xy_multi = np.repeat(xy, n_electron, axis=0) + hdiff  # One entry xy per electron
+        # Remove points outside tpc, and the pattern will be the average inside tpc
+        # Should be done natually with the s2 pattern map, however, there's some bug there so we apply this hard cut
+        mask = np.sum(xy_multi ** 2, axis=1) <= self.config['tpc_radius'] ** 2
+
+        pattern = np.zeros((len(n_electron), self.resource.s2_pattern_map.data['map'].shape[-1]))
+        n0 = 0
+        # Average over electrons for each s2
+        for ix, ne in enumerate(n_electron):
+            s = slice(n0, n0+ne)
+            pattern[ix, :] = np.average(self.resource.s2_pattern_map(xy_multi[s][mask[s]]), axis=0)
+            n0 += ne
+
+        return pattern
+
+    def photon_channels(self, n_electron, z_obs, positions):
         # TODO log this
         if len(self._photon_timings) == 0:
             self._photon_channels = []
@@ -627,14 +645,17 @@ class S2(Pulse):
         top_index = np.arange(self.config['n_top_pmts'])
         bottom_index = np.array(self.config['channels_bottom'])
 
-        pattern = self.resource.s2_pattern_map(points)  # [position, pmt]
+        if getattr(self.config, 'diffusion_constant_liquid_horizontal', 0) > 0:
+            pattern = self.s2_pattern_map_hdiff(n_electron, z_obs, positions)  # [position, pmt]
+        else:
+            pattern = self.resource.s2_pattern_map(positions)  # [position, pmt]
         if pattern.shape[1] - 1 not in bottom_index:
             pattern = np.pad(pattern, [[0, 0], [0, len(bottom_index)]], 
                 'constant', constant_values=1)
         sum_pat = np.sum(pattern, axis=1).reshape(-1, 1)
         pattern = np.divide(pattern, sum_pat, out=np.zeros_like(pattern), where=sum_pat!=0)
 
-        assert pattern.shape[0] == len(points)
+        assert pattern.shape[0] == len(positions)
         assert pattern.shape[1] == len(channels)
 
         self._photon_channels = np.array([], dtype=int)
@@ -1025,7 +1046,7 @@ class RawData(object):
                 
                 self._raw_data[ch, _slice] += adc_wave
 
-                if self.config['detector'] == 'xenonnt_detector':
+                if self.config['detector'] == 'XENONnT':
                     adc_wave_he = adc_wave * int(self.config['high_energy_deamplification_factor'])
                     if ch < self.config['n_top_pmts']:
                         ch_he = np.arange(self.config['channel_map']['he'][0],self.config['channel_map']['he'][1]+1)[ch]
