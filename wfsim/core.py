@@ -291,7 +291,7 @@ class S1(Pulse):
             np.array(v).reshape(-1) for v in zip(*instruction)]
 
         positions = np.array([x, y, z]).T  # For map interpolation
-        if self.config['detector']=='xenonnt_detector':
+        if self.config['detector']=='XENONnT':
             ly = np.squeeze(self.resource.s1_light_yield_map(positions),
                             axis=-1)
         elif self.config['detector']=='XENON1T':
@@ -403,7 +403,7 @@ class S2(Pulse):
         else:
             z_obs, positions = z, np.array([x, y]).T
 
-        if self.config['detector']=='xenonnt_detector':
+        if self.config['detector']=='XENONnT':
             sc_gain = np.squeeze(self.resource.s2_light_yield_map(positions), axis=-1) \
                 * self.config['s2_secondary_sc_gain']
         elif self.config['detector']=='XENON1T':
@@ -1056,7 +1056,7 @@ class RawData(object):
                 
                 self._raw_data[ch, _slice] += adc_wave
 
-                if self.config['detector'] == 'xenonnt_detector':
+                if self.config['detector'] == 'XENONnT':
                     adc_wave_he = adc_wave * int(self.config['high_energy_deamplification_factor'])
                     if ch < self.config['n_top_pmts']:
                         ch_he = np.arange(self.config['channel_map']['he'][0],self.config['channel_map']['he'][1]+1)[ch]
