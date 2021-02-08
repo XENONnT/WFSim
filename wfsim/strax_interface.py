@@ -175,11 +175,14 @@ class ChunkRawRecords(object):
             self.record_buffer[s]['data'] = np.pad(data, 
                 (0, records_needed * samples_per_record - pulse_length), 'constant').reshape((-1, samples_per_record))
             self.blevel += records_needed
-
+            # print(f"Current digitized right: {self.current_digitized_right}")
+            # print(f"last digitized right: {self.last_digitized_right}")
+            # print(f"right: {self.rawdata.right}")
             if self.rawdata.right != self.current_digitized_right:
                 self.last_digitized_right = self.current_digitized_right
                 self.current_digitized_right = self.rawdata.right
-        
+
+        self.last_digitized_right = self.current_digitized_right
         yield from self.final_results()
 
     def final_results(self):
@@ -204,7 +207,7 @@ class ChunkRawRecords(object):
               <= self.last_digitized_right * self.config['sample_duration'])
             )))
         truth = self.truth_buffer[maskb]   # This is a copy, not a view!
-
+        
         # Careful here: [maskb]['fill'] = ... does not work
         # numpy creates a copy of the array on the first index.
         # The assignment then goes to the (unused) copy.
@@ -455,7 +458,6 @@ class RawRecordsFromFax1T(RawRecordsFromFaxNT):
 
 @export
 class RawRecordsFromFaxOptical(RawRecordsFromFaxNT):
-
     def _setup(self):
         self.sim = ChunkRawRecordsOptical(self.config)
         self.sim_iter = self.sim(instructions=self.instructions, 
