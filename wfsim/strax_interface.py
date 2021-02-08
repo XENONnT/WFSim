@@ -71,7 +71,8 @@ def read_optical(c):
     except:
         raise Exception("Are you using mc version >4?")
 
-    n_events = len(e['eventid'].array(library="np"))
+    event_id = e['eventid'].array(library="np")
+    n_events = len(event_id)
     # lets separate the events in time by a constant time difference
     time = np.arange(1, n_events+1)
 
@@ -91,6 +92,7 @@ def read_optical(c):
     ins['z'] = e["zp_pri"].array(library="np").flatten() / 10.
     ins['time']= 1e7 * time.flatten()
     ins['event_number'] = np.arange(n_events)
+    ins['g4id'] = event_id
     ins['type'] = np.repeat(1, n_events)
     ins['recoil'] = np.repeat(1, n_events)
     ins['amp'] = [len(t) for t in timings]
