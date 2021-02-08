@@ -224,13 +224,13 @@ class ChunkRawRecords(object):
         _truth.sort(order='time')
 
         #Oke this will be a bit ugly but it's easy
-        if self.config['detector']=='xenon1t_detector':
+        if self.config['detector']=='XENON1T':
             yield dict(raw_records=records,
                        truth=_truth)
         if self.config['neutron_veto']:
             yield dict(raw_records_nv=records[records['channel'] < self.config['channel_map']['he'][0]],
                        truth=_truth)
-        elif self.config['detector']=='xenonnt_detector':
+        elif self.config['detector']=='XENONnT':
             yield dict(raw_records=records[records['channel'] < self.config['channel_map']['he'][0]],
                        raw_records_he=records[(records['channel'] >= self.config['channel_map']['he'][0]) &
                                               (records['channel'] <= self.config['channel_map']['he'][-1])],
@@ -279,7 +279,7 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
     strax.Option('gain_model',
                  default=('to_pe_per_run', 'https://github.com/XENONnT/private_nt_aux_files/blob/master/sim_files/to_pe_nt.npy?raw=true'),
                  help='PMT gain model. Specify as (model_type, model_config).'),
-    strax.Option('detector', default='xenonnt_detector', track=True),
+    strax.Option('detector', default='XENONnT', track=True),
     strax.Option('channel_map', track=False, type=immutabledict,
                  help="immutabledict mapping subdetector to (min, max) "
                       "channel number. Provided by context"),
