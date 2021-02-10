@@ -337,7 +337,7 @@ class S1(Pulse):
         #TODO Fix the other recoil types to refer to the numbers
         try:
             self._photon_timings = np.append(self._photon_timings,
-                t + getattr(self, recoil_type.lower())(n_photons))
+                t + getattr(self, recoil_type)(n_photons))
         except AttributeError:
             raise AttributeError('Recoil type must be ER, NR, alpha or LED, not %s' % recoil_type)
 
