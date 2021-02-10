@@ -3,6 +3,7 @@ import tempfile
 import strax
 import straxen
 import wfsim
+import utilix
 
 strax.mailbox.Mailbox.DEFAULT_TIMEOUT = 60
 
@@ -34,7 +35,7 @@ def test_sim_1T():
 
 def test_sim_nT():
     """Test the nT simulator. Works only if one has access to the XENONnT databases"""
-    if straxen.uconfig is None:
+    if not hasattr(utilix, 'rundb'):
         # This means we cannot load the nT files. Most likely will work
         # locally but not a travis job.
         return
