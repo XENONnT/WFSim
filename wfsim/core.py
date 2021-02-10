@@ -249,8 +249,8 @@ class Pulse(object):
             pulse_current[start:start + template_length] += \
                 pmt_current_templates[reminder] * gain_total
 
-
-    def singlet_triplet_delays(self, size, singlet_ratio):
+    @staticmethod
+    def singlet_triplet_delays(size, singlet_ratio, config, phase):
         """
         Given the amount of the eximer, return time between excimer decay
         and their time of generation.
@@ -259,12 +259,12 @@ class Pulse(object):
         singlet_ratio  - fraction of excimers that become singlets
                          (NOT the ratio of singlets/triplets!)
         """
-        if self.phase == 'liquid':
-            t1, t3 = (self.config['singlet_lifetime_liquid'],
-                      self.config['triplet_lifetime_liquid'])
-        elif self.phase == 'gas':
-            t1, t3 = (self.config['singlet_lifetime_gas'],
-                      self.config['triplet_lifetime_gas'])
+        if phase == 'liquid':
+            t1, t3 = (config['singlet_lifetime_liquid'],
+                      config['triplet_lifetime_liquid'])
+        elif phase == 'gas':
+            t1, t3 = (config['singlet_lifetime_gas'],
+                      config['triplet_lifetime_gas'])
 
         delay = np.random.choice([t1, t3], size, replace=True,
                                  p=[singlet_ratio, 1 - singlet_ratio])
@@ -348,15 +348,16 @@ class S1(Pulse):
                 if recoil in NestId.recoil:
                     _photon_timings = t + getattr(S1, recoil_type.lower())(n_photons=n_photons,
                                                                            config=config,
-                                                                           singlet_triplet_delays=Pulse.singlet_triplet_delays)
+                                                                           singlet_triplet_delays=Pulse.singlet_triplet_delays,
+                                                                           phase=self.phase)
 
         except AttributeError:
             raise AttributeError('Recoil type must be ER, NR, alpha or LED, not %s' % recoil_type)
 
     @staticmethod
-    def alpha(size,config,singlet_triplet_delays):
+    def alpha(size,config,singlet_triplet_delays, phase):
         # Neglible recombination time
-        return singlet_triplet_delays(size, config['s1_ER_alpha_singlet_fraction'])
+        return singlet_triplet_delays(size, config['s1_ER_alpha_singlet_fraction'],config, phase)
 
     @staticmethod
     def led(size,config, **kwargs):
@@ -364,7 +365,7 @@ class S1(Pulse):
         return np.random.uniform(0, config['led_pulse_length'], size)
 
     @staticmethod
-    def er(size,config,singlet_triplet_delays):
+    def er(size,config,singlet_triplet_delays, phase):
         # How many of these are primary excimers? Others arise through recombination.
         efield = (config['drift_field'] / (units.V / units.cm))
         config['s1_ER_recombination_time'] = 3.5 / \
@@ -382,14 +383,14 @@ class S1(Pulse):
         timings = np.clip(timings, 0, config['maximum_recombination_time'])
         size_primary = len(timings[primary])
         timings[primary] += singlet_triplet_delays(
-            size_primary, config['s1_ER_primary_singlet_fraction'])
+            size_primary, config['s1_ER_primary_singlet_fraction'],config,phase)
         timings[~primary] += singlet_triplet_delays(
-            size - size_primary, config['s1_ER_secondary_singlet_fraction'])
+            size - size_primary, config['s1_ER_secondary_singlet_fraction'],config,phase)
         return timings
 
     @staticmethod
-    def nr(size, config, singlet_triplet_delays):
-        return singlet_triplet_delays(size, config['s1_NR_singlet_fraction'])
+    def nr(size, config, singlet_triplet_delays, phase):
+        return singlet_triplet_delays(size, config['s1_NR_singlet_fraction'], config, phase)
 
 
 @export

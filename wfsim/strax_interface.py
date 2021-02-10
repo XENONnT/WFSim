@@ -262,11 +262,11 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  help="Directory with fax instructions"),
     strax.Option('fax_config_override', default=None,
                  help="Dictionary with configuration option overrides"),
-    strax.Option('event_rate', default=2, track=False,
+    strax.Option('event_rate', default=5, track=False,
                  help="Average number of events per second"),
-    strax.Option('chunk_size', default=2, track=False,
+    strax.Option('chunk_size', default=100, track=False,
                  help="Duration of each chunk in seconds"),
-    strax.Option('nchunk', default=4, track=False,
+    strax.Option('nchunk', default=1, track=False,
                  help="Number of chunks to simulate"),
     strax.Option('right_raw_extension', default=50000),
     strax.Option('timeout', default=1800,
@@ -275,9 +275,14 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
     strax.Option('fax_config',
                  default='https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/master/sim_files/fax_config_nt.json?token=AHCU5AZMPZABYSGVRLDACR3ABAZUA'),
     strax.Option('gain_model',
+<<<<<<< Updated upstream
                  default=('to_pe_per_run', 'https://github.com/XENONnT/private_nt_aux_files/blob/master/sim_files/to_pe_nt.npy?raw=true'),
                  help='PMT gain model. Specify as (model_type, model_config).'),
     strax.Option('detector', default='xenonnt_detector', track=True),
+=======
+                 help='PMT gain model. Specify as (model_type, model_config). Provided by context (Eith cmt or a constant)'),
+    strax.Option('detector', default='XENONnT', track=True),
+>>>>>>> Stashed changes
     strax.Option('channel_map', track=False, type=immutabledict,
                  help="immutabledict mapping subdetector to (min, max) "
                       "channel number. Provided by context"),
