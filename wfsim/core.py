@@ -280,6 +280,10 @@ class S1(Pulse):
 
     def __init__(self, config):
         super().__init__(config)
+        # TODO
+        #  This config is not set for the 1T fax config
+        self.config.setdefault('s1_decay_spread', 1)
+        
         self.phase = 'liquid'  # To distinguish singlet/triplet time delay.
 
     def __call__(self, instruction):
@@ -402,6 +406,9 @@ class S2(Pulse):
 
     def __init__(self, config):
         super().__init__(config)
+        # TODO
+        #  This config is not set for the 1T fax config
+        self.config.setdefault('s2_time_spread', 1)
 
         self.phase = 'gas'  # To distinguish singlet/triplet time delay.
         self.luminescence_switch_threshold = 100  # When to use simplified model (NOT IN USE)
