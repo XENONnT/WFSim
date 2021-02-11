@@ -71,7 +71,8 @@ def read_optical(c):
     except:
         raise Exception("Are you using mc version >4?")
 
-    n_events = len(e['eventid'].array(library="np"))
+    event_id = e['eventid'].array(library="np")
+    n_events = len(event_id)
     # lets separate the events in time by a constant time difference
     time = np.arange(1, n_events+1)
 
@@ -91,6 +92,7 @@ def read_optical(c):
     ins['z'] = e["zp_pri"].array(library="np").flatten() / 10.
     ins['time']= 1e7 * time.flatten()
     ins['event_number'] = np.arange(n_events)
+    ins['g4id'] = event_id
     ins['type'] = np.repeat(1, n_events)
     ins['recoil'] = np.repeat(1, n_events)
     ins['amp'] = [len(t) for t in timings]
@@ -222,13 +224,13 @@ class ChunkRawRecords(object):
         _truth.sort(order='time')
 
         #Oke this will be a bit ugly but it's easy
-        if self.config['detector']=='xenon1t_detector':
+        if self.config['detector']=='XENON1T':
             yield dict(raw_records=records,
                        truth=_truth)
         if self.config['neutron_veto']:
             yield dict(raw_records_nv=records[records['channel'] < self.config['channel_map']['he'][0]],
                        truth=_truth)
-        elif self.config['detector']=='xenonnt_detector':
+        elif self.config['detector']=='XENONnT':
             yield dict(raw_records=records[records['channel'] < self.config['channel_map']['he'][0]],
                        raw_records_he=records[(records['channel'] >= self.config['channel_map']['he'][0]) &
                                               (records['channel'] <= self.config['channel_map']['he'][-1])],
@@ -275,14 +277,9 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
     strax.Option('fax_config',
                  default='https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/master/sim_files/fax_config_nt.json?token=AHCU5AZMPZABYSGVRLDACR3ABAZUA'),
     strax.Option('gain_model',
-<<<<<<< Updated upstream
                  default=('to_pe_per_run', 'https://github.com/XENONnT/private_nt_aux_files/blob/master/sim_files/to_pe_nt.npy?raw=true'),
                  help='PMT gain model. Specify as (model_type, model_config).'),
-    strax.Option('detector', default='xenonnt_detector', track=True),
-=======
-                 help='PMT gain model. Specify as (model_type, model_config). Provided by context (Eith cmt or a constant)'),
     strax.Option('detector', default='XENONnT', track=True),
->>>>>>> Stashed changes
     strax.Option('channel_map', track=False, type=immutabledict,
                  help="immutabledict mapping subdetector to (min, max) "
                       "channel number. Provided by context"),
@@ -370,6 +367,7 @@ class FaxSimulatorPlugin(strax.Plugin):
         """Return whether all instructions has been used."""
         return self.sim.source_finished()
 
+
 @export
 class RawRecordsFromFaxNT(FaxSimulatorPlugin):
     provides = ('raw_records', 'raw_records_he', 'raw_records_aqmon', 'truth')
@@ -420,6 +418,7 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
             end=self.sim.chunk_time,
             data=result[data_type],
             data_type=data_type) for data_type in self.provides}
+
 
 @export
 class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
@@ -475,10 +474,15 @@ class RawRecordsFromFaxOptical(RawRecordsFromFaxNT):
 class RawRecordsFromFaxnVeto(RawRecordsFromFaxOptical):
     provides = ('raw_records_nv', 'truth')
     data_kind = immutabledict(zip(provides, provides))
-    #Why does the data_kind need to be repeated?? So the overriding of the 
+    # Why does the data_kind need to be repeated?? So the overriding of the 
     # provides doesn't work in the setting of the data__kind?
+
+    def compute(self):
+        result = super().compute()
+        result['raw_records_nv'].data['channel'] += 2000  # nVeto PMT ID offset
+        return result
 
 
     def check_instructions(self):
-        #Are there some nveto boundries we need to include?
+        # Are there some nveto boundries we need to include?
         pass
