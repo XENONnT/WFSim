@@ -45,8 +45,8 @@ class Resource:
         elif config['detector'] == 'XENONnT':
             files.update({
                 'photon_area_distribution': 'XENONnT_spe_distributions.csv',
-                's1_pattern_map': 'XENONnT_s1_xyz_patterns_corrected_MCv3.1.0_disks.pkl',
-                's2_pattern_map': 'XENONnT_s2_xy_patterns_topbottom_corrected_MCv3.1.0_disks.pkl',
+                's1_pattern_map': 'XENONnT_s1_xyz_patterns_corrected_qes_MCva43fa9b_wires.pkl',
+                's2_pattern_map': 'XENONnT_s2_xy_patterns_topbottom_corrected_qes_MCva43fa9b_wires.pkl',
                 'photon_ap_cdfs': 'xnt_pmt_afterpulse_config.pkl.gz',
                 's2_luminescence': 'XENONnT_s2_garfield_luminescence_distribution_v0.pkl.gz',
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
@@ -55,9 +55,9 @@ class Resource:
             raise ValueError(f"Unsupported detector {config['detector']}")
 
         for k in set(config).intersection(files):
-            files[k] = config[k] # Allowing user to replace default with specified files
+            files[k] = config[k]  # Allowing user to replace default with specified files
         commit = 'master'   # Replace this by a commit hash if you feel solid and responsible
-        url_base = f'/Users/petergaemers/Desktop/python/private_nt_aux_files/sim_files/'
+        url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/sim_files'
         for k, v in files.items():
             if v.startswith('/'):
                 print(f"WARNING: Using local file {v} for a resource. "
@@ -74,11 +74,10 @@ class Resource:
                 # cannot load the requested config
                 downloaded_file = downloader.download_single(v)
                 files[k] = downloaded_file
-            except (FileNotFoundError, ValueError, NameError):
+            except (FileNotFoundError, ValueError, NameError, AttributeError):
                 # We cannot download the file from the database. We need to
                 # try to get a placeholder file from a URL.
                 files[k] = osp.join(url_base, v)
-
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
 
         if config['detector'] == 'XENON1T':
@@ -87,6 +86,9 @@ class Resource:
             self.s2_light_yield_map = make_map(files['s2_light_yield_map'], fmt='json')
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='json.gz')
             self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
+            # TODO
+            #  config not set
+            self.gas_gap_length = lambda positions: np.ones(253)
 
         if config['detector'] == 'XENONnT':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')

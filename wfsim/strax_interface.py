@@ -177,11 +177,11 @@ class ChunkRawRecords(object):
             self.record_buffer[s]['data'] = np.pad(data, 
                 (0, records_needed * samples_per_record - pulse_length), 'constant').reshape((-1, samples_per_record))
             self.blevel += records_needed
-
             if self.rawdata.right != self.current_digitized_right:
                 self.last_digitized_right = self.current_digitized_right
                 self.current_digitized_right = self.rawdata.right
-        
+
+        self.last_digitized_right = self.current_digitized_right
         yield from self.final_results()
 
     def final_results(self):
@@ -264,11 +264,11 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  help="Directory with fax instructions"),
     strax.Option('fax_config_override', default=None,
                  help="Dictionary with configuration option overrides"),
-    strax.Option('event_rate', default=2, track=False,
+    strax.Option('event_rate', default=5, track=False,
                  help="Average number of events per second"),
-    strax.Option('chunk_size', default=2, track=False,
+    strax.Option('chunk_size', default=100, track=False,
                  help="Duration of each chunk in seconds"),
-    strax.Option('nchunk', default=4, track=False,
+    strax.Option('nchunk', default=1, track=False,
                  help="Number of chunks to simulate"),
     strax.Option('right_raw_extension', default=50000),
     strax.Option('timeout', default=1800,
@@ -459,7 +459,6 @@ class RawRecordsFromFax1T(RawRecordsFromFaxNT):
 
 @export
 class RawRecordsFromFaxOptical(RawRecordsFromFaxNT):
-
     def _setup(self):
         self.sim = ChunkRawRecordsOptical(self.config)
         self.sim_iter = self.sim(instructions=self.instructions, 
