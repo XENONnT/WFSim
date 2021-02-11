@@ -314,7 +314,7 @@ class S1(Pulse):
         return n_photons
 
     @staticmethod
-    def photon_channels(points, n_photons,config,s1_pattern_map):
+    def photon_channels(points, n_photons, config, s1_pattern_map):
         channels = np.arange(config['n_tpc_pmts'])#+1 for the channel map
         p_per_channel = s1_pattern_map(points)
         p_per_channel[:, np.in1d(channels, config['turned_off_pmts'])] = 0
@@ -352,10 +352,10 @@ class S1(Pulse):
                                                                            phase=self.phase)
 
         except AttributeError:
-            raise AttributeError('Recoil type must be ER, NR, alpha or LED, not %s' % recoil_type)
+            raise AttributeError(f"Recoil type must be ER, NR, alpha or LED, not {recoil_type}. Check nest ids")
 
     @staticmethod
-    def alpha(size,config,singlet_triplet_delays, phase):
+    def alpha(size,config, singlet_triplet_delays, phase):
         # Neglible recombination time
         return singlet_triplet_delays(size, config['s1_ER_alpha_singlet_fraction'],config, phase)
 
@@ -365,7 +365,7 @@ class S1(Pulse):
         return np.random.uniform(0, config['led_pulse_length'], size)
 
     @staticmethod
-    def er(size,config,singlet_triplet_delays, phase):
+    def er(size,config, singlet_triplet_delays, phase):
         # How many of these are primary excimers? Others arise through recombination.
         efield = (config['drift_field'] / (units.V / units.cm))
         config['s1_ER_recombination_time'] = 3.5 / \
