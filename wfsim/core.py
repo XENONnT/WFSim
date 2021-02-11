@@ -533,7 +533,7 @@ class S2(Pulse):
     def electron_timings(t, n_electron, z, sc_gain, timings, gains,
             drift_velocity_liquid,
             drift_time_gate,
-            diffusion_constant_liquid,
+            diffusion_constant_longitudinal,
             electron_trapping_time):
         assert len(timings) == np.sum(n_electron)
         assert len(gains) == np.sum(n_electron)
@@ -545,7 +545,7 @@ class S2(Pulse):
             drift_time_mean = - z[i] / \
                 drift_velocity_liquid + drift_time_gate
             _drift_time_mean = max(drift_time_mean, 0)
-            drift_time_stdev = np.sqrt(2 * diffusion_constant_liquid * _drift_time_mean)
+            drift_time_stdev = np.sqrt(2 * diffusion_constant_longitudinal * _drift_time_mean)
             drift_time_stdev /= drift_velocity_liquid
             # Calculate electron arrival times in the ELR region
 
@@ -566,7 +566,7 @@ class S2(Pulse):
         _config = [self.config[k] for k in
                    ['drift_velocity_liquid',
                     'drift_time_gate',
-                    'diffusion_constant_liquid',
+                    'diffusion_constant_longitudinal',
                     'electron_trapping_time']]
         self.electron_timings(t, n_electron, z, sc_gain, 
             self._electron_timings, self._electron_gains, *_config)
@@ -616,7 +616,16 @@ class S2(Pulse):
                 s = slice(cumulate_npho[i-1], cumulate_npho[i])
             np.random.shuffle(self._photon_timings[s])
 
-    def s2_pattern_map_hdiff(self, n_electron, z, xy):
+    def s2_pattern_map_diffuse(self, n_electron, z, xy):
+        """Returns an array of pattern of shape [n interaction, n PMTs]
+        pattern of each interaction is an average of n_electron patterns evaluated at
+        diffused position near xy. The diffused positions sample from 2d symmetric gaussian
+        with spread scale with sqrt of drift time.
+
+        :param n_electron: a 1d int array
+        :param z: a 1d float array
+        :param xy: a 2d float array of shape [n interaction, 2]
+        """
         drift_time_gate = self.config['drift_time_gate']
         drift_velocity_liquid = self.config['drift_velocity_liquid']
         diffusion_constant_transverse = getattr(self.config, 'diffusion_constant_transverse', 0)
@@ -656,7 +665,7 @@ class S2(Pulse):
         bottom_index = np.array(self.config['channels_bottom'])
 
         if getattr(self.config, 'diffusion_constant_transverse', 0) > 0:
-            pattern = self.s2_pattern_map_hdiff(n_electron, z_obs, positions)  # [position, pmt]
+            pattern = self.s2_pattern_map_diffuse(n_electron, z_obs, positions)  # [position, pmt]
         else:
             pattern = self.resource.s2_pattern_map(positions)  # [position, pmt]
         if pattern.shape[1] - 1 not in bottom_index:
