@@ -7,12 +7,17 @@ import wfsim
 export, __all__ = exporter()
 
 
+PULSE_TYPE_NAMES = ('RESERVED', 'pulse', 'pulse', 'unknown', 'pi_el', 'pmt_ap', 'pe_el')
+
 @export
 class RawDataOptical(wfsim.RawData):
 
     def __init__(self, config):
         self.config = config
-        self.pulses = wfsim.Pulse(config)
+        self.pulses = dict(pulse=wfsim.Pulse(config),
+            pi_el=wfsim.PhotoIonization_Electron(config),
+            pe_el=wfsim.PhotoElectric_Electron(config),
+            pmt_ap=wfsim.PMT_Afterpulse(config))
         self.resource = load_config(self.config)
 
     def __call__(self, instructions, channels, timings, truth_buffer=None, **kwargs):
@@ -74,116 +79,44 @@ class RawDataOptical(wfsim.RawData):
             # D) Run all clusters before the current source
             stop_at_this_group = False
             for ibqs in instb_queue:
-                for ptype in [1, 2]:  # S1 S2 PI Gate
+                for ptype in [1, 2, 4, 6]: # S1 S2 PI Gate
                     mask = instb_type[ibqs] == ptype
-                    if np.sum(mask) == 0: continue  # No such instruction type
-                    instb_run = instb_indx[ibqs[mask]]  # Take hold of todo list
+                    if np.sum(mask) == 0: continue # No such instruction type
+                    instb_run = instb_indx[ibqs[mask]] # Take hold of todo list
 
                     if self.symtype(ptype) in ['s1', 's2']:
-                        stop_at_this_group = True  # Stop group iteration
+                        stop_at_this_group = True # Stop group iteration
                         _instb_run = np.array_split(instb_run, len(instb_run))
-                    else:
-                        _instb_run = [instb_run]  # Small trick to make truth small
+                    else: _instb_run = [instb_run] # Small trick to make truth small
 
                     # Run pulse simulation for real
                     for instb_run in _instb_run:
-                        for instb_secondary in self.sim_data(instb[instb_run],
-                                                             channels[instb[instb_run]['event_number'][0]],
-                                                             instb[instb_run]['time'] + timings[instb[instb_run]['event_number'][0]]):
+                        for instb_secondary in self.sim_data(instruction=instb[instb_run],
+                                                             channels=channels[instb[instb_run]['event_number'][0]],
+                                                             timings=instb[instb_run]['time'] + timings[instb[instb_run]['event_number'][0]]):
                             ib = np.where(~instb_filled)[0][:len(instb_secondary)]
                             instb[ib] = instb_secondary
                             instb_filled[ib] = True
 
-                        if len(truth_buffer):  # Extract truth info
+                        if len(truth_buffer): # Extract truth info
                             self.get_truth(instb[instb_run], truth_buffer)
 
-                        instb_filled[instb_run] = False  # Free buffer AFTER copyting into truth buffer
+                        instb_filled[instb_run] = False # Free buffer AFTER copyting into truth buffer
 
-                if stop_at_this_group: break
-                self.digitize_pulse_cache()  # from pulse cache to raw data
+                if stop_at_this_group: 
+                    break
+                self.digitize_pulse_cache() # from pulse cache to raw data
                 yield from self.ZLE()
-
+                
             self.source_finished = len(inst_queue) == 0 and np.sum(instb_filled) == 0
         pbar.close()
 
-    def sim_data(self, instruction, channels, timings):
-        """Simulate a pulse according to instruction, and yield any additional instructions
-        for secondary electron afterpulses.
-        """
-        # Any additional fields in instruction correspond to temporary
-        # configuration overrides. No need to restore the old config:
-        # next instruction cannot but contain the same fields.
+    @staticmethod
+    def symtype(ptype):
+        '''Little stupid we need this guy twice, but we need the different values for PULSE_TYPE_NAMES'''
+        return PULSE_TYPE_NAMES[ptype]
 
-        # Simulate the primary pulse
-        self.pulses._photon_channels = channels
-        self.pulses._photon_timings = timings
-        self.pulses()
-
-        # Append pulses we just simulated to our cache
-        _pulses = getattr(self.pulses, '_pulses')
-        if len(_pulses) > 0:
-            self._pulses_cache += _pulses
-            self.last_pulse_end_time = max(
-                self.last_pulse_end_time,
-                np.max([p['right'] for p in _pulses]) * self.config['sample_duration'])
-        return []
-
-    def get_truth(self, instruction, truth_buffer):
-        """Write truth in the first empty row of truth_buffer
-
-        :param instruction: Array of instructions that were simulated as a
-        single cluster, and should thus get one line in the truth info.
-        :param truth_buffer: Truth buffer to write in.
-        """
-        ix = np.argmin(truth_buffer['fill'])
-        tb = truth_buffer[ix]
-        peak_type = self.symtype(instruction['type'][0])
-        pulse = self.pulses
-
-        for quantum in 'photon', 'electron':
-            times = getattr(pulse, f'_{quantum}_timings', [])
-            # Set an endtime (if times has no length)
-            tb['endtime'] = np.mean(instruction['time'])
-            if len(times):
-                tb[f'n_{quantum}'] = len(times)
-                tb[f't_mean_{quantum}'] = np.mean(times)
-                tb[f't_first_{quantum}'] = np.min(times)
-                tb[f't_last_{quantum}'] = np.max(times)
-                tb[f't_sigma_{quantum}'] = np.std(times)
-                tb['endtime'] = tb['t_last_photon']
-            else:
-                # Peak does not have photons / electrons
-                # zero-photon afterpulses can be removed from truth info
-                if peak_type not in ['s1', 's2'] and quantum == 'photon':
-                    return
-                tb[f'n_{quantum}'] = 0
-                tb[f't_mean_{quantum}'] = np.nan
-                tb[f't_first_{quantum}'] = np.nan
-                tb[f't_last_{quantum}'] = np.nan
-                tb[f't_sigma_{quantum}'] = np.nan
-
-        channels = getattr(pulse, '_photon_channels', [])
-        n_dpe = getattr(pulse, '_n_double_pe', 0)
-        n_dpe_bot = getattr(pulse, '_n_double_pe_bot', 0)
-        tb['n_photon'] += n_dpe
-        tb['n_photon'] -= np.sum(np.isin(channels, getattr(pulse, 'turned_off_pmts', [])))
-
-        channels_bottom = list(
-            set(self.config['channels_bottom']).difference(getattr(pulse, 'turned_off_pmts', [])))
-        tb['n_photon_bottom'] = (
-            np.sum(np.isin(channels, channels_bottom))
-            + n_dpe_bot)
-
-        # Summarize the instruction cluster in one row of the truth file
-        for field in instruction.dtype.names:
-            value = instruction[field]
-            if len(instruction) > 1 and field in 'txyz':
-                tb[field] = np.mean(value)
-            elif len(instruction) > 1 and field == 'amp':
-                tb[field] = np.sum(value)
-            else:
-                # Cannot summarize intelligently: just take the first value
-                tb[field] = value[0]
-
-        # Signal this row is now filled, so it won't be overwritten
-        tb['fill'] = True
+    def sim_primary(self, primary_pulse, instruction, channels,timings):
+        self.pulses[primary_pulse]._photon_channels = channels
+        self.pulses[primary_pulse]._photon_timings = timings
+        self.pulses[primary_pulse]()
