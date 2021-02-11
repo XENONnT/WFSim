@@ -24,7 +24,7 @@ class NestId():
     NR = [0]      
     ALPHA = [6]   
     ER = [7, 8, 11]
-    ALL = NR+ALPHA+ER
+    _ALL = NR+ALPHA+ER
 
 @export
 class Pulse(object):
@@ -37,7 +37,7 @@ class Pulse(object):
 
         self.init_pmt_current_templates()
         self.init_spe_scaling_factor_distributions()
-        self.turned_off_pmts = np.arange(len(config['gains']))[np.array(config['gains']) == 0]
+        self.config['turned_off_pmts'] = np.arange(len(config['gains']))[np.array(config['gains']) == 0]
         
         self.clear_pulse_cache()
 
@@ -73,7 +73,7 @@ class Pulse(object):
             # Use 'counts' amount of photon for this channel 
             _channel_photon_timings = self._photon_timings[counts_start:counts_start+counts]
             counts_start += counts
-            if channel in self.turned_off_pmts: continue
+            if channel in self.config['turned_off_pmts']: continue
 
             # If gain of each photon is not specifically assigned
             # Sample from spe scaling factor distribution and to individual gain
@@ -249,8 +249,8 @@ class Pulse(object):
             pulse_current[start:start + template_length] += \
                 pmt_current_templates[reminder] * gain_total
 
-
-    def singlet_triplet_delays(self, size, singlet_ratio):
+    @staticmethod
+    def singlet_triplet_delays(size, singlet_ratio, config, phase):
         """
         Given the amount of the eximer, return time between excimer decay
         and their time of generation.
@@ -259,12 +259,12 @@ class Pulse(object):
         singlet_ratio  - fraction of excimers that become singlets
                          (NOT the ratio of singlets/triplets!)
         """
-        if self.phase == 'liquid':
-            t1, t3 = (self.config['singlet_lifetime_liquid'],
-                      self.config['triplet_lifetime_liquid'])
-        elif self.phase == 'gas':
-            t1, t3 = (self.config['singlet_lifetime_gas'],
-                      self.config['triplet_lifetime_gas'])
+        if phase == 'liquid':
+            t1, t3 = (config['singlet_lifetime_liquid'],
+                      config['triplet_lifetime_liquid'])
+        elif phase == 'gas':
+            t1, t3 = (config['singlet_lifetime_gas'],
+                      config['triplet_lifetime_gas'])
 
         delay = np.random.choice([t1, t3], size, replace=True,
                                  p=[singlet_ratio, 1 - singlet_ratio])
@@ -291,89 +291,106 @@ class S1(Pulse):
             np.array(v).reshape(-1) for v in zip(*instruction)]
 
         positions = np.array([x, y, z]).T  # For map interpolation
-        if self.config['detector']=='XENONnT':
-            ly = np.squeeze(self.resource.s1_light_yield_map(positions),
-                            axis=-1)
-        elif self.config['detector']=='XENON1T':
-            ly = self.resource.s1_light_yield_map(positions)
-            ly *= self.config['s1_detection_efficiency']
-        n_photons = np.random.binomial(n=n_photons, p=ly)
+        n_photons = self.get_n_photons(n_photons=n_photons,
+                                        positions=positions,
+                                        s1_light_yield_map=self.resource.s1_light_yield_map,
+                                        config=self.config)
 
-        self._photon_timings = np.array([])
-        list(map(self.photon_timings, t, n_photons, recoil_type))
+        self._photon_timings = self.photon_timings(t, n_photons, recoil_type, self.config)
         # The new way iterpolation is written always require a list
-        self.photon_channels(positions, n_photons)
+        self._photon_channels = self.photon_channels(positions, n_photons, self.config, self.resource.s1_pattern_map)
 
         super().__call__()
 
-    def photon_channels(self, points, n_photons):
+    @staticmethod
+    def get_n_photons(n_photons,positions, s1_light_yield_map, config):
+        if config['detector']=='xenonnt_detector':
+            ly = np.squeeze(s1_light_yield_map(positions),
+                            axis=-1)/(1+self.config['p_double_pe_emision'])
+        elif config['detector']=='XENON1T':
+            ly = s1_light_yield_map(positions)
+            ly *= config['s1_detection_efficiency']
+        n_photons = np.random.binomial(n=n_photons, p=ly)
+        return n_photons
 
-        # print(self.config)
-        channels = np.arange(self.config['n_tpc_pmts'])#+1 for the channel map
-        p_per_channel = self.resource.s1_pattern_map(points)
-        p_per_channel[:, np.in1d(channels, self.turned_off_pmts)] = 0
+    @staticmethod
+    def photon_channels(points, n_photons, config, s1_pattern_map):
+        channels = np.arange(config['n_tpc_pmts'])#+1 for the channel map
+        p_per_channel = s1_pattern_map(points)
+        p_per_channel[:, np.in1d(channels, config['turned_off_pmts'])] = 0
         
-        self._photon_channels = np.array([]).astype(int)
+        _photon_channels = np.array([]).astype(int)
         for ppc, n in zip(p_per_channel, n_photons):
-            self._photon_channels = np.append(self._photon_channels,
+            _photon_channels = np.append(_photon_channels,
                     np.random.choice(
                         channels,
                         size=n,
                         p=ppc / np.sum(ppc),
                         replace=True))
+        return _photon_channels
 
-    def photon_timings(self, t, n_photons, recoil_type):
+    @staticmethod
+    def photon_timings(t, n_photons, recoil_type, config):
         if n_photons == 0:
             return
 
-        if (self.config.get('s1_model_type') == 'simple' and 
-           recoil_type in NestId.ALL):
+        if (config.get('s1_model_type') == 'simple' and 
+           recoil_type in NestId._ALL):
             # Simple S1 model enabled: use it for ER and NR.
-            self._photon_timings = np.append(self._photon_timings,
-                t + np.random.exponential(self.config['s1_decay_time'], n_photons))
-            self._photon_timings += np.random.normal(0,self.config['s1_decay_spread'],len(self._photon_timings))
-            return
+            _photon_timings = t + np.random.exponential(config['s1_decay_time'], n_photons)
+            _photon_timings += np.random.normal(0,config['s1_decay_spread'],len(_photon_timings))
+            return _photon_timings
 
-        #TODO Fix the other recoil types to refer to the numbers
+        #TODO Looks nice but don't know if this actually works
         try:
-            self._photon_timings = np.append(self._photon_timings,
-                t + getattr(self, recoil_type.lower())(n_photons))
+            recoil_types = [k for k in vars(NestId) if not k.startswith('_')]
+            for recoil in recoil_types:
+                if recoil in NestId.recoil:
+                    _photon_timings = t + getattr(S1, recoil_type.lower())(n_photons=n_photons,
+                                                                           config=config,
+                                                                           singlet_triplet_delays=Pulse.singlet_triplet_delays,
+                                                                           phase=self.phase)
+
         except AttributeError:
-            raise AttributeError('Recoil type must be ER, NR, alpha or LED, not %s' % recoil_type)
+            raise AttributeError(f"Recoil type must be ER, NR, alpha or LED, not {recoil_type}. Check nest ids")
 
-    def alpha(self, size):
+    @staticmethod
+    def alpha(size,config, singlet_triplet_delays, phase):
         # Neglible recombination time
-        return self.singlet_triplet_delays(size, self.config['s1_ER_alpha_singlet_fraction'])
+        return singlet_triplet_delays(size, config['s1_ER_alpha_singlet_fraction'],config, phase)
 
-    def led(self, size):
+    @staticmethod
+    def led(size,config, **kwargs):
         # distribute photons uniformly within the LED pulse length
-        return np.random.uniform(0, self.config['led_pulse_length'], size)
+        return np.random.uniform(0, config['led_pulse_length'], size)
 
-    def er(self, size):
+    @staticmethod
+    def er(size,config, singlet_triplet_delays, phase):
         # How many of these are primary excimers? Others arise through recombination.
-        efield = (self.config['drift_field'] / (units.V / units.cm))
-        self.config['s1_ER_recombination_time'] = 3.5 / \
+        efield = (config['drift_field'] / (units.V / units.cm))
+        config['s1_ER_recombination_time'] = 3.5 / \
                                                   0.18 * (1 / 20 + 0.41) * np.exp(-0.009 * efield)
 
         reco_time, p_fraction, max_reco_time = (
-            self.config['s1_ER_recombination_time'],
-            self.config['s1_ER_primary_singlet_fraction'],
-            self.config['maximum_recombination_time'])
+            config['s1_ER_recombination_time'],
+            config['s1_ER_primary_singlet_fraction'],
+            config['maximum_recombination_time'])
 
         timings = np.random.choice([0, reco_time], size, replace=True,
                                    p=[p_fraction, 1 - p_fraction])
         primary = timings == 0
         timings *= 1 / (1 - np.random.uniform(0, 1, size)) - 1
-        timings = np.clip(timings, 0, self.config['maximum_recombination_time'])
+        timings = np.clip(timings, 0, config['maximum_recombination_time'])
         size_primary = len(timings[primary])
-        timings[primary] += self.singlet_triplet_delays(
-            size_primary, self.config['s1_ER_primary_singlet_fraction'])
-        timings[~primary] += self.singlet_triplet_delays(
-            size - size_primary, self.config['s1_ER_secondary_singlet_fraction'])
+        timings[primary] += singlet_triplet_delays(
+            size_primary, config['s1_ER_primary_singlet_fraction'],config,phase)
+        timings[~primary] += singlet_triplet_delays(
+            size - size_primary, config['s1_ER_secondary_singlet_fraction'],config,phase)
         return timings
 
-    def nr(self, size):
-        return self.singlet_triplet_delays(size, self.config['s1_NR_singlet_fraction'])
+    @staticmethod
+    def nr(size, config, singlet_triplet_delays, phase):
+        return singlet_triplet_delays(size, config['s1_NR_singlet_fraction'], config, phase)
 
 
 @export
@@ -935,7 +952,8 @@ class RawData(object):
 
                         instb_filled[instb_run] = False # Free buffer AFTER copyting into truth buffer
 
-                if stop_at_this_group: break
+                if stop_at_this_group: 
+                    break
                 self.digitize_pulse_cache() # from pulse cache to raw data
                 yield from self.ZLE()
                 
@@ -946,21 +964,16 @@ class RawData(object):
     def symtype(ptype):
         return PULSE_TYPE_NAMES[ptype]
 
-    def sim_data(self, instruction):
+    def sim_primary(self, primary_pulse, instruction, **kwargs):
+        self.pulses[primary_pulse](instruction)
+
+    def sim_data(self, instruction, **kwargs):
         """Simulate a pulse according to instruction, and yield any additional instructions
         for secondary electron afterpulses.
         """
-        # Any additional fields in instruction correspond to temporary
-        # configuration overrides. No need to restore the old config:
-        # next instruction cannot but contain the same fields.
-        if len(instruction.dtype.names) > 8:
-            for par in instruction.dtype.names:
-                if par in self.config:
-                    self.config[par] = instruction[par][0]
-
         # Simulate the primary pulse
         primary_pulse = self.symtype(instruction['type'][0])
-        self.pulses[primary_pulse](instruction)
+        self.sim_primary(primary_pulse, instruction, **kwargs)
 
         # Add PMT afterpulses, if requested
         do_pmt_ap = self.config.get('enable_pmt_afterpulses', True)
@@ -1015,7 +1028,7 @@ class RawData(object):
             self._channel_mask = np.zeros(801, dtype=[('mask', '?'), ('left', 'i8'), ('right', 'i8')])
             self._channel_mask['left'] = int(2**63-1)
 
-            for ix, _pulse in enumerate(self._pulses_cache):
+            for _pulse in self._pulses_cache:
                 ch = _pulse['channel']
                 self._channel_mask['mask'][ch] = True
                 self._channel_mask['left'][ch] = min(_pulse['left'], self._channel_mask['left'][ch])
@@ -1052,9 +1065,9 @@ class RawData(object):
                             channel_mask=self._channel_mask,
                             noise_data=self.resource.noise_data,
                             noise_data_length=len(self.resource.noise_data))
-                self.add_baseline(self._raw_data, self._channel_mask, 
+            self.add_baseline(self._raw_data, self._channel_mask, 
                     self.config['digitizer_reference_baseline'],)
-                self.digitizer_saturation(self._raw_data, self._channel_mask)
+            self.digitizer_saturation(self._raw_data, self._channel_mask)
 
 
     def ZLE(self):
@@ -1136,7 +1149,7 @@ class RawData(object):
             n_dpe_bot = getattr(pulse, '_n_double_pe_bot', 0)
         tb['n_photon'] += n_dpe
         tb['n_photon'] -= np.sum(np.isin(channels, getattr(pulse, 'turned_off_pmts', [])))
-
+        #TODO this turned_off guy, check how this works with a config['turned_off_guys']
         channels_bottom = list(
             set(self.config['channels_bottom']).difference(getattr(pulse, 'turned_off_pmts', [])))
         tb['n_photon_bottom'] = (
