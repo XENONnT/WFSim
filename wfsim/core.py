@@ -653,7 +653,12 @@ class S2(Pulse):
         return pattern
 
     def photon_channels(self, n_electron, z_obs, positions):
-        # TODO log this
+        """Set the _photon_channels property list of length same as _photon_timings
+
+        :param n_electron: a 1d int array
+        :param z_obs: a 1d float array
+        :param positions: a 2d float array of shape [n interaction, 2] for the xy coordinate
+        """
         if len(self._photon_timings) == 0:
             self._photon_channels = []
             return 1
