@@ -619,12 +619,12 @@ class S2(Pulse):
     def s2_pattern_map_hdiff(self, n_electron, z, xy):
         drift_time_gate = self.config['drift_time_gate']
         drift_velocity_liquid = self.config['drift_velocity_liquid']
-        diffusion_constant_liquid_horizontal = getattr(self.config, 'diffusion_constant_liquid_horizontal', 0)
+        diffusion_constant_transverse = getattr(self.config, 'diffusion_constant_transverse', 0)
 
         assert all(z < 0), 'All S2 in liquid should have z < 0'
 
         drift_time_mean = - z / drift_velocity_liquid + drift_time_gate  # Add gate time for consistancy?
-        hdiff_stdev = np.sqrt(2 * diffusion_constant_liquid_horizontal * drift_time_mean)
+        hdiff_stdev = np.sqrt(2 * diffusion_constant_transverse * drift_time_mean)
 
         hdiff = np.random.normal(0, 1, (np.sum(n_electron), 2)) * np.repeat(hdiff_stdev, n_electron, axis=0).reshape((-1, 1))
         # Should we also output this xy position in truth?
@@ -655,7 +655,7 @@ class S2(Pulse):
         top_index = np.arange(self.config['n_top_pmts'])
         bottom_index = np.array(self.config['channels_bottom'])
 
-        if getattr(self.config, 'diffusion_constant_liquid_horizontal', 0) > 0:
+        if getattr(self.config, 'diffusion_constant_transverse', 0) > 0:
             pattern = self.s2_pattern_map_hdiff(n_electron, z_obs, positions)  # [position, pmt]
         else:
             pattern = self.resource.s2_pattern_map(positions)  # [position, pmt]
