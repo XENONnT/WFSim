@@ -57,7 +57,11 @@ class Resource:
         for k in set(config).intersection(files):
             files[k] = config[k]  # Allowing user to replace default with specified files
         commit = 'master'   # Replace this by a commit hash if you feel solid and responsible
-        url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/sim_files'
+        if config['detector'] == "XENON1T":
+            url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/sim_files'
+        if config['detector'] == "XENONnT":
+            url_base = f'https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/{commit}/sim_files'
+
         for k, v in files.items():
             if v.startswith('/'):
                 print(f"WARNING: Using local file {v} for a resource. "
