@@ -308,7 +308,7 @@ class S1(Pulse):
 
     @staticmethod
     def get_n_photons(n_photons,positions, s1_light_yield_map, config):
-        if config['detector']=='xenonnt_detector':
+        if config['detector']=='XENONnT':
             ly = np.squeeze(s1_light_yield_map(positions),
                             axis=-1)/(1+self.config['p_double_pe_emision'])
         elif config['detector']=='XENON1T':
