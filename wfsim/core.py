@@ -336,7 +336,7 @@ class S1(Pulse):
     @staticmethod
     def photon_timings(t, n_photons, recoil_type, config):
         if n_photons == 0:
-            return
+            return np.array([])
 
         if (config.get('s1_model_type') == 'simple' and 
            recoil_type in NestId._ALL):
