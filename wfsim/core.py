@@ -337,7 +337,7 @@ class S1(Pulse):
     @staticmethod
     def photon_timings(t, n_photons, recoil_type, config):
         if n_photons == 0:
-            return
+            return np.array([])
 
         if (config.get('s1_model_type') == 'simple' and 
            recoil_type in NestId._ALL):
@@ -476,8 +476,18 @@ class S2(Pulse):
         n_electron = np.random.binomial(n=n_electron, p=cy)
         return n_electron
 
+<<<<<<< HEAD
     @staticmethod
     def inverse_field_distortion(x, y, z, resource):
+=======
+        # Second generate photon timing and channel
+        self.photon_timings(t, n_electron, z_obs, positions, sc_gain)
+        self.photon_channels(n_electron, z_obs, positions)
+
+        super().__call__()
+
+    def inverse_field_distortion(self, x, y, z):
+>>>>>>> 5c14d31ea25934d96310d0325feaaa0918d8777e
         positions = np.array([x, y, z]).T
         for i_iter in range(6):  # 6 iterations seems to work
             dr = resource.fdc_3d(positions)
@@ -583,7 +593,7 @@ class S2(Pulse):
     def electron_timings(t, n_electron, z, sc_gain, timings, gains,
             drift_velocity_liquid,
             drift_time_gate,
-            diffusion_constant_liquid,
+            diffusion_constant_longitudinal,
             electron_trapping_time):
         assert len(timings) == np.sum(n_electron)
         assert len(gains) == np.sum(n_electron)
@@ -595,7 +605,7 @@ class S2(Pulse):
             drift_time_mean = - z[i] / \
                 drift_velocity_liquid + drift_time_gate
             _drift_time_mean = max(drift_time_mean, 0)
-            drift_time_stdev = np.sqrt(2 * diffusion_constant_liquid * _drift_time_mean)
+            drift_time_stdev = np.sqrt(2 * diffusion_constant_longitudinal * _drift_time_mean)
             drift_time_stdev /= drift_velocity_liquid
             # Calculate electron arrival times in the ELR region
 
@@ -617,7 +627,7 @@ class S2(Pulse):
         _config = [config[k] for k in
                    ['drift_velocity_liquid',
                     'drift_time_gate',
-                    'diffusion_constant_liquid',
+                    'diffusion_constant_longitudinal',
                     'electron_trapping_time']]
         S2.electron_timings(t, n_electron, z, sc_gain, 
             _electron_timings, _electron_gains, *_config)
@@ -649,15 +659,26 @@ class S2(Pulse):
         threshold = np.repeat(np.random.poisson(_electron_gains), npho).reshape((nele, npho))
         _photon_timings = _photon_timings[probability < threshold]
 
+<<<<<<< HEAD
         # Special index for match photon to original electron poistion
         _instruction = np.repeat(
+=======
+        # Index to match photon with poistion input
+        self._instruction = np.repeat(
+>>>>>>> 5c14d31ea25934d96310d0325feaaa0918d8777e
             np.repeat(np.arange(len(t)), n_electron), npho).reshape((nele, npho))
         _instruction = _instruction[probability < threshold]
 
         _photon_timings += Pulse.singlet_triplet_delays(
             len(_photon_timings), config['singlet_fraction_gas'],config, phase)
         
+<<<<<<< HEAD
         _photon_timings += np.random.normal(0,config['s2_time_spread'],len(_photon_timings))
+=======
+        self._photon_timings += np.random.normal(0, 
+            self.config['s2_time_spread'], len(self._photon_timings))
+
+>>>>>>> 5c14d31ea25934d96310d0325feaaa0918d8777e
         # The timings generated is NOT randomly ordered, must do shuffle
         # Shuffle within each given n_electron[i]
         # We can do this by first finding out cumulative sum of the photons
@@ -671,11 +692,59 @@ class S2(Pulse):
 
         return _photon_timings, _instruction
 
+<<<<<<< HEAD
     @staticmethod
     def photon_channels(points, _photon_timings, _instruction, config, resource):
         # TODO log this
         if len(_photon_timings) == 0:
             _photon_channels = []
+=======
+    def s2_pattern_map_diffuse(self, n_electron, z, xy):
+        """Returns an array of pattern of shape [n interaction, n PMTs]
+        pattern of each interaction is an average of n_electron patterns evaluated at
+        diffused position near xy. The diffused positions sample from 2d symmetric gaussian
+        with spread scale with sqrt of drift time.
+
+        :param n_electron: a 1d int array
+        :param z: a 1d float array
+        :param xy: a 2d float array of shape [n interaction, 2]
+        """
+        drift_time_gate = self.config['drift_time_gate']
+        drift_velocity_liquid = self.config['drift_velocity_liquid']
+        diffusion_constant_transverse = getattr(self.config, 'diffusion_constant_transverse', 0)
+
+        assert all(z < 0), 'All S2 in liquid should have z < 0'
+
+        drift_time_mean = - z / drift_velocity_liquid + drift_time_gate  # Add gate time for consistancy?
+        hdiff_stdev = np.sqrt(2 * diffusion_constant_transverse * drift_time_mean)
+
+        hdiff = np.random.normal(0, 1, (np.sum(n_electron), 2)) * np.repeat(hdiff_stdev, n_electron, axis=0).reshape((-1, 1))
+        # Should we also output this xy position in truth?
+        xy_multi = np.repeat(xy, n_electron, axis=0) + hdiff  # One entry xy per electron
+        # Remove points outside tpc, and the pattern will be the average inside tpc
+        # Should be done natually with the s2 pattern map, however, there's some bug there so we apply this hard cut
+        mask = np.sum(xy_multi ** 2, axis=1) <= self.config['tpc_radius'] ** 2
+
+        pattern = np.zeros((len(n_electron), self.resource.s2_pattern_map.data['map'].shape[-1]))
+        n0 = 0
+        # Average over electrons for each s2
+        for ix, ne in enumerate(n_electron):
+            s = slice(n0, n0+ne)
+            pattern[ix, :] = np.average(self.resource.s2_pattern_map(xy_multi[s][mask[s]]), axis=0)
+            n0 += ne
+
+        return pattern
+
+    def photon_channels(self, n_electron, z_obs, positions):
+        """Set the _photon_channels property list of length same as _photon_timings
+
+        :param n_electron: a 1d int array
+        :param z_obs: a 1d float array
+        :param positions: a 2d float array of shape [n interaction, 2] for the xy coordinate
+        """
+        if len(self._photon_timings) == 0:
+            self._photon_channels = []
+>>>>>>> 5c14d31ea25934d96310d0325feaaa0918d8777e
             return 1
         
         aft = config['s2_mean_area_fraction_top']
@@ -684,14 +753,21 @@ class S2(Pulse):
         top_index = np.arange(config['n_top_pmts'])
         bottom_index = np.array(config['channels_bottom'])
 
+<<<<<<< HEAD
         pattern = resource.s2_pattern_map(points)  # [position, pmt]
+=======
+        if getattr(self.config, 'diffusion_constant_transverse', 0) > 0:
+            pattern = self.s2_pattern_map_diffuse(n_electron, z_obs, positions)  # [position, pmt]
+        else:
+            pattern = self.resource.s2_pattern_map(positions)  # [position, pmt]
+>>>>>>> 5c14d31ea25934d96310d0325feaaa0918d8777e
         if pattern.shape[1] - 1 not in bottom_index:
             pattern = np.pad(pattern, [[0, 0], [0, len(bottom_index)]], 
                 'constant', constant_values=1)
         sum_pat = np.sum(pattern, axis=1).reshape(-1, 1)
         pattern = np.divide(pattern, sum_pat, out=np.zeros_like(pattern), where=sum_pat!=0)
 
-        assert pattern.shape[0] == len(points)
+        assert pattern.shape[0] == len(positions)
         assert pattern.shape[1] == len(channels)
 
         _buffer_photon_channels = []
