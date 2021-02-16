@@ -22,7 +22,7 @@ def test_sim_1T():
             config=dict(
                 nchunk=1, event_rate=1, chunk_size=10,
                 detector='XENON1T',
-                fax_config='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/7ba4875b52162cbbe9284faf66a6b9193a254a30/sim_files/fax_config_1t.json',  # noqa
+                fax_config='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/e82a63a4d2d38f291f819bb1322433d2186545d0/sim_files/fax_config_1t.json',  # noqa
                 **straxen.contexts.x1t_common_config),
             **straxen.contexts.common_opts)
         st.register(wfsim.RawRecordsFromFax1T)
