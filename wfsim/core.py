@@ -236,8 +236,9 @@ class Pulse(object):
             if photon_timings[i] > tmp_photon_timing:
                 start = int(tmp_photon_timing // dt) - pulse_left
                 reminder = int(tmp_photon_timing % dt)
+                HACK_OFF_BY_ONE_ERROR = len(pulse_current[start:start + template_length])
                 pulse_current[start:start + template_length] += \
-                    pmt_current_templates[reminder] * gain_total
+                    pmt_current_templates[reminder][:HACK_OFF_BY_ONE_ERROR] * gain_total
 
                 gain_total = photon_gains[i]
                 tmp_photon_timing = photon_timings[i]
@@ -246,8 +247,9 @@ class Pulse(object):
         else:
             start = int(tmp_photon_timing // dt) - pulse_left
             reminder = int(tmp_photon_timing % dt)
+            HACK_OFF_BY_ONE_ERROR = len(pulse_current[start:start + template_length])
             pulse_current[start:start + template_length] += \
-                pmt_current_templates[reminder] * gain_total
+                pmt_current_templates[reminder][:HACK_OFF_BY_ONE_ERROR] * gain_total
 
     @staticmethod
     def singlet_triplet_delays(size, singlet_ratio, config, phase):
