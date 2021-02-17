@@ -37,4 +37,3 @@ def test_noise(data_length, n_channels, noise_data_length):
 
     # Actually test that we can run the function
     noise_function(data, channel_mask, noise_data, noise_data_length)
-
