@@ -17,7 +17,7 @@ on:
       - master
 
 jobs:
-  update:
+  test wfsim:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
