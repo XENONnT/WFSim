@@ -29,7 +29,8 @@ jobs:
       uses: py-actions/py-dependency-install@v2
     - name: Install requirements
       run: |
-          python setup.py install
+        pip install pytest hypothesis flake8 pytest-cov coveralls pytest
+        python setup.py install
     - name: Coveralls
       env:
         COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_TOKEN }}

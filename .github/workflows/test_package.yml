@@ -35,8 +35,8 @@ jobs:
         uses: py-actions/py-dependency-install@v2
       - name: Install dependencies
         run: |
-          pip install pytest hypothesis flake8 pytest-cov
-          python setup.py intall
+          pip install pytest flake8 pytest-cov pytest hypothesis
+          python setup.py install
       - name: Do the test
         if: matrix.os == 'windows-latest'
         run: |
