@@ -108,8 +108,12 @@ class Pulse(object):
             # Build a simulated waveform, length depends on min and max of photon timings
             min_timing, max_timing = np.min(
                 _channel_photon_timings), np.max(_channel_photon_timings)
-            pulse_left = int(min_timing // dt) - int(self.config['samples_to_store_before'])
-            pulse_right = int(max_timing // dt) + int(self.config['samples_to_store_after'])
+            pulse_left = (int(min_timing // dt) 
+                          - int(self.config['samples_to_store_before'])
+                          - self.config.get('samples_before_pulse_center', 2))
+            pulse_right = (int(max_timing // dt) 
+                           + int(self.config['samples_to_store_after'])
+                           + self.config.get('samples_after_pulse_center', 20))
             pulse_current = np.zeros(pulse_right - pulse_left + 1)
 
             Pulse.add_current(_channel_photon_timings.astype(int),
@@ -236,9 +240,8 @@ class Pulse(object):
             if photon_timings[i] > tmp_photon_timing:
                 start = int(tmp_photon_timing // dt) - pulse_left
                 reminder = int(tmp_photon_timing % dt)
-                HACK_OFF_BY_ONE_ERROR = len(pulse_current[start:start + template_length])
                 pulse_current[start:start + template_length] += \
-                    pmt_current_templates[reminder][:HACK_OFF_BY_ONE_ERROR] * gain_total
+                    pmt_current_templates[reminder] * gain_total
 
                 gain_total = photon_gains[i]
                 tmp_photon_timing = photon_timings[i]
@@ -247,9 +250,8 @@ class Pulse(object):
         else:
             start = int(tmp_photon_timing // dt) - pulse_left
             reminder = int(tmp_photon_timing % dt)
-            HACK_OFF_BY_ONE_ERROR = len(pulse_current[start:start + template_length])
             pulse_current[start:start + template_length] += \
-                pmt_current_templates[reminder][:HACK_OFF_BY_ONE_ERROR] * gain_total
+                pmt_current_templates[reminder] * gain_total
 
     @staticmethod
     def singlet_triplet_delays(size, singlet_ratio, config, phase):
