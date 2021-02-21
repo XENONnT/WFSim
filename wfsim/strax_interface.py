@@ -9,6 +9,7 @@ from straxen.common import get_resource
 from straxen import get_to_pe
 import wfsim
 from immutabledict import immutabledict
+from scipy.interpolate import interp1d
 
 export, __all__ = strax.exporter()
 __all__ += ['instruction_dtype', 'truth_extra_dtype']
@@ -80,10 +81,13 @@ def read_optical(c):
         nV_pmt_id_offset = 2000
         channels = [[channel - nV_pmt_id_offset for channel in array if channel >=2000] for array in e["pmthitID"].array(library="np")]
         timings = e["pmthitTime"].array(library="np")*1e9
+        wavelengths = [[1239.84 / wavelength for wavelength in array] for array in e["pmthitEnergy"].array(library="np")]
     else:
         # TPC
         channels = e["pmthitID"].array(library="np")
         timings = e["pmthitTime"].array(library="np")*1e9
+
+
 
     # Events should be in the TPC
     ins = np.zeros(n_events, dtype=instruction_dtype)
@@ -97,10 +101,36 @@ def read_optical(c):
     ins['recoil'] = np.repeat(1, n_events)
     ins['amp'] = [len(t) for t in timings]
 
-    # cut interactions without electrons or photons
-    ins = ins[ins["amp"] > 0]
 
-    return ins, channels, timings
+    # nVeto PMT QE
+    if c['neutron_veto']:
+        collection_efficiency = c['nv_pmt_ce_factor']
+        nv_pmt_qe_data = get_resource(c['nv_pmt_qe_file'], fmt='json')
+        wavelength_x = np.array(nv_pmt_qe_data['nv_pmt_qe_wavelength'])
+        nveto_pmt_qe = np.array([v for k, v in nv_pmt_qe_data['nv_pmt_qe'].items()])
+        interp_func = [interp1d(wavelength_x, qe, kind='linear', fill_value='extrapolate') for qe in nveto_pmt_qe]
+
+        new_channels_all = []
+        new_timings_all = []
+        for ievent in range(len(channels)):
+            new_channels = []
+            new_timings = []
+            for j in range(len(channels[ievent])):
+                rand = np.random.rand() * 100
+                channel = channels[ievent][j]
+                wavelength = wavelengths[ievent][j]
+                qe = interp_func[channel](wavelength)
+                if rand < qe * collection_efficiency:
+                    new_channels.append(channel)
+                    new_timings.append(timings[ievent][j])
+            new_channels_all.append(np.array(new_channels))
+            new_timings_all.append(np.array(new_timings))
+        return ins, new_channels_all, new_timings_all
+
+    else:
+        # cut interactions without electrons or photons
+        ins = ins[ins["amp"] > 0]
+        return ins, channels, timings
 
 def instruction_from_csv(filename):
     """
@@ -289,6 +319,10 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  help="Number of pmts in top array. Provided by context"),
     strax.Option('neutron_veto', default=False, track=True,
                  help="Flag for nVeto optical simulation instead of TPC"),
+    strax.Option('nv_pmt_qe_file', default='https://github.com/XENONnT/private_nt_aux_files/blob/master/sim_files/nveto_pmt_qe.json', track=True,
+                 help="path and filename to nveto PMT QE json file"),
+    strax.Option('nv_pmt_ce_factor', default=1.0, track=True,
+                 help="Collection efficiency factor for neutron Veto PMT"),
 )
 class FaxSimulatorPlugin(strax.Plugin):
     depends_on = tuple()
