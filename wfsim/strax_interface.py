@@ -125,12 +125,13 @@ def read_optical(c):
                     new_timings.append(timings[ievent][j])
             new_channels_all.append(np.array(new_channels))
             new_timings_all.append(np.array(new_timings))
-        return ins, new_channels_all, new_timings_all
+        channels = new_channels_all
+        timings = new_timings_all
 
     else:
         # cut interactions without electrons or photons
         ins = ins[ins["amp"] > 0]
-        return ins, channels, timings
+    return ins, channels, timings
 
 def instruction_from_csv(filename):
     """
