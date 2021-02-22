@@ -1,0 +1,30 @@
+# Lets upload wfsim to PyPi to make it pip instalable
+# Mostly based on https://github.com/marketplace/actions/pypi-publish
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # Setup steps
+      - name: Setup python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.6'
+      - name: Checkout repo
+        uses: actions/checkout@v2
+      - name: Install dependencies
+        run: pip install wheel
+      - name: Build package
+        run: python setup.py sdist bdist_wheel
+      # Do the publish
+      - name: Publish a Python distribution to PyPI
+        # Might want to add but does not work on workflow_dispatch :
+        # if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+        uses: pypa/gh-action-pypi-publish@master
+        with:
+          user:  __token__
+          password: ${{ secrets.pypi_password }}
