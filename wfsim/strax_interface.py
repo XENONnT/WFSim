@@ -320,10 +320,6 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  help="Number of pmts in top array. Provided by context"),
     strax.Option('neutron_veto', default=False, track=True,
                  help="Flag for nVeto optical simulation instead of TPC"),
-    strax.Option('nv_pmt_qe_file', default='https://github.com/XENONnT/private_nt_aux_files/blob/master/sim_files/nveto_pmt_qe.json', track=True,
-                 help="path and filename to nveto PMT QE json file"),
-    strax.Option('nv_pmt_ce_factor', default=1.0, track=True,
-                 help="Collection efficiency factor for neutron Veto PMT"),
 )
 class FaxSimulatorPlugin(strax.Plugin):
     depends_on = tuple()
