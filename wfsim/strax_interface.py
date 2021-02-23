@@ -79,31 +79,10 @@ def read_optical(c):
 
     if c['neutron_veto']:
         nV_pmt_id_offset = 2000
-        channels = [[channel - nV_pmt_id_offset for channel in array if channel >=2000] for array in e["pmthitID"].array(library="np")]
+        channels = [[channel - nV_pmt_id_offset for channel in array] for array in e["pmthitID"].array(library="np")]
         timings = e["pmthitTime"].array(library="np")*1e9
         wavelengths = [[1239.84 / wavelength for wavelength in array] for array in e["pmthitEnergy"].array(library="np")]
-    else:
-        # TPC
-        channels = e["pmthitID"].array(library="np")
-        timings = e["pmthitTime"].array(library="np")*1e9
 
-
-
-    # Events should be in the TPC
-    ins = np.zeros(n_events, dtype=instruction_dtype)
-    ins['x'] = e["xp_pri"].array(library="np").flatten() / 10.
-    ins['y'] = e["yp_pri"].array(library="np").flatten() / 10.
-    ins['z'] = e["zp_pri"].array(library="np").flatten() / 10.
-    ins['time']= 1e7 * time.flatten()
-    ins['event_number'] = np.arange(n_events)
-    ins['g4id'] = event_id
-    ins['type'] = np.repeat(1, n_events)
-    ins['recoil'] = np.repeat(1, n_events)
-    ins['amp'] = [len(t) for t in timings]
-
-
-    # nVeto PMT QE
-    if c['neutron_veto']:
         collection_efficiency = c['nv_pmt_ce_factor']
         nv_pmt_qe_data = get_resource(c['nv_pmt_qe_file'], fmt='json')
         wavelength_x = np.array(nv_pmt_qe_data['nv_pmt_qe_wavelength'])
@@ -118,19 +97,41 @@ def read_optical(c):
             for j in range(len(channels[ievent])):
                 rand = np.random.rand() * 100
                 channel = channels[ievent][j]
+                if not (0 <= channel < 120):
+                    continue
+                if not (timings[ievent][j] < 1.e6): # 1 msec. as a tentative
+                    continue
                 wavelength = wavelengths[ievent][j]
                 qe = interp_func[channel](wavelength)
-                if rand < qe * collection_efficiency:
-                    new_channels.append(channel)
-                    new_timings.append(timings[ievent][j])
+                if rand > qe * collection_efficiency:
+                    continue
+                new_channels.append(channel)
+                new_timings.append(timings[ievent][j])
             new_channels_all.append(np.array(new_channels))
             new_timings_all.append(np.array(new_timings))
         channels = new_channels_all
         timings = new_timings_all
 
     else:
-        # cut interactions without electrons or photons
+        # TPC
+        channels = e["pmthitID"].array(library="np")
+        timings = e["pmthitTime"].array(library="np")*1e9
+
+    # Events should be in the TPC
+    ins = np.zeros(n_events, dtype=instruction_dtype)
+    ins['x'] = e["xp_pri"].array(library="np").flatten() / 10.
+    ins['y'] = e["yp_pri"].array(library="np").flatten() / 10.
+    ins['z'] = e["zp_pri"].array(library="np").flatten() / 10.
+    ins['time']= 1e7 * time.flatten()
+    ins['event_number'] = np.arange(n_events)
+    ins['g4id'] = event_id
+    ins['type'] = np.repeat(1, n_events)
+    ins['recoil'] = np.repeat(1, n_events)
+    ins['amp'] = [len(t) for t in timings]
+
+    if not c['neutron_veto']:
         ins = ins[ins["amp"] > 0]
+
     return ins, channels, timings
 
 def instruction_from_csv(filename):

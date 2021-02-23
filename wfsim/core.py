@@ -1067,7 +1067,7 @@ class RawData(object):
 
             self.left = np.min([p['left'] for p in self._pulses_cache]) - self.config['trigger_window']
             self.right = np.max([p['right'] for p in self._pulses_cache]) + self.config['trigger_window']
-            assert self.right - self.left < 200000, "Pulse cache too long"
+            assert self.right - self.left < 1000000, "Pulse cache too long"
 
             if self.left % 2 != 0: self.left -= 1 # Seems like a digizier effect
 
