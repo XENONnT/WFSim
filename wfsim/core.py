@@ -108,8 +108,12 @@ class Pulse(object):
             # Build a simulated waveform, length depends on min and max of photon timings
             min_timing, max_timing = np.min(
                 _channel_photon_timings), np.max(_channel_photon_timings)
-            pulse_left = int(min_timing // dt) - int(self.config['samples_to_store_before'])
-            pulse_right = int(max_timing // dt) + int(self.config['samples_to_store_after'])
+            pulse_left = (int(min_timing // dt) 
+                          - int(self.config['samples_to_store_before'])
+                          - self.config.get('samples_before_pulse_center', 2))
+            pulse_right = (int(max_timing // dt) 
+                           + int(self.config['samples_to_store_after'])
+                           + self.config.get('samples_after_pulse_center', 20))
             pulse_current = np.zeros(pulse_right - pulse_left + 1)
 
             Pulse.add_current(_channel_photon_timings.astype(int),
