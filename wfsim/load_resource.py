@@ -116,6 +116,10 @@ class Resource:
         # Noise sample
         self.noise_data = straxen.get_resource(files['noise_file'], fmt='npy')['arr_0'].flatten()
 
+        # nVeto PMT Q.E.
+        if config['neutron_veto']:
+            self.nv_pmt_qe_data = straxen.get_resource(config['nv_pmt_qe_file'], fmt='json')
+
 
 def make_map(map_file: str, fmt='text'):
     map_data = straxen.get_resource(map_file, fmt)

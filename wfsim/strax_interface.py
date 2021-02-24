@@ -10,6 +10,7 @@ from straxen import get_to_pe
 import wfsim
 from immutabledict import immutabledict
 from scipy.interpolate import interp1d
+from .load_resource import load_config
 
 export, __all__ = strax.exporter()
 __all__ += ['instruction_dtype', 'truth_extra_dtype']
@@ -84,7 +85,8 @@ def read_optical(c):
         wavelengths = [[1239.84 / wavelength for wavelength in array] for array in e["pmthitEnergy"].array(library="np")]
 
         collection_efficiency = c['nv_pmt_ce_factor']
-        nv_pmt_qe_data = get_resource(c['nv_pmt_qe_file'], fmt='json')
+        resource = load_config(c)
+        nv_pmt_qe_data = resource.nv_pmt_qe_data
         wavelength_x = np.array(nv_pmt_qe_data['nv_pmt_qe_wavelength'])
         nveto_pmt_qe = np.array([v for k, v in nv_pmt_qe_data['nv_pmt_qe'].items()])
         interp_func = [interp1d(wavelength_x, qe, kind='linear', fill_value='extrapolate') for qe in nveto_pmt_qe]
