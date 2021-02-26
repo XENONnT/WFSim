@@ -64,8 +64,8 @@ class Resource:
         for k, v in files.items():
             log.debug(f'Obtaining {k} from {v}')
             if v.startswith('/'):
-                print(f"WARNING: Using local file {v} for a resource. "
-                      f"Do not set this as a default or TravisCI tests will break")
+                log.warning(f"WARNING: Using local file {v} for a resource. "
+                            f"Do not set this as a default or TravisCI tests will break")
             try:
                 # First try downloading it via
                 # https://straxen.readthedocs.io/en/latest/config_storage.html#downloading-xenonnt-files-from-the-database  # noqa
@@ -81,7 +81,10 @@ class Resource:
             except (FileNotFoundError, ValueError, NameError, AttributeError):
                 # We cannot download the file from the database. We need to
                 # try to get a placeholder file from a URL.
-                files[k] = osp.join(url_base, v)
+                raw_url = osp.join(url_base, v)
+                log.warning(f'{k} did not download, trying {raw_url}')
+                files[k] = raw_url
+            log.debug(f'Downloaded {k} successfully')
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
 
         if config['detector'] == 'XENON1T':
@@ -120,6 +123,7 @@ class Resource:
         # Noise sample
         self.noise_data = straxen.get_resource(files['noise_file'], fmt='npy')['arr_0'].flatten()
 
+        log.debug(f'{self.__class__.__name__} fully initialized')
 
 def make_map(map_file: str, fmt='text'):
     map_data = straxen.get_resource(map_file, fmt)
