@@ -102,7 +102,8 @@ def read_optical(c):
 
     # cut interactions without electrons or photons
     ins = ins[ins["amp"] > 0]
-    if (c['event_start']&c['event_stop']):
+
+    if c['event_stop']:
         mask = np.where((ins['g4id']<c['event_stop'])&(ins['g4id']>=c['event_start']))
         return ins[mask], channels[mask],timings[mask]
 
@@ -131,58 +132,74 @@ def instruction_from_csv(filename):
 @export
 class McChainSimulator(object):
     def __init__(self,strax_context,run_id) -> None:
-        ''' Epix needs to be imported in here to avoid circle imports'''
         self.context = strax_context
         self.file = self.context.config['fax_file']
         self.targets = ('raw_records')
         self.run_id = run_id
-        if "RawRecordsFromFaxNVeto" in self.context._plugin_class_registry:
+        if self.context.config['neutron_veto']:
             self.targets = ('raw_records','raw_records_nv')
 
+    def _set_max(self,):
+        '''If no event_stop is specified set it to the maximum'''
+        if self.context.config['event_stop']:
+            self.context.set_config(dict(event_stop=self.instructions_epix['g4id'][-1]+1))
+        else:
+            pass
+
+    def _instructions_from_epix_cut(self,):
+        '''Cut away events not within event_start & event_stop'''
+        mask=(self.instructions_epix['g4id']<self.context.config['event_stop'])&\
+             (self.instructions_epix['g4id']>=self.context.config['event_start'])
+        self.instructions_epix = self.instructions_epix[mask]
+
+
     def instructions_from_epix(self,):
-        '''Run epix and save instructions as self.instruction.'''
+        '''Run epix and save instructions as self.instruction.
+         For the moment we'll just process the whole file and then throw out all events we won't use
+         Epix needs to be imported in here to avoid circle imports'''
         logging.info("Getting instructions from epix")
         import epix
-        epix_config=dict(
-            input_file='/Volumes/Extreme SSD/XENONnT_TPC_neutron_50000-001.root',
-            detector='XENONnT',
-            epix_config_override='',
-            entry_stop=self.context.config['event_stop'],
-            micro_separation=0.05,
-            micro_separation_time=10,
-            tag_cluster_by='time',
-            max_delay=1e7, #ns
-            source_rate=-1,
-            output_path="",
-            debug=False,)
-        epix_config = epix.run_epix.setup(epix_config)
+        self.context.config['epix_config']=dict(input_file=self.context.config['fax_file'],
+                                                source_rate=0,
+                                                detector='XENONnT',
+                                                epix_config_override='',
+                                                debug=False,
+                                                entry_stop=-1,
+                                                )
+        epix_config = epix.run_epix.setup(self.context.config['epix_config'])
         self.instructions_epix=epix.run_epix.main(epix_config,return_wfsim_instructions=True)
+        self._set_max()
+        self._instructions_from_epix_cut()
 
     def instructions_from_nveto(self,):
         logging.info("Getting nveto instructions")
         self.instructions_nveto=read_optical(self.context.config)
 
     def set_timing(self,):
+        '''Timing information is set in wfsim'''
         logging.info("Setting timings")
         rate = self.context.config['event_rate']
-        n_events = self.instructions_epix['g4id'][-1]-self.instructions_epix['g4id'][0]+1
+        start = self.context.config['event_start']
+        stop=self.context.config['event_stop']
+        n_events = stop-start+1
 
-        timings= self.context.config['event_start']/rate + wfsim.units.s*np.random.random(n_events)*(n_events)/rate
+        timings= self.context.config['event_start']/rate + \
+                 wfsim.units.s*np.random.random(n_events)*(n_events)/rate
         timings.sort()
 
         #For tpc we have multiple instructions per g4id. For nveto we only have one
         counter=Counter(self.instructions_epix['g4id'])
-        _min=list(counter.keys())[0]
-        _max=list(counter.keys())[-1]+1 #We need to include the last vlaue
-        i_per_id = [counter[k] for k in range(_min,_max)]
+        i_per_id = [counter[k] for k in range(start,stop+1)]#We need to include the last vlaue
         timings_tpc=np.repeat(timings,i_per_id)
-        self.instructions_epix['time']=timings_tpc
+        self.instructions_epix['time']+=timings_tpc
         if self.context.config['neutron_veto']:
             self.instructions_nveto['time']=timings
     
     def set_configuration(self,):
-        chunk_size = np.ceil(500/self.context.config['event_rate'])
-        nchunk = np.ceil((self.context.config['event_stop']-self.context.config['event_start']+1)/ (chunk_size*self.context.config['event_rate']))
+        max_events_per_chunk=500
+        chunk_size = np.ceil(max_events_per_chunk/self.context.config['event_rate'])
+        nchunk = np.ceil((self.context.config['event_stop']-self.context.config['event_start'])/ \
+                            (chunk_size*self.context.config['event_rate']))
         self.context.set_config(dict(chunk_size=chunk_size, nchunk=nchunk,))
         self.context.set_config(dict(wfsim_instructions=self.instructions_epix,))
         if self.context.config['neutron_veto']:
@@ -550,7 +567,9 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
 
 @export
 @strax.takes_config(
-    strax.Option('wfsim_instructions',track=False,default=False),)
+    strax.Option('wfsim_instructions',track=False,default=False),
+    strax.Option('epix_config',track=True,default=dict()),
+    )
 class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
 
     def get_instructions(self):
