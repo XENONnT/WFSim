@@ -481,7 +481,7 @@ class FaxSimulatorPlugin(strax.Plugin):
             raise RuntimeError("Simulator returned non-sorted records!")
         self.last_chunk_time = result['time'].max()
 
-    def is_ready(self, chunk_i):
+    def is_ready(self,):
         """Overwritten to mimic online input plugin.
         Returns False to check source finished;
         Returns True to get next chunk.
@@ -553,19 +553,6 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
     strax.Option('wfsim_instructions',track=False,default=False),)
 class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
 
-    # def _setup(self):
-    #     self.sim = ChunkRawRecords(self.config)
-    #     self.sim_iter = self.sim(self.instructions)
-        
-    # def compute(self):
-    #     try:
-    #         result = next(self.sim_iter)
-    #     except StopIteration:
-    #         raise RuntimeError("Bug in chunk count computation")
-    #     self._sort_check(result['raw_records'])
-
-    #     return {data_type:result[data_type] for data_type in self.provides}
-
     def get_instructions(self):
         if self.config['wfsim_instructions'] !=False:
             self.instructions=self.config['wfsim_instructions']  
@@ -577,12 +564,6 @@ class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
     def check_instructions(self):
         pass
 
-    # def is_ready(self,chuck_i):
-    #     """Overwritten to mimic online input plugin.
-    #     Returns False to check source finished;
-    #     Returns True to get next chunk.
-    #     """
-    #     return True
 
 
 @export

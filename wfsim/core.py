@@ -684,6 +684,15 @@ class S2(Pulse):
             drift_time_gate,
             diffusion_constant_longitudinal,
             electron_trapping_time):
+        '''Calculate arrival times of the electrons. Data is written to the timings and gains arrays
+        :param t: 1d array of ints
+        :param n_electron:1 d array of ints
+        :param z: 1d array of floats
+        :param sc_gain: secondairy scintallation gain       
+        :param timings: empty array with length sum(n_electron)
+        :param gains: empty array with length sum(n_electron)
+        :param drift_velocity_liquid, drift_time_gate, diffusion_constant_longitudinal, electron_trapping_time: configuration values
+        '''
         assert len(timings) == np.sum(n_electron)
         assert len(gains) == np.sum(n_electron)
         assert len(sc_gain) == len(t)
