@@ -5,7 +5,7 @@ import numpy as np
 import strax
 import straxen
 import logging
-log = logging.getLogger('Get resource')
+log = logging.getLogger('load_resource')
 
 _cached_configs = dict()
 
