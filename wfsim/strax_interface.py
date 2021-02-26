@@ -125,15 +125,20 @@ def instruction_from_csv(filename):
 @export
 class ChunkRawRecords(object):
     def __init__(self, config):
+        log.debug(f'Starting {self.__class__.__name__} with {config}')
         self.config = config
+        log.debug(f'Setting raw data')
         self.rawdata = wfsim.RawData(self.config)
+        log.debug(f'Raw data is set')
         self.record_buffer = np.zeros(5000000,
                                       dtype=strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH)) # 2*250 ms buffer
         self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)])
 
         self.blevel = buffer_filled_level = 0
+        log.debug(f'Starting {self.__class__.__name__} initiated')
 
     def __call__(self, instructions, **kwargs):
+        log.debug(f'{self.__class__.__name__} called')
         samples_per_record = strax.DEFAULT_RECORD_LENGTH
         dt = self.config['sample_duration']
         buffer_length = len(self.record_buffer)
