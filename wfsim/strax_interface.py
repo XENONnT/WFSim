@@ -94,10 +94,10 @@ def read_optical(c):
 
         new_channels_all = []
         new_timings_all = []
-        for ievent in range(len(channels)):
+        for ievent, event in enumerate(channels):
             new_channels = []
             new_timings = []
-            for j in range(len(channels[ievent])):
+            for j, _ in enumerate(channels[ievent]):
                 rand = np.random.rand() * 100
                 channel = channels[ievent][j]
                 if not (0 <= channel < 120):
