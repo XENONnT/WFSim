@@ -4,6 +4,8 @@ import os.path as osp
 import numpy as np
 import strax
 import straxen
+import logging
+log = logging.getLogger('Get resource')
 
 _cached_configs = dict()
 
@@ -23,6 +25,7 @@ def load_config(config):
 
 class Resource:
     def __init__(self, config=None):
+        log.debug(f'Getting {config}')
         if config is None:
             config = dict()
         config = deepcopy(config)
@@ -59,6 +62,7 @@ class Resource:
         commit = 'master'   # Replace this by a commit hash if you feel solid and responsible
         url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/sim_files'
         for k, v in files.items():
+            log.debug(f'Obtaining {k} from {v}')
             if v.startswith('/'):
                 print(f"WARNING: Using local file {v} for a resource. "
                       f"Do not set this as a default or TravisCI tests will break")
@@ -120,6 +124,7 @@ class Resource:
 def make_map(map_file: str, fmt='text'):
     map_data = straxen.get_resource(map_file, fmt)
     return straxen.InterpolatingMap(map_data)
+
 
 class dummy_map():
     def __init__(self, result):
