@@ -79,42 +79,7 @@ def read_optical(c):
     time = np.arange(1, n_events+1)
 
     if c['neutron_veto']:
-        nV_pmt_id_offset = 2000
-        channels = [[channel - nV_pmt_id_offset for channel in array] for array in e["pmthitID"].array(library="np")]
-        timings = e["pmthitTime"].array(library="np")*1e9
-        constant_hc = 1239.841984 # (eV*nm) to calculate (wavelength lambda) = h * c / energy
-        wavelengths = [[constant_hc / wavelength for wavelength in array] for array in e["pmthitEnergy"].array(library="np")]
-
-        collection_efficiency = c['nv_pmt_ce_factor']
-        resource = load_config(c)
-        nv_pmt_qe_data = resource.nv_pmt_qe_data
-        wavelength_x = np.array(nv_pmt_qe_data['nv_pmt_qe_wavelength'])
-        nveto_pmt_qe = np.array([v for k, v in nv_pmt_qe_data['nv_pmt_qe'].items()])
-        interp_func = [interp1d(wavelength_x, qe, kind='linear', fill_value='extrapolate') for qe in nveto_pmt_qe]
-
-        new_channels_all = []
-        new_timings_all = []
-        for ievent, event in enumerate(channels):
-            new_channels = []
-            new_timings = []
-            for j, _ in enumerate(channels[ievent]):
-                rand = np.random.rand() * 100
-                channel = channels[ievent][j]
-                if not (0 <= channel < 120):
-                    continue
-                if not (timings[ievent][j] < 1.e6): # 1 msec. as a tentative
-                    continue
-                wavelength = wavelengths[ievent][j]
-                qe = interp_func[channel](wavelength)
-                if rand > qe * collection_efficiency:
-                    continue
-                new_channels.append(channel)
-                new_timings.append(timings[ievent][j])
-            new_channels_all.append(np.array(new_channels))
-            new_timings_all.append(np.array(new_timings))
-        channels = new_channels_all
-        timings = new_timings_all
-
+        channels, timings = read_optical_nveto_with_cut(c, e)
     else:
         # TPC
         channels = e["pmthitID"].array(library="np")
@@ -136,6 +101,44 @@ def read_optical(c):
         ins = ins[ins["amp"] > 0]
 
     return ins, channels, timings
+
+
+def read_optical_nveto_with_cut(c, e):
+    nV_pmt_id_offset = 2000
+    channels = [[channel - nV_pmt_id_offset for channel in array] for array in e["pmthitID"].array(library="np")]
+    timings = e["pmthitTime"].array(library="np")*1e9
+    constant_hc = 1239.841984 # (eV*nm) to calculate (wavelength lambda) = h * c / energy
+    wavelengths = [[constant_hc / energy for energy in array] for array in e["pmthitEnergy"].array(library="np")]
+
+    collection_efficiency = c['nv_pmt_ce_factor']
+    resource = load_config(c)
+    nv_pmt_qe_data = resource.nv_pmt_qe_data
+    wavelength_x = np.array(nv_pmt_qe_data['nv_pmt_qe_wavelength'])
+    nveto_pmt_qe = np.array([v for k, v in nv_pmt_qe_data['nv_pmt_qe'].items()])
+    interp_func = [interp1d(wavelength_x, qe, kind='linear', fill_value='extrapolate') for qe in nveto_pmt_qe]
+
+    new_channels_all = []
+    new_timings_all = []
+    for ievent, event in enumerate(channels):
+        new_channels = []
+        new_timings = []
+        for j, _ in enumerate(channels[ievent]):
+            rand = np.random.rand() * 100
+            channel = channels[ievent][j]
+            if not (0 <= channel < 120):
+                continue
+            if not (timings[ievent][j] < 1.e6): # 1 msec. as a tentative
+                continue
+            wavelength = wavelengths[ievent][j]
+            qe = interp_func[channel](wavelength)
+            if rand > qe * collection_efficiency:
+                continue
+            new_channels.append(channel)
+            new_timings.append(timings[ievent][j])
+        new_channels_all.append(np.array(new_channels))
+        new_timings_all.append(np.array(new_timings))
+    return new_channels_all, new_timings_all
+
 
 def instruction_from_csv(filename):
     """
