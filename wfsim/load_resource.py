@@ -6,7 +6,7 @@ import strax
 import straxen
 
 _cached_configs = dict()
-
+import ntauxfiles
 
 def load_config(config):
     """Create a Resource instance from the configuration
@@ -81,8 +81,11 @@ class Resource:
             except (FileNotFoundError, ValueError, NameError, AttributeError):
                 # We cannot download the file from the database. We need to
                 # try to get a placeholder file from a URL.
-                files[k] = osp.join(url_base, v)
-        self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
+                # files[k] = osp.join(url_base, v)
+                continue
+
+        # self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
+        self.photon_area_distribution = ntauxfiles.get_sim_file(files['photon_area_distribution'], fmt='csv')
 
         if config['detector'] == 'XENON1T':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='json.gz')
@@ -106,23 +109,23 @@ class Resource:
             lymap.data['map'] = np.sum(lymap.data['map'][:][:], axis=2, keepdims=True)
             lymap.__init__(lymap.data)
             self.s2_light_yield_map = lymap
-            self.s2_luminescence = straxen.get_resource(files['s2_luminescence'], fmt='pkl.gz')
+            self.s2_luminescence = ntauxfiles.get_sim_file(files['s2_luminescence'], fmt='pkl.gz')
             self.fdc_3d = dummy_map(result=0)
-            gas_gap_map = straxen.get_resource(files['gas_gap_map'], fmt='pkl')
+            gas_gap_map = ntauxfiles.get_sim_file(files['gas_gap_map'], fmt='pkl')
             self.gas_gap_length = lambda positions: gas_gap_map.lookup(*positions.T)
 
         # Electron After Pulses compressed, haven't figure out how pkl.gz works
-        self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
+        self.uniform_to_ele_ap = ntauxfiles.get_sim_file(files['ele_ap_pdfs'], fmt='pkl.gz')
 
         # Photon After Pulses
-        self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
+        self.uniform_to_pmt_ap = ntauxfiles.get_sim_file(files['photon_ap_cdfs'], fmt='pkl.gz')
 
         # Noise sample
-        self.noise_data = straxen.get_resource(files['noise_file'], fmt='npy')['arr_0'].flatten()
+        self.noise_data = ntauxfiles.get_sim_file(files['noise_file'], fmt='npy')['arr_0'].flatten()
 
 
 def make_map(map_file: str, fmt='text'):
-    map_data = straxen.get_resource(map_file, fmt)
+    map_data = ntauxfiles.get_sim_file(map_file, fmt=fmt)
     return straxen.InterpolatingMap(map_data)
 
 class dummy_map():
