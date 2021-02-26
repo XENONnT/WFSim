@@ -35,7 +35,7 @@ def test_sim_1T():
 
 def test_sim_nT():
     """Test the nT simulator. Works only if one has access to the XENONnT databases"""
-    if not hasattr(utilix, 'rundb'):
+    if not straxen.utilix_is_configured():
         # This means we cannot load the nT files. Most likely will work
         # locally but not a travis job.
         return
