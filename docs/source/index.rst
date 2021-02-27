@@ -25,18 +25,18 @@ contain the root `toctree` directive.
 
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+    :maxdepth: 1
+    :caption: Contents:
 
-   intro
+    intro
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Tutorials:
+    :maxdepth: 2
+    :caption: Tutorials:
 
-   tutorials/Understanding_WFSim_P1.ipynb
-   tutorials/Understanding_WFSim_P2.ipynb
-   tutorials/Advanced_tricks.ipynb
+    tutorials/Understanding_WFSim_P1.ipynb
+    tutorials/Understanding_WFSim_P2.ipynb
+    tutorials/Advanced_tricks.ipynb
 
 .. toctree::
     :maxdepth: 1
