@@ -50,9 +50,12 @@ lib64
 
 # Sphinx
 docs/_build
+docs/reference/wfsim.rst
+docs/tutorials/*
 
 # Pycharm
 .idea
 
 # coverage
 .coverage
+
