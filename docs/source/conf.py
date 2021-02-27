@@ -27,12 +27,6 @@ release = wfsim.__version__
 
 # -- General configuration ---------------------------------------------------
 
-# Add any Sphinx extension module names here, as strings. They can be
-# extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
-# ones.
-extensions = [
-]
-
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
@@ -194,8 +188,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'straxen', 'straxen Documentation',
-     author, 'straxen', 'One line description of project.',
+    (master_doc, 'wfsim', 'wfsim',
+     author, 'wfsim', 'One line description of project.',
      'Miscellaneous'),
 ]
 
