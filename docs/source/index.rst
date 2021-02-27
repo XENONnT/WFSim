@@ -19,9 +19,9 @@ Installation
 
 
 .. wfsim documentation master file, created by
-   sphinx-quickstart on Sat Feb 27 10:43:35 2021.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+sphinx-quickstart on Sat Feb 27 10:43:35 2021.
+You can adapt this file completely to your liking, but it should at least
+contain the root `toctree` directive.
 
 
 .. toctree::
