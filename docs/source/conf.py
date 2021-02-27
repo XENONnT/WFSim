@@ -19,6 +19,7 @@
 import wfsim
 
 project = 'wfsim'
+# pylint: disable=redefined-builtin
 copyright = '2021, XENON collaboration'
 author = 'XENON collaboration'
 # The short X.Y version
@@ -202,5 +203,6 @@ def setup(app):
     # situation where you get a __name__  is not in globals KeyError
     # if you just try to do a relative import...
     import os
+    # pylint: disable=reimported
     import sys
     sys.path.append(os.path.dirname(os.path.realpath(__file__)))
