@@ -1215,6 +1215,8 @@ class RawData(object):
                 tb[field] = np.mean(value)
             elif len(instruction) > 1 and field == 'amp':
                 tb[field] = np.sum(value)
+            elif field == 'endtime':
+                pass
             else:
                 # Cannot summarize intelligently: just take the first value
                 tb[field] = value[0]
