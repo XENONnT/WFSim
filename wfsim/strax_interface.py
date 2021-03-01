@@ -101,11 +101,15 @@ def read_optical(c):
     ins['amp'] = [len(t) for t in timings]
 
     # cut interactions without electrons or photons
-    ins = ins[ins["amp"] > 0]
+    # ins = ins[ins["amp"] > 0]
 
     if c['event_stop']:
-        mask = np.where((ins['g4id']<c['event_stop'])&(ins['g4id']>=c['event_start']))
-        return ins[mask], channels[mask],timings[mask]
+        mask = (ins['g4id']<c['event_stop']) & (ins['g4id']>=c['event_start'])
+        np.save('./mask.npy',mask)
+        np.save('./ins.npy',ins)
+        np.save('./channels.npy',channels)
+        np.save('./timings.npy',timings)
+        return ins[np.where(mask)], channels[np.where(mask)],timings[np.where(mask)]
 
     return ins, channels, timings
 
@@ -160,11 +164,15 @@ class McChainSimulator(object):
         logging.info("Getting instructions from epix")
         import epix
         self.context.config['epix_config']=dict(input_file=self.context.config['fax_file'],
-                                                source_rate=0,
+                                                source_rate=5,
                                                 detector='XENONnT',
                                                 epix_config_override='',
                                                 debug=False,
-                                                entry_stop=-1,
+                                                entry_stop=100,
+                                                micro_separation=0.05,
+                                                micro_separation_time=10,
+                                                tag_cluster_by='time',
+                                                max_delay=1e7, #ns
                                                 )
         epix_config = epix.run_epix.setup(self.context.config['epix_config'])
         self.instructions_epix=epix.run_epix.main(epix_config,return_wfsim_instructions=True)
@@ -408,7 +416,7 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  help="Directory with fax instructions"),
     strax.Option('fax_config_override', default=None,
                  help="Dictionary with configuration option overrides"),
-    strax.Option('event_rate', default=5, track=False,
+    strax.Option('event_rate', default=1000, track=False,
                  help="Average number of events per second"),
     strax.Option('chunk_size', default=100, track=False,
                  help="Duration of each chunk in seconds"),
@@ -431,8 +439,6 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  help="Number of pmts in tpc. Provided by context"),
     strax.Option('n_top_pmts', track=False,
                  help="Number of pmts in top array. Provided by context"),
-    strax.Option('neutron_veto', default=False, track=True,
-                 help="Flag for nVeto optical simulation instead of TPC"),
 )
 class FaxSimulatorPlugin(strax.Plugin):
     depends_on = tuple()
@@ -605,6 +611,8 @@ class RawRecordsFromFaxOptical(RawRecordsFromFaxNT):
 
 @export
 @strax.takes_config(
+    strax.Option('neutron_veto', default=True, track=True,
+                 help="Flag for nVeto optical simulation instead of TPC"),
     strax.Option('wfsim_nveto_instructions',track=False,default=False),
     strax.Option('nveto_channels',track=False,default=False),
     strax.Option('nveto_timings',track=False,default=False),
