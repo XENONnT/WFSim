@@ -4,6 +4,8 @@ import os.path as osp
 import numpy as np
 import strax
 import straxen
+import logging
+log = logging.getLogger('load_resource')
 
 _cached_configs = dict()
 import ntauxfiles
@@ -13,16 +15,17 @@ def load_config(config):
 
     Uses a cache to avoid re-creating instances from the same config
     """
-    h = strax.deterministic_hash(config)
-    if h in _cached_configs:
-        return _cached_configs[h]
+    # h = strax.deterministic_hash(config)
+    # if h in _cached_configs:
+        # return _cached_configs[h]
     result = Resource(config)
-    _cached_configs[h] = result
+    # _cached_configs[h] = result
     return result
 
 
 class Resource:
     def __init__(self, config=None):
+        log.debug(f'Getting {config}')
         if config is None:
             config = dict()
         config = deepcopy(config)
@@ -50,6 +53,7 @@ class Resource:
                 'photon_ap_cdfs': 'xnt_pmt_afterpulse_config.pkl.gz',
                 's2_luminescence': 'XENONnT_s2_garfield_luminescence_distribution_v0.pkl.gz',
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
+                'nv_pmt_qe_file': 'nveto_pmt_qe.json'
             })
         else:
             raise ValueError(f"Unsupported detector {config['detector']}")
@@ -60,32 +64,32 @@ class Resource:
         if config['detector'] == "XENON1T":
             url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/sim_files'
         if config['detector'] == "XENONnT":
-            url_base = f'https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/{commit}/sim_files'
+            url_base = f'/Users/petergaemers/Desktop/python/private_nt_aux_files/sim_files'
 
-        for k, v in files.items():
-            if v.startswith('/'):
-                print(f"WARNING: Using local file {v} for a resource. "
-                      f"Do not set this as a default or TravisCI tests will break")
-            try:
-                # First try downloading it via
-                # https://straxen.readthedocs.io/en/latest/config_storage.html#downloading-xenonnt-files-from-the-database  # noqa
+        # for k, v in files.items():
+        #     log.debug(f'Obtaining {k} from {v}')
+        #     if v.startswith('/'):
+        #         log.warning(f"WARNING: Using local file {v} for a resource. "
+        #                     f"Do not set this as a default or TravisCI tests will break")
+        #     try:
+        #         # First try downloading it via
+        #         # https://straxen.readthedocs.io/en/latest/config_storage.html#downloading-xenonnt-files-from-the-database  # noqa
 
-                # we need to add the straxen.MongoDownloader() in this
-                # try: except NameError: logic because the NameError
-                # gets raised if we don't have access to utilix.
-                downloader = straxen.MongoDownloader()
-                # FileNotFoundError, ValueErrors can be raised if we
-                # cannot load the requested config
-                downloaded_file = downloader.download_single(v)
-                files[k] = downloaded_file
-            except (FileNotFoundError, ValueError, NameError, AttributeError):
-                # We cannot download the file from the database. We need to
-                # try to get a placeholder file from a URL.
-                # files[k] = osp.join(url_base, v)
-                continue
-
-        # self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
-        self.photon_area_distribution = ntauxfiles.get_sim_file(files['photon_area_distribution'], fmt='csv')
+        #         # we need to add the straxen.MongoDownloader() in this
+        #         # try: except NameError: logic because the NameError
+        #         # gets raised if we don't have access to utilix.
+        #         downloader = straxen.MongoDownloader()
+        #         # FileNotFoundError, ValueErrors can be raised if we
+        #         # cannot load the requested config
+        #         downloaded_file = downloader.download_single(v)
+        #         files[k] = downloaded_file
+        #     except (FileNotFoundError, ValueError, NameError, AttributeError):
+        #         # We cannot download the file from the database. We need to
+        #         # try to get a placeholder file from a URL.
+        #         raw_url = osp.join(url_base, v)
+        #         log.warning(f'{k} did not download, trying {raw_url}')
+        #         files[k] = raw_url
+        #     log.debug(f'Downloaded {k} successfully')
 
         if config['detector'] == 'XENON1T':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='json.gz')
@@ -114,6 +118,8 @@ class Resource:
             gas_gap_map = ntauxfiles.get_sim_file(files['gas_gap_map'], fmt='pkl')
             self.gas_gap_length = lambda positions: gas_gap_map.lookup(*positions.T)
 
+        #Spe area distributions
+        self.photon_area_distribution = ntauxfiles.get_sim_file(files['photon_area_distribution'], fmt='csv')
         # Electron After Pulses compressed, haven't figure out how pkl.gz works
         self.uniform_to_ele_ap = ntauxfiles.get_sim_file(files['ele_ap_pdfs'], fmt='pkl.gz')
 
@@ -123,10 +129,16 @@ class Resource:
         # Noise sample
         self.noise_data = ntauxfiles.get_sim_file(files['noise_file'], fmt='npy')['arr_0'].flatten()
 
+        # nVeto PMT Q.E.
+        if config['neutron_veto']:
+            self.nv_pmt_qe_data = ntauxfiles.get_sim_file(files['nv_pmt_qe_file'], fmt='json')
+
+        log.debug(f'{self.__class__.__name__} fully initialized')
 
 def make_map(map_file: str, fmt='text'):
     map_data = ntauxfiles.get_sim_file(map_file, fmt=fmt)
     return straxen.InterpolatingMap(map_data)
+
 
 class dummy_map():
     def __init__(self, result):

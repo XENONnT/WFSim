@@ -67,11 +67,7 @@ class Pulse(object):
         counts_start = 0 # Secondary loop index for assigning channel
         for channel, counts in zip(*np.unique(self._photon_channels, return_counts=True)):
 
-            #TODO: This is temporary continue to avoid out-of-range error.
-            # It should be added a proper method for nVeto PMTs also.
-            if channel >= 2000:
-                continue
-            # Use 'counts' amount of photon for this channel 
+            # Use 'counts' amount of photon for this channel
             _channel_photon_timings = self._photon_timings[counts_start:counts_start+counts]
             counts_start += counts
             if channel in self.config['turned_off_pmts']: continue
@@ -109,8 +105,12 @@ class Pulse(object):
             # Build a simulated waveform, length depends on min and max of photon timings
             min_timing, max_timing = np.min(
                 _channel_photon_timings), np.max(_channel_photon_timings)
-            pulse_left = int(min_timing // dt) - int(self.config['samples_to_store_before'])
-            pulse_right = int(max_timing // dt) + int(self.config['samples_to_store_after'])
+            pulse_left = (int(min_timing // dt) 
+                          - int(self.config['samples_to_store_before'])
+                          - self.config.get('samples_before_pulse_center', 2))
+            pulse_right = (int(max_timing // dt) 
+                           + int(self.config['samples_to_store_after'])
+                           + self.config.get('samples_after_pulse_center', 20))
             pulse_current = np.zeros(pulse_right - pulse_left + 1)
 
             Pulse.add_current(_channel_photon_timings.astype(int),
@@ -339,9 +339,9 @@ class S1(Pulse):
         return n_photons
 
     @staticmethod
-    def photon_channels(points, n_photons, config, s1_pattern_map):
+    def photon_channels(positions, n_photons, config, s1_pattern_map):
         '''Calculate photon arrival channels
-        :params points: 2d array with xy positions of interactions
+        :params positions: 2d array with xy positions of interactions
         :params n_photons: 1d array of ints with number of photons to simulate
         :params config: dict wfsim config
         :params s1_pattern_map: interpolator instance of the s1 pattern map
@@ -349,7 +349,7 @@ class S1(Pulse):
         returns nested array with photon channels   
         '''
         channels = np.arange(config['n_tpc_pmts'])#+1 for the channel map
-        p_per_channel = s1_pattern_map(points)
+        p_per_channel = s1_pattern_map(positions)
         p_per_channel[:, np.in1d(channels, config['turned_off_pmts'])] = 0
         
         _photon_channels = np.array([]).astype(int)
@@ -1225,7 +1225,7 @@ class RawData(object):
 
             self.left = np.min([p['left'] for p in self._pulses_cache]) - self.config['trigger_window']
             self.right = np.max([p['right'] for p in self._pulses_cache]) + self.config['trigger_window']
-            assert self.right - self.left < 200000, "Pulse cache too long"
+            assert self.right - self.left < 1000000, "Pulse cache too long"
 
             if self.left % 2 != 0: self.left -= 1 # Seems like a digizier effect
 

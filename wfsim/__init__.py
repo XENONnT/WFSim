@@ -1,4 +1,4 @@
-__version__ = "0.2.2"
+__version__ = "0.2.5"
 
 from .core import *
 from .strax_interface import *

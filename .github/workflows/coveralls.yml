@@ -1,0 +1,40 @@
+on:
+  workflow_dispatch:
+  release:
+    types: [created]
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+
+name: Test Coveralls
+
+jobs:
+
+  build:
+    name: Coveralls
+    runs-on: ubuntu-latest
+    steps:
+
+    - uses: actions/checkout@v1
+    - name: Setup python
+      uses: actions/setup-python@v2 # https://github.com/marketplace/actions/setup-miniconda
+      with:
+        python-version: 3.8
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    - name: Install python dependencies
+      uses: py-actions/py-dependency-install@v2
+    - name: Install requirements
+      run: |
+        pip install pytest hypothesis flake8 pytest-cov coveralls pytest
+        python setup.py install
+    - name: Coveralls
+      env:
+        COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
+        NUMBA_DISABLE_JIT: 1
+      run: |
+        coverage run --source=wfsim setup.py test
+        coveralls
