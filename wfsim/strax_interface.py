@@ -9,6 +9,8 @@ from straxen.common import get_resource
 from straxen import get_to_pe
 import wfsim
 from immutabledict import immutabledict
+from scipy.interpolate import interp1d
+from .load_resource import load_config
 
 export, __all__ = strax.exporter()
 __all__ += ['instruction_dtype', 'truth_extra_dtype']
@@ -32,9 +34,9 @@ instruction_dtype = [(('Waveform simulator event number.', 'event_number'), np.i
 truth_extra_dtype = [
     ('n_electron', np.float),
     ('n_photon', np.float), ('n_photon_bottom', np.float),
-    ('t_first_photon', np.float), ('t_last_photon', np.float), 
-    ('t_mean_photon', np.float), ('t_sigma_photon', np.float), 
-    ('t_first_electron', np.float), ('t_last_electron', np.float), 
+    ('t_first_photon', np.float), ('t_last_photon', np.float),
+    ('t_mean_photon', np.float), ('t_sigma_photon', np.float),
+    ('t_first_electron', np.float), ('t_last_electron', np.float),
     ('t_mean_electron', np.float), ('t_sigma_electron', np.float)]
 
 log = logging.getLogger('SimulationCore')
@@ -77,9 +79,7 @@ def read_optical(c):
     time = np.arange(1, n_events+1)
 
     if c['neutron_veto']:
-        nV_pmt_id_offset = 2000
-        channels = [[channel - nV_pmt_id_offset for channel in array if channel >=2000] for array in e["pmthitID"].array(library="np")]
-        timings = e["pmthitTime"].array(library="np")*1e9
+        channels, timings = read_optical_nveto_with_cut(c, e)
     else:
         # TPC
         channels = e["pmthitID"].array(library="np")
@@ -97,10 +97,48 @@ def read_optical(c):
     ins['recoil'] = np.repeat(1, n_events)
     ins['amp'] = [len(t) for t in timings]
 
-    # cut interactions without electrons or photons
-    ins = ins[ins["amp"] > 0]
+    if not c['neutron_veto']:
+        ins = ins[ins["amp"] > 0]
 
     return ins, channels, timings
+
+
+def read_optical_nveto_with_cut(c, e):
+    nV_pmt_id_offset = 2000
+    channels = [[channel - nV_pmt_id_offset for channel in array] for array in e["pmthitID"].array(library="np")]
+    timings = e["pmthitTime"].array(library="np")*1e9
+    constant_hc = 1239.841984 # (eV*nm) to calculate (wavelength lambda) = h * c / energy
+    wavelengths = [[constant_hc / energy for energy in array] for array in e["pmthitEnergy"].array(library="np")]
+
+    collection_efficiency = c['nv_pmt_ce_factor']
+    resource = load_config(c)
+    nv_pmt_qe_data = resource.nv_pmt_qe_data
+    wavelength_x = np.array(nv_pmt_qe_data['nv_pmt_qe_wavelength'])
+    nveto_pmt_qe = np.array([v for k, v in nv_pmt_qe_data['nv_pmt_qe'].items()])
+    interp_func = [interp1d(wavelength_x, qe, kind='linear', fill_value='extrapolate') for qe in nveto_pmt_qe]
+
+    new_channels_all = []
+    new_timings_all = []
+    for ievent, event in enumerate(channels):
+        new_channels = []
+        new_timings = []
+        for j, _ in enumerate(channels[ievent]):
+            rand = np.random.rand() * 100
+            channel = channels[ievent][j]
+            if not (0 <= channel < 120):
+                continue
+            if not (timings[ievent][j] < 1.e6): # 1 msec. as a tentative
+                continue
+            wavelength = wavelengths[ievent][j]
+            qe = interp_func[channel](wavelength)
+            if rand > qe * collection_efficiency:
+                continue
+            new_channels.append(channel)
+            new_timings.append(timings[ievent][j])
+        new_channels_all.append(np.array(new_channels))
+        new_timings_all.append(np.array(new_timings))
+    return new_channels_all, new_timings_all
+
 
 def instruction_from_csv(filename):
     """
@@ -109,13 +147,13 @@ def instruction_from_csv(filename):
     :param filename: Path to csv file
     """
     df = pd.read_csv(filename)
-    
+
     recs = np.zeros(len(df),
                     dtype=instruction_dtype
                    )
     for column in df.columns:
         recs[column]=df[column]
-        
+
     expected_dtype = np.dtype(instruction_dtype)
     assert recs.dtype == expected_dtype, \
         f"CSV {filename} produced wrong dtype. Got {recs.dtype}, expected {expected_dtype}."
@@ -175,11 +213,11 @@ class ChunkRawRecords(object):
             self.record_buffer[s]['channel'] = channel
             self.record_buffer[s]['dt'] = dt
             self.record_buffer[s]['time'] = dt * (left + samples_per_record * np.arange(records_needed))
-            self.record_buffer[s]['length'] = [min(pulse_length, samples_per_record * (i+1)) 
+            self.record_buffer[s]['length'] = [min(pulse_length, samples_per_record * (i+1))
                 - samples_per_record * i for i in range(records_needed)]
             self.record_buffer[s]['pulse_length'] = pulse_length
             self.record_buffer[s]['record_i'] = np.arange(records_needed)
-            self.record_buffer[s]['data'] = np.pad(data, 
+            self.record_buffer[s]['data'] = np.pad(data,
                 (0, records_needed * samples_per_record - pulse_length), 'constant').reshape((-1, samples_per_record))
             self.blevel += records_needed
             if self.rawdata.right != self.current_digitized_right:
@@ -331,11 +369,11 @@ class FaxSimulatorPlugin(strax.Plugin):
         self.config['channel_map'] = dict(self.config['channel_map'])
         self.config['channel_map']['sum_signal']=800
         self.config['channels_bottom'] = np.arange(self.config['n_top_pmts'],self.config['n_tpc_pmts'])
-        
+
         self.get_instructions()
         self.check_instructions()
         self._setup()
-    
+
     def _setup(self):
         #Set in inheriting class
         pass
@@ -405,7 +443,7 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
 
 
     def infer_dtype(self):
-        dtype = {data_type:strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH) 
+        dtype = {data_type:strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH)
                 for data_type in self.provides if data_type is not 'truth'}
         dtype['truth']=instruction_dtype + truth_extra_dtype
         return dtype
@@ -431,7 +469,7 @@ class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
 
     def _setup(self):
         self.sim = ChunkRawRecords(self.config)
-        
+
     def compute(self,wfsim_instructions):
         self.sim_iter = self.sim(wfsim_instructions)
 
@@ -466,8 +504,8 @@ class RawRecordsFromFax1T(RawRecordsFromFaxNT):
 class RawRecordsFromFaxOptical(RawRecordsFromFaxNT):
     def _setup(self):
         self.sim = ChunkRawRecordsOptical(self.config)
-        self.sim_iter = self.sim(instructions=self.instructions, 
-                                 channels=self.channels, 
+        self.sim_iter = self.sim(instructions=self.instructions,
+                                 channels=self.channels,
                                  timings=self.timings)
 
     def get_instructions(self):
@@ -479,7 +517,7 @@ class RawRecordsFromFaxOptical(RawRecordsFromFaxNT):
 class RawRecordsFromFaxnVeto(RawRecordsFromFaxOptical):
     provides = ('raw_records_nv', 'truth')
     data_kind = immutabledict(zip(provides, provides))
-    # Why does the data_kind need to be repeated?? So the overriding of the 
+    # Why does the data_kind need to be repeated?? So the overriding of the
     # provides doesn't work in the setting of the data__kind?
 
     def compute(self):
