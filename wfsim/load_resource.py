@@ -15,11 +15,11 @@ def load_config(config):
 
     Uses a cache to avoid re-creating instances from the same config
     """
-    # h = strax.deterministic_hash(config)
-    # if h in _cached_configs:
-        # return _cached_configs[h]
+    h = strax.deterministic_hash(config)
+    if h in _cached_configs:
+        return _cached_configs[h]
     result = Resource(config)
-    # _cached_configs[h] = result
+    _cached_configs[h] = result
     return result
 
 
@@ -66,30 +66,31 @@ class Resource:
         if config['detector'] == "XENONnT":
             url_base = f'/Users/petergaemers/Desktop/python/private_nt_aux_files/sim_files'
 
-        # for k, v in files.items():
-        #     log.debug(f'Obtaining {k} from {v}')
-        #     if v.startswith('/'):
-        #         log.warning(f"WARNING: Using local file {v} for a resource. "
-        #                     f"Do not set this as a default or TravisCI tests will break")
-        #     try:
-        #         # First try downloading it via
-        #         # https://straxen.readthedocs.io/en/latest/config_storage.html#downloading-xenonnt-files-from-the-database  # noqa
+        for k, v in files.items():
+            log.debug(f'Obtaining {k} from {v}')
+            if v.startswith('/'):
+                log.warning(f"WARNING: Using local file {v} for a resource. "
+                            f"Do not set this as a default or TravisCI tests will break")
+                continue
+            try:
+                # First try downloading it via
+                # https://straxen.readthedocs.io/en/latest/config_storage.html#downloading-xenonnt-files-from-the-database  # noqa
 
-        #         # we need to add the straxen.MongoDownloader() in this
-        #         # try: except NameError: logic because the NameError
-        #         # gets raised if we don't have access to utilix.
-        #         downloader = straxen.MongoDownloader()
-        #         # FileNotFoundError, ValueErrors can be raised if we
-        #         # cannot load the requested config
-        #         downloaded_file = downloader.download_single(v)
-        #         files[k] = downloaded_file
-        #     except (FileNotFoundError, ValueError, NameError, AttributeError):
-        #         # We cannot download the file from the database. We need to
-        #         # try to get a placeholder file from a URL.
-        #         raw_url = osp.join(url_base, v)
-        #         log.warning(f'{k} did not download, trying {raw_url}')
-        #         files[k] = raw_url
-        #     log.debug(f'Downloaded {k} successfully')
+                # we need to add the straxen.MongoDownloader() in this
+                # try: except NameError: logic because the NameError
+                # gets raised if we don't have access to utilix.
+                downloader = straxen.MongoDownloader()
+                # FileNotFoundError, ValueErrors can be raised if we
+                # cannot load the requested config
+                downloaded_file = downloader.download_single(v)
+                files[k] = downloaded_file
+            except (FileNotFoundError, ValueError, NameError, AttributeError):
+                # We cannot download the file from the database. We need to
+                # try to get a placeholder file from a URL.
+                raw_url = osp.join(url_base, v)
+                log.warning(f'{k} did not download, trying {raw_url}')
+                files[k] = raw_url
+            log.debug(f'Downloaded {k} successfully')
 
         if config['detector'] == 'XENON1T':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='json.gz')

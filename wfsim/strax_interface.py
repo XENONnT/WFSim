@@ -14,7 +14,7 @@ import json
 from collections import Counter
 from scipy.interpolate import interp1d
 from .load_resource import load_config
-import sys
+from copy import deepcopy
 export, __all__ = strax.exporter()
 __all__ += ['instruction_dtype', 'truth_extra_dtype']
 
@@ -78,7 +78,7 @@ def read_optical(c):
     file = c['fax_file']
     data = uproot.open(file)
     try:
-        e = data.get('events/events')
+        e = data.get('events')
     except:
         raise Exception("Are you using mc version >4?")
 
@@ -86,7 +86,7 @@ def read_optical(c):
     n_events = len(event_id)
     # lets separate the events in time by a constant time difference
     time = np.arange(1, n_events+1)
-    print(c['neutron_veto'])
+
     if c['neutron_veto']:
         channels, timings = _read_optical_nveto(c, e)
     else:
@@ -109,17 +109,12 @@ def read_optical(c):
     if not c['neutron_veto']:
         ins = ins[ins["amp"] > 0]
 
-    # if c['event_stop']:
-    mask = (ins['g4id']<c['event_stop'])&(ins['g4id']>=c['event_start'])
-    np.save('./mask.npy',mask)
-    np.save('./ins.npy',ins)
-    np.save('./channels.npy',channels)
-    np.save('./timings.npy',timings)
+    #Slightly weird here. Entry_stop is not in the regular config, so if it's not skip this part
+    if c.get('event_stop',-1)!=-1:
+        mask = (ins['g4id']<c['event_stop'])&(ins['g4id']>=c['event_start'])
+
     return ins[mask], channels[mask], timings[mask]
         
-    # return ins, channels, timings
-
-
 def _read_optical_nveto(config, events):
     '''Helper function for nveto to read photon channels and timings from G4 and apply QE's
     :params c: dict, wfsim configuration
@@ -127,7 +122,6 @@ def _read_optical_nveto(config, events):
     
     returns 2 nested arrays
     '''
-    
     nV_pmt_id_offset = 2000
     constant_hc = 1239.841984 # (eV*nm) to calculate (wavelength lambda) = h * c / energy
     channels = [[channel - nV_pmt_id_offset for channel in array] for array in events["pmthitID"].array(library="np")]
@@ -147,6 +141,7 @@ def _read_optical_nveto(config, events):
         for j, _ in enumerate(channels[ievent]):
             rand = np.random.rand() * 100
             channel = channels[ievent][j]
+            #This trows away accidental none-nveto hits (so in tpc or mv)
             if not (0 <= channel < 120):
                 continue
             if not (timings[ievent][j] < 1.e6): # 1 msec. as a tentative
@@ -159,7 +154,7 @@ def _read_optical_nveto(config, events):
             new_timings.append(timings[ievent][j])
         new_channels_all.append(np.array(new_channels))
         new_timings_all.append(np.array(new_timings))
-    return new_channels_all, new_timings_all
+    return np.asarray(new_channels_all), np.asarray(new_timings_all)
 
 
 def instruction_from_csv(filename):
@@ -202,14 +197,14 @@ class McChainSimulator(object):
         '''Sets configuration. '''
         self.context = strax_context
         self.file = self.context.config['fax_file']
-        self.targets = ('raw_records')
+        self.targets = ('raw_records',)
         self.run_id = run_id
         if self.context.config['neutron_veto']:
             self.targets = ('raw_records','raw_records_nv')
 
     def _set_max(self,):
-        '''If no event_stop is specified set it to the maximum'''
-        if self.context.config['event_stop']:
+        '''If no event_stop is specified set it to the maximum (-1=do all events)'''
+        if self.context.config['event_stop']==-1:
             self.context.set_config(dict(event_stop=self.instructions_epix['g4id'][-1]+1))
         else:
             pass
@@ -227,17 +222,10 @@ class McChainSimulator(object):
          Epix needs to be imported in here to avoid circle imports'''
         logging.info("Getting instructions from epix")
         import epix
-        epix_config=dict(input_file=self.context.config['fax_file'],
-                                                source_rate=5,
-                                                detector='XENONnT',
-                                                epix_config_override='',
-                                                debug=False,
-                                                entry_stop=10,
-                                                micro_separation=0.05,
-                                                micro_separation_time=10,
-                                                tag_cluster_by='time',
-                                                max_delay=1e7, #ns
-                                                )
+
+        #make deepcopy cause some of the things in the setup will add unhashable stuff
+        epix_config = get_resource(self.context.config['epix_config'],fmt='json')
+        epix_config.update({'input_file':self.context.config['fax_file']})
         epix_config = epix.run_epix.setup(epix_config)
         self.instructions_epix=epix.run_epix.main(epix_config,return_wfsim_instructions=True)
         self._set_max()
@@ -246,11 +234,8 @@ class McChainSimulator(object):
     def instructions_from_nveto(self,):
         logging.info("Getting nveto instructions")
         #TODO make config working with nveto...
-        self.context.config['nv_pmt_qe_file'] = "nveto_pmt_qe.json" 
         self.context.config['nv_pmt_ce_factor'] = 1.0
-
-        # self.context.config.update(get_resource(self.context.config['fax_config'], fmt='json'))
-        self.instructions_nveto=read_optical(self.context.config)
+        self.instructions_nveto, self.nveto_channels, self.nveto_timings=read_optical(self.context.config)
         
 
     def set_timing(self,):
@@ -259,23 +244,23 @@ class McChainSimulator(object):
         rate = self.context.config['event_rate']
         start = self.context.config['event_start']
         stop=self.context.config['event_stop']
-        n_events = stop-start+1
+        n_events = stop-start
 
-        timings= self.context.config['event_start']/rate + \
-                 wfsim.units.s*np.random.random(n_events)*(n_events)/rate
+        timings= (self.context.config['event_start']/rate + \
+                 wfsim.units.s*np.random.random(n_events)*(n_events)/rate).astype(np.int64)
         timings.sort()
 
         #For tpc we have multiple instructions per g4id. For nveto we only have one
         counter=Counter(self.instructions_epix['g4id'])
-        i_per_id = [counter[k] for k in range(start,stop+1)]#We need to include the last vlaue
+        i_per_id = [counter[k] for k in range(start,stop)]
         timings_tpc=np.repeat(timings,i_per_id)
-        self.instructions_epix['time']+=timings_tpc.astype(np.int64)
+        self.instructions_epix['time']+=timings_tpc
         if self.context.config['neutron_veto']:
-            self.instructions_nveto['time']=timings.astype(np.int64)
+            self.instructions_nveto['time']=timings[self.instructions_nveto['g4id']]
     
     def set_configuration(self,):
         '''Set chunking configuration and feeds instructions to wfsim'''
-        max_events_per_chunk=500
+        max_events_per_chunk=500#is this hard coding really nessecairy...
         chunk_size = np.ceil(max_events_per_chunk/self.context.config['event_rate'])
         nchunk = np.ceil((self.context.config['event_stop']-self.context.config['event_start'])/ \
                             (chunk_size*self.context.config['event_rate']))
@@ -283,7 +268,7 @@ class McChainSimulator(object):
         self.context.set_config(dict(wfsim_instructions=self.instructions_epix,))
         
         if self.context.config['neutron_veto']:
-            self.context.set_config(dict(wfsim_nveto_instruction=self.instructions_nveto,
+            self.context.set_config(dict(wfsim_nveto_instructions=self.instructions_nveto,
                                          wfsim_nveto_channels=self.nveto_channels,
                                          wfsim_nveto_timings=self.nveto_timings))
 
@@ -297,24 +282,23 @@ class McChainSimulator(object):
         self.set_configuration()
 
     def run_strax(self,run_id):
-        '''Runs wfsim up to raw records for tpc and if requisted the nveto.'''
+        '''Runs wfsim up to raw records for tpc and if requisted the nveto.
+            All this setting neutron_veto=True/False is needed to get wfsim to do the right thing
+        '''
         self.context.set_config(dict(neutron_veto=False))
-        self.context.make(str(run_id),'raw_records')
+        self.context.make(run_id,'raw_records')
 
         #nveto doesn't have proper afterpulses or noise implementation
+        #Cannot use neutron_veto=True/False here
         if len(self.targets)>1:
-            self.context.set_config(dict(neutron_veto=True,
-                                        fax_config_override=dict(
-                                                              enable_pmt_afterpulses=False,
-                                                              enable_electron_afterpulses=False,
-                                                              enable_noise=False,)))
+            self.context.set_config(dict(neutron_veto=True,))
             self.context.make(run_id,'raw_records_nv')
         
     def _sync_meta(self,):
         '''Sync metadata between tpc and nveto. The start and end times of the metadata must match for
             something strax wants. Check which ever one starts first, make that the start of both. Same for end'''
         logging.debug('Syncing metadata')
-        keys = ('start','stop')
+        keys = ('start','end')
         for key in keys:
             if self.tpc_meta[key]>self.nveto_meta[key]:
                 self.tpc_meta[key]=self.nveto_meta[key]
@@ -324,15 +308,15 @@ class McChainSimulator(object):
     def _store_meta(self,):
         ''''Store metadata after matching'''
         logging.debug('Storing synced metadata')
-        json_options = dict(sort_keys=True, indent=4)
         metas=(self.tpc_meta,self.nveto_meta)
 
-        for target,ix in enumerate(self.targets):
+        json_options = dict(sort_keys=True, indent=4)
+        for ix,target in enumerate(self.targets):
             prefix=f"{self.context.key_for(self.run_id,target)}-metadata.json"
             path = self.context.storage[0].path
             md_path = osp.join(path,prefix)
             with open(md_path, mode='w') as f:
-                f.write(json.dumps(metas[ix], **self.json_options))
+                f.write(json.dumps(metas[ix], **json_options))
     
     def sync_meta(self,run_id):
         '''Sync metadata outputs from the tpc and the nveto.'''
@@ -342,13 +326,14 @@ class McChainSimulator(object):
         self._store_meta()
 
     def run_chain(self):
+        '''Main function. Sets instructions needed, runs wfsim and synch metadata'''
         logging.info(f"Setting instructions")
         self.set_instructions()
         logging.info(f"Simulating data")
         self.run_strax(run_id=self.run_id)
         if self.context.config['neutron_veto']:
             logging.info(f"Syncing metadata")
-            self.sync_meta()
+            self.sync_meta(self.run_id)
 
 
 @export
@@ -521,7 +506,7 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  help="Number of pmts in tpc. Provided by context"),
     strax.Option('n_top_pmts', track=False,
                  help="Number of pmts in top array. Provided by context"),
-    strax.Option('neutron_veto', default=False, track=True,
+    strax.Option('neutron_veto', default=False, track=False,
                  help="Flag for nVeto optical simulation instead of TPC"),
 )
 class FaxSimulatorPlugin(strax.Plugin):
@@ -659,6 +644,8 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
 @strax.takes_config(
     strax.Option('wfsim_instructions',track=False,default=False),
     strax.Option('epix_config',track=False,default=dict()),
+    strax.Option('event_start',track=False,),
+    strax.Option('event_stop',track=False,),
     )
 class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
 
@@ -696,8 +683,8 @@ class RawRecordsFromFaxOptical(RawRecordsFromFaxNT):
 @export
 @strax.takes_config(
     strax.Option('wfsim_nveto_instructions',track=False,default=False),
-    strax.Option('nveto_channels',track=False,default=False),
-    strax.Option('nveto_timings',track=False,default=False),
+    strax.Option('wfsim_nveto_channels',track=False,default=False),
+    strax.Option('wfsim_nveto_timings',track=False,default=False),
     )
 class RawRecordsFromFaxnVeto(RawRecordsFromFaxOptical):
     provides = ('raw_records_nv', 'truth')
@@ -711,10 +698,12 @@ class RawRecordsFromFaxnVeto(RawRecordsFromFaxOptical):
         return result
 
     def get_instructions(self):
-        if (self.config['wfsim_nveto_instructions']& self.config['nveto_channels'] &  self.config['nveto_timings']):
-            self.instructions=self.config['instructions']
-            self.channels=self.config['channels']
-            self.timings=self.config['timings']
+        #Check if the instructions are already defined by McChainSimulator, else call read_optical
+        if (isinstance(self.config['wfsim_nveto_instructions'],np.ndarray) & isinstance(self.config['wfsim_nveto_channels'],np.ndarray) &  isinstance(self.config['wfsim_nveto_timings'],np.ndarray)):
+            self.instructions=self.config['wfsim_nveto_instructions']
+            self.channels=self.config['wfsim_nveto_channels']
+            self.timings=self.config['wfsim_nveto_timings']
+            np.save('./channels.npy',self.channels)
         else:
             super().get_instructions()
 
