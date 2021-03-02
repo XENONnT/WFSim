@@ -324,7 +324,7 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                           'https://github.com/XENONnT/private_nt_aux_files/blob/master/sim_files/to_pe_nt.npy?raw=true'),
                  track=True,
                  help='PMT gain model. Specify as (model_type, model_config).'),
-    strax.Option('cmt_run_id', default=None, track=True,
+    strax.Option('cmt_run_id', default='0', track=True,
                  help='Run id used for querying correction manager tool'),
     strax.Option('detector', default='XENONnT', track=True),
     strax.Option('channel_map', track=False, type=immutabledict,
@@ -361,7 +361,7 @@ class FaxSimulatorPlugin(strax.Plugin):
         if overrides is not None:
             c.update(overrides)
 
-        cmt_run_id = c['cmt_run_id'] if c['cmt_run_id'] is not None else self.run_id
+        cmt_run_id = c['cmt_run_id'] if c['cmt_run_id'] != '0' else self.run_id
         # Update gains depending on gain model
         self.to_pe = get_to_pe(cmt_run_id, c['gain_model'],
                               c['channel_map']['tpc'][1]+1)
