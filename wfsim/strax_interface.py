@@ -320,8 +320,11 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
     strax.Option('fax_config',
                  default='https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/master/sim_files/fax_config_nt.json?token=AHCU5AZMPZABYSGVRLDACR3ABAZUA'),
     strax.Option('gain_model',
-                 default=('to_pe_per_run', 'https://github.com/XENONnT/private_nt_aux_files/blob/master/sim_files/to_pe_nt.npy?raw=true'),
+                 default=('to_pe_per_run',
+                          'https://github.com/XENONnT/private_nt_aux_files/blob/master/sim_files/to_pe_nt.npy?raw=true'),
+                 track=True,
                  help='PMT gain model. Specify as (model_type, model_config).'),
+    strax.Option('gain_run_id', default=None, track=True),
     strax.Option('detector', default='XENONnT', track=True),
     strax.Option('channel_map', track=False, type=immutabledict,
                  help="immutabledict mapping subdetector to (min, max) "
@@ -353,8 +356,10 @@ class FaxSimulatorPlugin(strax.Plugin):
     def setup(self):
         c = self.config
         c.update(get_resource(c['fax_config'], fmt='json'))
-        # Update gains to the nT defaults
-        self.to_pe = get_to_pe(self.run_id, c['gain_model'],
+
+        # Update gains depending on gain model
+        gain_run_id = c['gain_run_id'] if c['gain_run_id'] is not None else self.run_id
+        self.to_pe = get_to_pe(gain_run_id, c['gain_model'],
                               c['channel_map']['tpc'][1]+1)
         c['gains'] = 1 / self.to_pe * (1e-8 * 2.25 / 2**14) / (1.6e-19 * 10 * 50)
         c['gains'][self.to_pe==0] = 0
