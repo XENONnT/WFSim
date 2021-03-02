@@ -51,7 +51,7 @@ def test_sim_nT():
             config=dict(
                 nchunk=1, event_rate=1, chunk_size=2,
                 detector='XENONnT',
-                fax_config='fax_config_nt.json',
+                fax_config='fax_config_nt_design.json',
                 **straxen.contexts.xnt_common_config),
             **straxen.contexts.common_opts)
         st.register(wfsim.RawRecordsFromFaxNT)
