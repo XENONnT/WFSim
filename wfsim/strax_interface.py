@@ -370,9 +370,7 @@ class FaxSimulatorPlugin(strax.Plugin):
         if c['seed'] != False:
             np.random.seed(c['seed'])
 
-        # TODO Update electron lifetime depending on cmt_run_id
-
-        #We hash the config to load resources. Channel map is immutable and cannot be hashed
+        # We hash the config to load resources. Channel map is immutable and cannot be hashed
         self.config['channel_map'] = dict(self.config['channel_map'])
         self.config['channel_map']['sum_signal']=800
         self.config['channels_bottom'] = np.arange(self.config['n_top_pmts'],self.config['n_tpc_pmts'])
