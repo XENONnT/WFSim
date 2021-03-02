@@ -324,7 +324,8 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                           'https://github.com/XENONnT/private_nt_aux_files/blob/master/sim_files/to_pe_nt.npy?raw=true'),
                  track=True,
                  help='PMT gain model. Specify as (model_type, model_config).'),
-    strax.Option('gain_run_id', default=None, track=True),
+    strax.Option('cmt_run_id', default=None, track=True,
+                 help='Run id used for querying correction manager tool'),
     strax.Option('detector', default='XENONnT', track=True),
     strax.Option('channel_map', track=False, type=immutabledict,
                  help="immutabledict mapping subdetector to (min, max) "
@@ -356,19 +357,20 @@ class FaxSimulatorPlugin(strax.Plugin):
     def setup(self):
         c = self.config
         c.update(get_resource(c['fax_config'], fmt='json'))
+        overrides = self.config['fax_config_override']
+        if overrides is not None:
+            c.update(overrides)
 
+        cmt_run_id = c['cmt_run_id'] if c['cmt_run_id'] is not None else self.run_id
         # Update gains depending on gain model
-        gain_run_id = c['gain_run_id'] if c['gain_run_id'] is not None else self.run_id
-        self.to_pe = get_to_pe(gain_run_id, c['gain_model'],
+        self.to_pe = get_to_pe(cmt_run_id, c['gain_model'],
                               c['channel_map']['tpc'][1]+1)
         c['gains'] = 1 / self.to_pe * (1e-8 * 2.25 / 2**14) / (1.6e-19 * 10 * 50)
         c['gains'][self.to_pe==0] = 0
         if c['seed'] != False:
             np.random.seed(c['seed'])
 
-        overrides = self.config['fax_config_override']
-        if overrides is not None:
-            c.update(overrides)
+        # TODO Update electron lifetime depending on cmt_run_id
 
         #We hash the config to load resources. Channel map is immutable and cannot be hashed
         self.config['channel_map'] = dict(self.config['channel_map'])
