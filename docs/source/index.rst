@@ -9,19 +9,8 @@ Github page: https://github.com/XENONnT/WFSim
 Installation
 ==================
 
-1. To get started for simulating XENONnT please follow the `straxen setup guide <https://straxen.readthedocs.io/en/latest/setup.html>`_. Simulating XENON1T works out of the box.
+See `the installation guide <https://wfsim.readthedocs.io/en/latest/intro.html>`_
 
-2. On top of ``straxen``, install ``wfsim``:
-
-.. code-block:: bash
-
-   pip install wfsim
-
-
-.. wfsim documentation master file, created by
-sphinx-quickstart on Sat Feb 27 10:43:35 2021.
-You can adapt this file completely to your liking, but it should at least
-contain the root `toctree` directive.
 
 
 .. toctree::
@@ -34,9 +23,9 @@ contain the root `toctree` directive.
     :maxdepth: 2
     :caption: Tutorials:
 
+    tutorials/Getting_started_wfsim.ipynb
     tutorials/Understanding_WFSim_P1.ipynb
     tutorials/Understanding_WFSim_P2.ipynb
-    tutorials/Advanced_tricks.ipynb
 
 .. toctree::
     :maxdepth: 1
