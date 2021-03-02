@@ -67,11 +67,7 @@ class Pulse(object):
         counts_start = 0 # Secondary loop index for assigning channel
         for channel, counts in zip(*np.unique(self._photon_channels, return_counts=True)):
 
-            #TODO: This is temporary continue to avoid out-of-range error.
-            # It should be added a proper method for nVeto PMTs also.
-            if channel >= 2000:
-                continue
-            # Use 'counts' amount of photon for this channel 
+            # Use 'counts' amount of photon for this channel
             _channel_photon_timings = self._photon_timings[counts_start:counts_start+counts]
             counts_start += counts
             if channel in self.config['turned_off_pmts']: continue
@@ -1072,7 +1068,7 @@ class RawData(object):
 
             self.left = np.min([p['left'] for p in self._pulses_cache]) - self.config['trigger_window']
             self.right = np.max([p['right'] for p in self._pulses_cache]) + self.config['trigger_window']
-            assert self.right - self.left < 200000, "Pulse cache too long"
+            assert self.right - self.left < 1000000, "Pulse cache too long"
 
             if self.left % 2 != 0: self.left -= 1 # Seems like a digizier effect
 
