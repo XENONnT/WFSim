@@ -56,9 +56,10 @@ class Pulse(object):
         self.clear_pulse_cache()
 
         # Correct for PMT Transition Time Spread (skip for pmt afterpulses)
+        # note that PMT datasheet provides FWHM TTS, so sigma = TTS/(2*sqrt(2*log(2)))=TTS/2.35482
         if '_photon_gains' not in self.__dict__:
             self._photon_timings += np.random.normal(self.config['pmt_transit_time_mean'],
-                                                     self.config['pmt_transit_time_spread'],
+                                                     self.config['pmt_transit_time_spread'] / 2.35482,
                                                      len(self._photon_timings))
 
         dt = self.config.get('sample_duration', 10) # Getting dt from the lib just once
