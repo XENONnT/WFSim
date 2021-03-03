@@ -112,8 +112,11 @@ def read_optical(c):
     #Slightly weird here. Entry_stop is not in the regular config, so if it's not skip this part
     if c.get('event_stop',-1)!=-1:
         mask = (ins['g4id']<c['event_stop'])&(ins['g4id']>=c['event_start'])
-
-    return ins[mask], channels[mask], timings[mask]
+        ins=ins[mask]
+        ins['event_number']=np.arange(0,len(ins))
+        return ins, channels[mask], timings[mask]
+    
+    return ins, channels, timings
         
 def _read_optical_nveto(config, events):
     '''Helper function for nveto to read photon channels and timings from G4 and apply QE's
@@ -283,6 +286,8 @@ class McChainSimulator(object):
             self.instructions_from_nveto()
         self.set_timing()
         self.set_configuration()
+        np.save('./instructions.npy',self.instructions_epix)
+        np.save('./instructions_nveto.npy',self.instructions_nveto)
 
     def run_strax(self,run_id):
         '''Runs wfsim up to raw records for tpc and if requisted the nveto.
