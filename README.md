@@ -1,5 +1,5 @@
 # WFSim
-[The XENON wavefrom simulator.](https://wfsim.readthedocs.io)
+[The XENON waveform simulator.](https://wfsim.readthedocs.io)
 
 ## Fax in strax
 
