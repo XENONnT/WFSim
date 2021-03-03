@@ -303,14 +303,14 @@ class McChainSimulator(object):
         logging.debug('Syncing metadata')
 
         #First run start and stop
-        self.tpc_meta['start'], self.nveto_meta['start'] = np.repeat(np.min(self.tpc_meta['start'],self.tpc_meta['start']),2)
-        self.tpc_meta['stop'], self.nveto_meta['stop'] = np.repeat(np.max(self.tpc_meta['stop'],self.tpc_meta['stop']),2)
+        self.tpc_meta['start'], self.nveto_meta['start'] = [min((self.tpc_meta['start'],self.nveto_meta['start']))]*2
+        self.tpc_meta['end'], self.nveto_meta['end'] = [max((self.tpc_meta['end'],self.nveto_meta['end']))]*2
         
         #Second first and last chunk start/stop
         self.tpc_meta['chunks'][0]['start'], self.nveto_meta['chunks'][0]['start'] = \
-            np.repeat(np.min(self.tpc_meta['chunks'][0]['start'],self.nveto_meta['chunks'][0]['start']),2)
+            [min((self.tpc_meta['chunks'][0]['start'],self.nveto_meta['chunks'][0]['start']))]*2
         self.tpc_meta['chunks'][-1]['end'], self.nveto_meta['chunks'][0]['end'] = \
-            np.repeat(np.min(self.tpc_meta['chunks'][-1]['end'],self.nveto_meta['chunks'][-1]['end']),2)
+            [max((self.tpc_meta['chunks'][-1]['end'],self.nveto_meta['chunks'][-1]['end']))]*2
         
     def _store_meta(self,):
         ''''Store metadata after matching'''
