@@ -361,7 +361,7 @@ class FaxSimulatorPlugin(strax.Plugin):
         if overrides is not None:
             c.update(overrides)
 
-        assert isinstance(cmt_run_id, str), "cmt_run_id should be a string not %s" % type(cmt_run_id).__name__
+        assert isinstance(c['cmt_run_id'], str), "cmt_run_id should be a string not %s" % type(c['cmt_run_id']).__name__
         cmt_run_id = c['cmt_run_id'] if c['cmt_run_id'] != '0' else self.run_id
         # Update gains depending on gain model
         self.to_pe = get_to_pe(cmt_run_id, c['gain_model'],
