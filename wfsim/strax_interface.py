@@ -122,7 +122,7 @@ def _read_optical_nveto(config, events):
     
     returns 2 nested arrays
     '''
-    nV_pmt_id_offset = 2000
+    nV_pmt_id_offset = config['channel_map']['nveto'][0]
     constant_hc = 1239.841984 # (eV*nm) to calculate (wavelength lambda) = h * c / energy
     channels = [[channel - nV_pmt_id_offset for channel in array] for array in events["pmthitID"].array(library="np")]
     timings = events["pmthitTime"].array(library="np")*1e9
@@ -205,7 +205,8 @@ class McChainSimulator(object):
     def _set_max(self,):
         '''If no event_stop is specified set it to the maximum (-1=do all events)'''
         if self.context.config['event_stop']==-1:
-            self.context.set_config(dict(event_stop=self.instructions_epix['g4id'][-1]+1))
+            self.context.set_config(dict(event_stop=\
+                np.max(self.instructions_epix['g4id'][-1],self.instructions_nveto['g4id'][-1])+1))
         else:
             pass
 
@@ -236,7 +237,6 @@ class McChainSimulator(object):
 
     def instructions_from_nveto(self,):
         logging.info("Getting nveto instructions")
-        #TODO make config working with nveto...
         self.context.config['nv_pmt_ce_factor'] = 1.0
         self.instructions_nveto, self.nveto_channels, self.nveto_timings=read_optical(self.context.config)
         
@@ -244,13 +244,13 @@ class McChainSimulator(object):
     def set_timing(self,):
         '''Set timing information in such a way to synchronize instructions for the TPC and nVeto'''
         logging.info("Setting timings")
-        rate = self.context.config['event_rate']
+        
+        #Rate in ns^-1
+        rate = self.context.config['event_rate']/wfsim.units.s
         start = self.context.config['event_start']
-        stop=self.context.config['event_stop']
-        n_events = stop-start
+        stop = self.context.config['event_stop']
 
-        timings= (self.context.config['event_start']/rate + \
-                 wfsim.units.s*np.random.random(n_events)*(n_events)/rate).astype(np.int64)
+        timings= np.random.uniform(start/rate,stop/rate,stop-start).astype(np.int64)
         timings.sort()
 
         #For tpc we have multiple instructions per g4id. For nveto we only have one
@@ -259,7 +259,7 @@ class McChainSimulator(object):
         timings_tpc=np.repeat(timings,i_per_id)
         self.instructions_epix['time']+=timings_tpc
         if self.context.config['neutron_veto']:
-            self.instructions_nveto['time']=timings[self.instructions_nveto['g4id']]
+            self.instructions_nveto['time']=timings[self.instructions_nveto['g4id']-start]
     
     def set_configuration(self,):
         '''Set chunking configuration and feeds instructions to wfsim'''
@@ -301,21 +301,26 @@ class McChainSimulator(object):
         '''Sync metadata between tpc and nveto. The start and end times of the metadata must match for
             something strax wants. Check which ever one starts first, make that the start of both. Same for end'''
         logging.debug('Syncing metadata')
-        keys = ('start','end')
-        for key in keys:
-            if self.tpc_meta[key]>self.nveto_meta[key]:
-                self.tpc_meta[key]=self.nveto_meta[key]
-            else:
-                self.nveto_meta[key]=self.tpc_meta[key]
 
+        #First run start and stop
+        self.tpc_meta['start'], self.nveto_meta['start'] = np.repeat(np.min(self.tpc_meta['start'],self.tpc_meta['start']),2)
+        self.tpc_meta['stop'], self.nveto_meta['stop'] = np.repeat(np.max(self.tpc_meta['stop'],self.tpc_meta['stop']),2)
+        
+        #Second first and last chunk start/stop
+        self.tpc_meta['chunks'][0]['start'], self.nveto_meta['chunks'][0]['start'] = \
+            np.repeat(np.min(self.tpc_meta['chunks'][0]['start'],self.nveto_meta['chunks'][0]['start']),2)
+        self.tpc_meta['chunks'][-1]['end'], self.nveto_meta['chunks'][0]['end'] = \
+            np.repeat(np.min(self.tpc_meta['chunks'][-1]['end'],self.nveto_meta['chunks'][-1]['end']),2)
+        
     def _store_meta(self,):
         ''''Store metadata after matching'''
+        #TODO Metadata is written to the wrong folder
         logging.debug('Storing synced metadata')
         metas=(self.tpc_meta,self.nveto_meta)
 
         json_options = dict(sort_keys=True, indent=4)
         for ix,target in enumerate(self.targets):
-            prefix=f"{self.context.key_for(self.run_id,target)}-metadata.json"
+            prefix=f"{self.context.key_for(self.run_id,target)}/{self.context.key_for(self.run_id,target)}-metadata.json"
             path = self.context.storage[0].path
             md_path = osp.join(path,prefix)
             with open(md_path, mode='w') as f:
@@ -530,8 +535,10 @@ class FaxSimulatorPlugin(strax.Plugin):
     input_timeout = 3600 # as an hour
 
     def setup(self):
-        c = self.config
-        c.update(get_resource(c['fax_config'], fmt='json'))
+        self.set_config()
+
+        c=self.config
+        
         # Update gains to the nT defaults
         self.to_pe = get_to_pe(self.run_id, c['gain_model'],
                               c['channel_map']['tpc'][1]+1)
@@ -539,10 +546,6 @@ class FaxSimulatorPlugin(strax.Plugin):
         c['gains'][self.to_pe==0] = 0
         if c['seed'] != False:
             np.random.seed(c['seed'])
-
-        overrides = self.config['fax_config_override']
-        if overrides is not None:
-            c.update(overrides)
 
         #We hash the config to load resources. Channel map is immutable and cannot be hashed
         self.config['channel_map'] = dict(self.config['channel_map'])
@@ -552,6 +555,13 @@ class FaxSimulatorPlugin(strax.Plugin):
         self.get_instructions()
         self.check_instructions()
         self._setup()
+
+    def set_config(self,):
+        c = self.config
+        c.update(get_resource(c['fax_config'], fmt='json'))
+        overrides = self.config['fax_config_override']
+        if overrides is not None:
+            c.update(overrides)
 
     def _setup(self):
         #Set in inheriting class
@@ -688,12 +698,22 @@ class RawRecordsFromFaxOptical(RawRecordsFromFaxNT):
     strax.Option('wfsim_nveto_instructions',track=False,default=False),
     strax.Option('wfsim_nveto_channels',track=False,default=False),
     strax.Option('wfsim_nveto_timings',track=False,default=False),
+    strax.Option('fax_config_nveto',default=None,track=True,),
     )
 class RawRecordsFromFaxnVeto(RawRecordsFromFaxOptical):
     provides = ('raw_records_nv', 'truth')
     data_kind = immutabledict(zip(provides, provides))
     # Why does the data_kind need to be repeated?? So the overriding of the
     # provides doesn't work in the setting of the data__kind?
+
+    def set_config(self,):
+        c = self.config
+        # assert c['fax_config_nveto'], "You must specify a nveto config file!"
+        c.update(get_resource(c['fax_config'], fmt='json'))
+        overrides = self.config['fax_config_override']
+        if overrides is not None:
+            c.update(overrides)
+
 
     def compute(self):
         result = super().compute()
@@ -706,7 +726,6 @@ class RawRecordsFromFaxnVeto(RawRecordsFromFaxOptical):
             self.instructions=self.config['wfsim_nveto_instructions']
             self.channels=self.config['wfsim_nveto_channels']
             self.timings=self.config['wfsim_nveto_timings']
-            np.save('./channels.npy',self.channels)
         else:
             super().get_instructions()
 
