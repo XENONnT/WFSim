@@ -1,4 +1,6 @@
 # WFSim
+[The XENON wavefrom simulator.](https://wfsim.readthedocs.io)
+
 ## Fax in strax
 
 [![Readthedocs Badge](https://readthedocs.org/projects/wfsim/badge/?version=latest)](https://wfsim.readthedocs.io/en/latest/?badge=latest)
@@ -11,17 +13,7 @@
 Here are the files needed to run the waveform simulator fax and give output in the same formats as used by strax.
 
 ## Installation
+Follow the [installation guide](https://wfsim.readthedocs.io/en/latest/intro.html) to setup WFSim.
 
-Clone the repository and let pip install it for you
-```bash
-pip install wfsim
-```
-
-Or on midway
-```
-# Activate the container, the latest version of wfsim is installed
-/project2/lgrandi/xenonnt/development/xnt_env
-```
-
-## Usage
-In the notebook folder there is a short test notebook showing basic usage.
+## Examples
+Several tutorials are provided in the [tutorial section](https://wfsim.readthedocs.io/en/latest/index.html) linked in the documentation. This code is available as [IPython Notebooks](https://github.com/XENONnT/WFSim/tree/master/notebooks).
