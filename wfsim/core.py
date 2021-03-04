@@ -515,19 +515,19 @@ class S2(Pulse):
                                           config=self.config,
                                           resource=self.resource)
 
-
         n_electron = self.get_electron_yield(n_electron=n_electron,
                                              z_obs=z_obs,
                                              config=self.config)
 
         # Second generate photon timing and channel
         self._photon_timings, self._instruction = self.photon_timings(t, n_electron, z_obs, positions, sc_gain,
-                                                   config=self.config,
-                                                   resource=self.resource,
-                                                   phase=self.phase)
+                                                                      config=self.config,
+                                                                      resource=self.resource,
+                                                                      phase=self.phase)
+
         self._photon_channels, self._photon_timings = self.photon_channels(n_electron=n_electron,
-                                                                            z_obs=z_obs,
-                                                                            positions=positions,
+                                                                           z_obs=z_obs,
+                                                                           positions=positions,
                                                                            _photon_timings=self._photon_timings,
                                                                            _instruction=self._instruction,
                                                                            config=self.config,
@@ -542,7 +542,7 @@ class S2(Pulse):
         :param config: dict with wfsim config
         :param resource: instance of the resource class
         
-        returns array of floats (ints?) 
+        returns array of floats (mean expectation) 
         '''
         if config['detector']=='XENONnT':
             sc_gain = np.squeeze(resource.s2_light_yield_map(positions), axis=-1) \
@@ -764,7 +764,6 @@ class S2(Pulse):
         S2.electron_timings(t, n_electron, z, sc_gain, 
             _electron_timings, _electron_gains, *_config)
 
-        # TODO log this
         if len(_electron_timings) < 1:
             _photon_timings = []
             return _photon_timings, []
@@ -798,7 +797,7 @@ class S2(Pulse):
 
         _photon_timings += Pulse.singlet_triplet_delays(
             len(_photon_timings), config['singlet_fraction_gas'],config, phase)
-        
+
         _photon_timings += np.random.normal(0,config['s2_time_spread'],len(_photon_timings))
         # The timings generated is NOT randomly ordered, must do shuffle
         # Shuffle within each given n_electron[i]
@@ -864,8 +863,8 @@ class S2(Pulse):
         """
         if len(_photon_timings) == 0:
             _photon_channels = []
-            return _photon_timings,_photon_channels
-        
+            return _photon_timings, _photon_channels
+
         aft = config['s2_mean_area_fraction_top']
         aft_random = config.get('randomize_fraction_of_s2_top_array_photons', 0)
         channels = np.arange(config['n_tpc_pmts']).astype(int)
@@ -912,8 +911,10 @@ class S2(Pulse):
         mask = _photon_channels != -1
         _photon_channels = _photon_channels[mask]
         _photon_timings = _photon_timings[mask]
+        
+        sorted_index = np.argsort(_photon_channels)
 
-        return _photon_channels, _photon_timings
+        return _photon_channels[sorted_index], _photon_timings[sorted_index]
 
 
 @export
@@ -962,7 +963,7 @@ class PhotoIonization_Electron(S2):
         return instruction
 
     def _rand_position(self, n):
-        Rupper = 46
+        Rupper = self.config['tpc_radius']
 
         r = np.sqrt(np.random.uniform(0, Rupper*Rupper, n))
         angle = np.random.uniform(-np.pi, np.pi, n)
