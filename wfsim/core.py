@@ -14,18 +14,18 @@ export, __all__ = exporter()
 __all__.append('PULSE_TYPE_NAMES')
 
 log = logging.getLogger('SimulationCore')
+log.setLevel('DEBUG')
 
 PULSE_TYPE_NAMES = ('RESERVED', 's1', 's2', 'unknown', 'pi_el', 'pmt_ap', 'pe_el')
-
 
 @export
 class NestId():
     """Nest ids for refering to different scintilation models, only ER is actually validated"""
-    NR = [0]      
-    ALPHA = [6]   
-    ER = [7, 8, 11,12]
+    NR = [0]
+    ALPHA = [6]
+    ER = [7, 8, 11, 12]
     LED = [20]
-    _ALL = NR+ALPHA+ER+LED
+    _ALL = NR + ALPHA + ER + LED
 
 @export
 class Pulse(object):
@@ -283,9 +283,8 @@ class S1(Pulse):
     def __init__(self, config):
         super().__init__(config)
         # TODO
-        #  This config is not set for the 1T fax config
+        # This config is not set for the 1T fax config
         self.config.setdefault('s1_decay_spread', 1)
-        
         self.phase = 'liquid'  # To distinguish singlet/triplet time delay.
 
     def __call__(self, instruction):
@@ -303,9 +302,9 @@ class S1(Pulse):
 
         positions = np.array([x, y, z]).T  # For map interpolation
         n_photons = self.get_n_photons(n_photons=n_photons,
-                                        positions=positions,
-                                        s1_light_yield_map=self.resource.s1_light_yield_map,
-                                        config=self.config)
+                                       positions=positions,
+                                       s1_light_yield_map=self.resource.s1_light_yield_map,
+                                       config=self.config)
 
         self._photon_timings = self.photon_timings(t=t,
                                                    n_photons=n_photons, 
@@ -349,10 +348,10 @@ class S1(Pulse):
 
         returns nested array with photon channels   
         '''
-        channels = np.arange(config['n_tpc_pmts'])#+1 for the channel map
+        channels = np.arange(config['n_tpc_pmts'])  # +1 for the channel map
         p_per_channel = s1_pattern_map(positions)
         p_per_channel[:, np.in1d(channels, config['turned_off_pmts'])] = 0
-        
+
         _photon_channels = np.array([]).astype(int)
         for ppc, n in zip(p_per_channel, n_photons):
             _photon_channels = np.append(_photon_channels,
@@ -370,44 +369,49 @@ class S1(Pulse):
         :param n_photons: 1d array of ints
         :param recoil_type: 1d array of ints
         :param config: dict wfsim config
-        :param ohase: str "liquid"
+        :param phase: str "liquid"
 
         returns photon timing array'''
-        if n_photons == 0:
-            return np.array([])
-
-        if (config.get('s1_model_type') == 'simple' and 
-           recoil_type in NestId._ALL):
+        _photon_timings = np.repeat(t, n_photons)
+        if len(_photon_timings) == 0:
+            return _photon_timings.astype(int)
+        
+        if (config['s1_model_type'] == 'simple' and 
+            np.isin(recoil_type, NestId._ALL).all()):
             # Simple S1 model enabled: use it for ER and NR.
-            _photon_timings = t + np.random.exponential(config['s1_decay_time'], n_photons)
-            _photon_timings += np.random.normal(0,config['s1_decay_spread'],len(_photon_timings))
+            _photon_timings += np.random.exponential(config['s1_decay_time'], len(_photon_timings)).astype(int)
+            _photon_timings += np.random.normal(0, config['s1_decay_spread'], len(_photon_timings)).astype(int)
             return _photon_timings
 
-        #TODO Looks nice but don't know if this actually works
-        try:
-            recoil_types = [k for k in vars(NestId) if not k.startswith('_')]
-            for recoil in recoil_types:
-                if recoil in NestId.recoil:
-                    _photon_timings = t + getattr(S1, recoil_type.lower())(n_photons=n_photons,
-                                                                           config=config,
-                                                                           phase=phase)
-                    return _photon_timings
-
-        except AttributeError:
-            raise AttributeError(f"Recoil type must be ER, NR, alpha or LED, not {recoil_type}. Check nest ids")
+        counts_start = 0
+        for i, counts in enumerate(n_photons):
+            for k in vars(NestId):
+                if k.startswith('_'): continue
+                if recoil_type[i] in getattr(NestId, k):
+                    str_recoil_type = k
+            try:
+                _photon_timings[counts_start: counts_start + counts] += \
+                    getattr(S1, str_recoil_type.lower())(
+                    size=counts,
+                    config=config,
+                    phase=phase).astype(int)
+            except AttributeError:
+                raise AttributeError(f"Recoil type must be ER, NR, alpha or LED, not {recoil_type}. Check nest ids")
+            counts_start += counts
+        return _photon_timings
 
     @staticmethod
-    def alpha(size,config, phase):
+    def alpha(size, config, phase):
         '''  Calculate S1 photon timings for an alpha decay. Neglible recombination time, not validated
         :param size: 1d array of ints, number of photons
         :param config: dict wfsim config
         :parma phase: str "liquid"
         
         return 1d array of photon timings'''
-        return Pulse.singlet_triplet_delays(size, config['s1_ER_alpha_singlet_fraction'],config, phase)
+        return Pulse.singlet_triplet_delays(size, config['s1_ER_alpha_singlet_fraction'], config, phase)
 
     @staticmethod
-    def led(size,config, **kwargs):
+    def led(size, config, **kwargs):
         '''  distribute photons uniformly within the LED pulse length, not validated
         :param size: 1d array of ints, number of photons
         :param config: dict wfsim config
@@ -417,34 +421,53 @@ class S1(Pulse):
         return np.random.uniform(0, config['led_pulse_length'], size)
 
     @staticmethod
-    def er(size,config, singlet_triplet_delays, phase):
+    def er(size, config, phase):
         '''Complex ER model, not validated
         :param size: 1d array of ints, number of photons
         :param config: dict wfsim config
         :parma phase: str "liquid"
         return 1d array of photon timings
         '''
-        
-        # How many of these are primary excimers? Others arise through recombination.
-        efield = (config['drift_field'] / (units.V / units.cm))
-        config['s1_ER_recombination_time'] = 3.5 / \
-                                                  0.18 * (1 / 20 + 0.41) * np.exp(-0.009 * efield)
 
-        reco_time, p_fraction, max_reco_time = (
-            config['s1_ER_recombination_time'],
-            config['s1_ER_primary_singlet_fraction'],
-            config['maximum_recombination_time'])
+        # How many of these are primary excimers? Others arise through recombination.
+        # TODO
+        # This config is not set for the nT fax config
+        config.setdefault('liquid_density', 1.872452802978054e+30)
+        density = config['liquid_density'] / (units.g / units.cm ** 3)
+        excfrac = 0.4 - 0.11131 * density - 0.0026651 * density ** 2    # primary / secondary excimers
+        excfrac = 1 / (1 + excfrac)                                     # primary / all excimers
+        # primary / all excimers that produce a photon:
+        excfrac /= 1 - (1 - excfrac) * (1 - config['s1_ER_recombination_fraction'])
+        config['s1_ER_primary_excimer_fraction'] = excfrac
+        log.debug('Inferred s1_ER_primary_excimer_fraction %s' % excfrac)
+
+        # Recombination time from NEST 2014
+        # 3.5 seems fishy, they fit an exponential to data, but in the code they use a non-exponential distribution...
+        efield = (config['drift_field'] / (units.V / units.cm))
+        reco_time = 3.5 / \
+            0.18 * (1 / 20 + 0.41) * np.exp(-0.009 * efield)
+        config['s1_ER_recombination_time'] = reco_time
+        log.debug('Inferred s1_ER_recombination_time %s' % reco_time)
 
         timings = np.random.choice([0, reco_time], size, replace=True,
-                                   p=[p_fraction, 1 - p_fraction])
+                                   p=[excfrac, 1 - excfrac])
         primary = timings == 0
-        timings *= 1 / (1 - np.random.uniform(0, 1, size)) - 1
-        timings = np.clip(timings, 0, config['maximum_recombination_time'])
         size_primary = len(timings[primary])
-        timings[primary] += singlet_triplet_delays(
-            size_primary, config['s1_ER_primary_singlet_fraction'],config,phase)
-        timings[~primary] += singlet_triplet_delays(
-            size - size_primary, config['s1_ER_secondary_singlet_fraction'],config,phase)
+
+        timings[primary] += Pulse.singlet_triplet_delays(
+            size_primary, config['s1_ER_primary_singlet_fraction'], config, phase)
+
+        # Correct for the recombination time
+        # For the non-exponential distribution: see Kubota 1979, solve eqn 2 for n/n0.
+        # Alternatively, see Nest V098 source code G4S1Light.cc line 948
+        timings[~primary] *= 1 / (-1 + 1 / np.random.uniform(0, 1, size - size_primary))
+        # TODO
+        # Update max recombine time in the nT fax config
+        config['maximum_recombination_time'] = 1000
+        timings[~primary] = np.clip(timings[~primary], 0, config['maximum_recombination_time'])
+        timings[~primary] += Pulse.singlet_triplet_delays(
+            size - size_primary, config['s1_ER_secondary_singlet_fraction'], config, phase)
+
         return timings
 
     @staticmethod
@@ -468,7 +491,7 @@ class S2(Pulse):
     def __init__(self, config):
         super().__init__(config)
         # TODO
-        #  This config is not set for the 1T fax config
+        # This config is not set for the 1T fax config
         self.config.setdefault('s2_time_spread', 1)
 
         self.phase = 'gas'  # To distinguish singlet/triplet time delay.
