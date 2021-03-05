@@ -92,11 +92,11 @@ class Resource:
                 files[k] = downloaded_file
             except (FileNotFoundError, ValueError, NameError, AttributeError):
                 try:
-                    log.warning(f"Trying to use the private repo to download {v}")
+                    log.warning(f"Trying to use the private repo to load {v} locally")
                     # You might want to use this, for example if you are a developer
                     import ntauxfiles
                     files[k] = ntauxfiles.get_abspath(v)
-                    log.info(f"Loading {v} is successfull")
+                    log.info(f"Loading {v} is successfully from {files[k]}")
                 except (ModuleNotFoundError, ImportError, FileNotFoundError):
                     log.info(f"ntauxfiles is not installed or does not have {v}")
                 else:
