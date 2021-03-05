@@ -99,7 +99,6 @@ class Resource:
                     log.info(f"Loading {v} is successfully from {files[k]}")
                 except (ModuleNotFoundError, ImportError, FileNotFoundError):
                     log.info(f"ntauxfiles is not installed or does not have {v}")
-                else:
                     # We cannot download the file from the database. We need to
                     # try to get a placeholder file from a URL.
                     raw_url = osp.join(url_base, v)
