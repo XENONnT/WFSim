@@ -24,6 +24,18 @@ def load_config(config):
 
 
 class Resource:
+    """
+    Get the configs needed for running WFSim. Configs can be obtained in
+        three ways:
+        1. Get it directly from the mongo database. This only needs the
+            name of the file.
+        2. Get if from the 'ntauxfiles' package. This should only be
+            used by developers because you might get a version that is
+            outdated.
+        3. Download it from the strax_auxiliary_files repository. Since
+            this is a public repository anyone can download the files
+            stored here.
+    """
     def __init__(self, config=None):
         log.debug(f'Getting {config}')
         if config is None:
@@ -79,11 +91,20 @@ class Resource:
                 downloaded_file = downloader.download_single(v)
                 files[k] = downloaded_file
             except (FileNotFoundError, ValueError, NameError, AttributeError):
-                # We cannot download the file from the database. We need to
-                # try to get a placeholder file from a URL.
-                raw_url = osp.join(url_base, v)
-                log.warning(f'{k} did not download, trying {raw_url}')
-                files[k] = raw_url
+                try:
+                    log.warning(f"Trying to use the private repo to download {v}")
+                    # You might want to use this, for example if you are a developer
+                    import ntauxfiles
+                    files[k] = ntauxfiles.get_abspath(v)
+                    log.info(f"Loading {v} is successfull")
+                except (ModuleNotFoundError, ImportError, FileNotFoundError):
+                    log.info(f"ntauxfiles is not installed or does not have {v}")
+                else:
+                    # We cannot download the file from the database. We need to
+                    # try to get a placeholder file from a URL.
+                    raw_url = osp.join(url_base, v)
+                    log.warning(f'{k} did not download, trying {raw_url}')
+                    files[k] = raw_url
             log.debug(f'Downloaded {k} successfully')
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
 
