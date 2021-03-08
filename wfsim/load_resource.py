@@ -8,7 +8,6 @@ import logging
 log = logging.getLogger('load_resource')
 
 _cached_configs = dict()
-import ntauxfiles
 
 def load_config(config):
     """Create a Resource instance from the configuration
