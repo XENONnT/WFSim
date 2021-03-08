@@ -5,10 +5,10 @@ import numpy as np
 import strax
 import straxen
 import logging
+import sys
 log = logging.getLogger('load_resource')
 
 _cached_configs = dict()
-import ntauxfiles
 
 def load_config(config):
     """Create a Resource instance from the configuration
@@ -157,7 +157,10 @@ class Resource:
         log.debug(f'{self.__class__.__name__} fully initialized')
 
 def make_map(map_file: str, fmt='text'):
-    map_data = ntauxfiles.get_sim_file(map_file, fmt=fmt)
+    if 'ntauxfiles' in sys.modules:
+        map_data = ntauxfiles.get_sim_file(map_file, fmt=fmt)
+    else:
+        map_data = straxen.get_resource(map_file,fmt=fmt)
     return straxen.InterpolatingMap(map_data)
 
 
