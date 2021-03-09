@@ -16,7 +16,7 @@
     "field_distortion_on": false,
 
     // Resource
-    "url_base": "https://raw.githubusercontent.com/XENONnT/WFSim/22004e28421044452f42aaf5797be7186e07bbba/files",
+    "url_base": "https://raw.githubusercontent.com/XENONnT/WFSim/b42e398f8c9c6305344b29853b473f47a4c4c613/files",
     "photon_area_distribution": "XENONnT_spe_distributions_1T_copy.csv",
     "s1_pattern_map": "XENONnT_s1_xyz_patterns_uniform.pkl",
     "s2_pattern_map": "XENONnT_s2_xy_patterns_uniform.pkl",
