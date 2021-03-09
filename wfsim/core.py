@@ -282,8 +282,7 @@ class S1(Pulse):
 
     def __init__(self, config):
         super().__init__(config)
-        # TODO
-        # This config is not set for the 1T fax config
+        # TODO: This config is not set for the 1T fax config
         self.config.setdefault('s1_decay_spread', 1)
         self.phase = 'liquid'  # To distinguish singlet/triplet time delay.
 
@@ -386,7 +385,8 @@ class S1(Pulse):
         counts_start = 0
         for i, counts in enumerate(n_photons):
             for k in vars(NestId):
-                if k.startswith('_'): continue
+                if k.startswith('_'):
+                    continue
                 if recoil_type[i] in getattr(NestId, k):
                     str_recoil_type = k
             try:
@@ -430,9 +430,7 @@ class S1(Pulse):
         '''
 
         # How many of these are primary excimers? Others arise through recombination.
-        # TODO
-        # This config is not set for the nT fax config
-        config.setdefault('liquid_density', 1.872452802978054e+30)
+        config.setdefault('liquid_density', 1.872452802978054e+30)  # This config is not set for the nT fax config
         density = config['liquid_density'] / (units.g / units.cm ** 3)
         excfrac = 0.4 - 0.11131 * density - 0.0026651 * density ** 2    # primary / secondary excimers
         excfrac = 1 / (1 + excfrac)                                     # primary / all excimers
@@ -461,8 +459,7 @@ class S1(Pulse):
         # For the non-exponential distribution: see Kubota 1979, solve eqn 2 for n/n0.
         # Alternatively, see Nest V098 source code G4S1Light.cc line 948
         timings[~primary] *= 1 / (-1 + 1 / np.random.uniform(0, 1, size - size_primary))
-        # TODO
-        # Update max recombine time in the nT fax config
+        # TODO: Update max recombine time in the nT fax config
         config['maximum_recombination_time'] = 1000
         timings[~primary] = np.clip(timings[~primary], 0, config['maximum_recombination_time'])
         timings[~primary] += Pulse.singlet_triplet_delays(
@@ -490,8 +487,7 @@ class S2(Pulse):
 
     def __init__(self, config):
         super().__init__(config)
-        # TODO
-        # This config is not set for the 1T fax config
+        # TODO: This config is not set for the 1T fax config
         self.config.setdefault('s2_time_spread', 1)
 
         self.phase = 'gas'  # To distinguish singlet/triplet time delay.
@@ -603,12 +599,12 @@ class S2(Pulse):
     @staticmethod
     @njit
     def _luminescence_timings_simple(n, dG, E0, r, dr, rr, alpha, uE, p, n_electron, shape):
-        emission_time = np.zeros(shape)
         """
         Luminescence time distribution computation, calculates emission timings of photons from the excited electrons
         return 1d nested array with ints
         """
 
+        emission_time = np.zeros(shape)
         ci = 0
         for i in range(n):
             ne = n_electron[i]
@@ -1384,7 +1380,7 @@ class RawData(object):
             n_dpe_bot = getattr(pulse, '_n_double_pe_bot', 0)
         tb['n_photon'] += n_dpe
         tb['n_photon'] -= np.sum(np.isin(channels, getattr(pulse, 'turned_off_pmts', [])))
-        #TODO this turned_off guy, check how this works with a config['turned_off_guys']
+        #TODO: this turned_off guy, check how this works with a config['turned_off_guys']
         channels_bottom = list(
             set(self.config['channels_bottom']).difference(getattr(pulse, 'turned_off_pmts', [])))
         tb['n_photon_bottom'] = (

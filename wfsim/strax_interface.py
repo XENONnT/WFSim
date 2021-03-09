@@ -319,7 +319,7 @@ class McChainSimulator(object):
         
     def _store_meta(self,):
         ''''Store metadata after matching'''
-        #TODO Metadata is written to the wrong folder
+        #TODO: Metadata is written to the wrong folder
         logging.debug('Storing synced metadata')
         metas=(self.tpc_meta,self.nveto_meta)
 
