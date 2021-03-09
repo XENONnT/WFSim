@@ -32,7 +32,6 @@ class Resource:
 
         files = {
             'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
-            'ele_ap_cdfs': 'ele_after_pulse.npy',
             'noise_file': 'x1t_noise_170203_0850_00_small.npz',
         }
         if config['detector'] == 'XENON1T':
@@ -60,11 +59,14 @@ class Resource:
 
         for k in set(config).intersection(files):
             files[k] = config[k]  # Allowing user to replace default with specified files
-        commit = 'master'   # Replace this by a commit hash if you feel solid and responsible
-        if config['detector'] == "XENON1T":
+
+        commit = 'master'  # Replace this by a commit hash if you feel solid and responsible
+        if getattr(config, 'url_base', False):
+            url_base = config['url_base']
+        elif config['detector'] == "XENON1T":
             url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/sim_files'
-        if config['detector'] == "XENONnT":
-            url_base = f'/Users/petergaemers/Desktop/python/private_nt_aux_files/sim_files'
+        elif config['detector'] == "XENONnT":
+            url_base = f'https://raw.githubusercontent.com/XENONnT/WFSim/{commit}/files'
 
         for k, v in files.items():
             log.debug(f'Obtaining {k} from {v}')
@@ -99,7 +101,7 @@ class Resource:
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='json.gz')
             self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
             # TODO
-            #  config not set
+            # config not set
             self.gas_gap_length = lambda positions: np.ones(253)
 
         if config['detector'] == 'XENONnT':
@@ -114,30 +116,37 @@ class Resource:
             lymap.data['map'] = np.sum(lymap.data['map'][:][:], axis=2, keepdims=True)
             lymap.__init__(lymap.data)
             self.s2_light_yield_map = lymap
-            self.s2_luminescence = ntauxfiles.get_sim_file(files['s2_luminescence'], fmt='pkl.gz')
+            self.s2_luminescence = straxen.get_resource(files['s2_luminescence'], fmt='pkl.gz')
             self.fdc_3d = dummy_map(result=0)
-            gas_gap_map = ntauxfiles.get_sim_file(files['gas_gap_map'], fmt='pkl')
-            self.gas_gap_length = lambda positions: gas_gap_map.lookup(*positions.T)
+            
+            # Gas gap warping map
+            if config['enable_gas_gap_warping']:
+                gas_gap_map = straxen.get_resource(files['gas_gap_map'], fmt='pkl')
+                self.gas_gap_length = lambda positions: gas_gap_map.lookup(*positions.T)
 
-        #Spe area distributions
-        self.photon_area_distribution = ntauxfiles.get_sim_file(files['photon_area_distribution'], fmt='csv')
+        # Spe area distributions
+        self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
+
         # Electron After Pulses compressed, haven't figure out how pkl.gz works
-        self.uniform_to_ele_ap = ntauxfiles.get_sim_file(files['ele_ap_pdfs'], fmt='pkl.gz')
+        if config['enable_electron_afterpulses']:
+            self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
 
         # Photon After Pulses
-        self.uniform_to_pmt_ap = ntauxfiles.get_sim_file(files['photon_ap_cdfs'], fmt='pkl.gz')
+        if config['enable_pmt_afterpulses']:
+            self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
 
         # Noise sample
-        self.noise_data = ntauxfiles.get_sim_file(files['noise_file'], fmt='npy')['arr_0'].flatten()
+        if config['enable_noise']:
+            self.noise_data = straxen.get_resource(files['noise_file'], fmt='npy')['arr_0'].flatten()
 
         # nVeto PMT Q.E.
         if config['neutron_veto']:
-            self.nv_pmt_qe_data = ntauxfiles.get_sim_file(files['nv_pmt_qe_file'], fmt='json')
+            self.nv_pmt_qe_data = straxen.get_resource(files['nv_pmt_qe_file'], fmt='json')
 
         log.debug(f'{self.__class__.__name__} fully initialized')
 
 def make_map(map_file: str, fmt='text'):
-    map_data = ntauxfiles.get_sim_file(map_file, fmt=fmt)
+    map_data = straxen.get_resource(map_file, fmt=fmt)
     return straxen.InterpolatingMap(map_data)
 
 
