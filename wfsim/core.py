@@ -60,7 +60,7 @@ class Pulse(object):
         if '_photon_gains' not in self.__dict__:
             self._photon_timings += np.random.normal(self.config['pmt_transit_time_mean'],
                                                      self.config['pmt_transit_time_spread'] / 2.35482,
-                                                     len(self._photon_timings))
+                                                     len(self._photon_timings)).astype(int)
 
         dt = self.config.get('sample_duration', 10) # Getting dt from the lib just once
         self._n_double_pe = self._n_double_pe_bot = 0 # For truth aft output

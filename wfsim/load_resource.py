@@ -61,7 +61,7 @@ class Resource:
             files[k] = config[k]  # Allowing user to replace default with specified files
 
         commit = 'master'  # Replace this by a commit hash if you feel solid and responsible
-        if getattr(config, 'url_base', False):
+        if config.get('url_base', None):
             url_base = config['url_base']
         elif config['detector'] == "XENON1T":
             url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/sim_files'

@@ -39,7 +39,7 @@ def test_sim_1T():
 
 
 def test_sim_nT():
-    """Test the nT simulator. Works only if one has access to the XENONnT databases"""
+    """Test the nT simulator (should also work with the publicly available file)"""
     if not straxen.utilix_is_configured():
         # This means we cannot load the nT files. Most likely will work
         # locally but not a travis job.
@@ -51,10 +51,11 @@ def test_sim_nT():
             config=dict(
                 nchunk=1, event_rate=1, chunk_size=2,
                 detector='XENONnT',
-                fax_config='fax_config_nt.json',
+                fax_config='https://raw.githubusercontent.com/XENONnT/WFSim/22004e28421044452f42aaf5797be7186e07bbba/files/XENONnT_wfsim_config.json',
                 **straxen.contexts.xnt_common_config),
             **straxen.contexts.common_opts)
         st.register(wfsim.RawRecordsFromFaxNT)
+        st.set_config(dict(gain_model=('to_pe_constant', 0.01)))
 
         log.debug(f'Getting raw-records')
         rr = st.get_array(run_id, 'raw_records')

@@ -507,7 +507,7 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  help="Terminate processing if any one mailbox receives "
                       "no result for more than this many seconds"),
     strax.Option('fax_config',
-                 default='https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/master/sim_files/fax_config_nt.json?token=AHCU5AZMPZABYSGVRLDACR3ABAZUA'),
+                 default='https://raw.githubusercontent.com/XENONnT/WFSim/53ee94fca9d37d8ad6f53ab97aaa3b783028ceaa/files/XENONnT_wfsim_config.json'),
     strax.Option('gain_model',
                  default=('to_pe_per_run', 'https://github.com/XENONnT/private_nt_aux_files/blob/master/sim_files/to_pe_nt.npy?raw=true'),
                  help='PMT gain model. Specify as (model_type, model_config).'),
@@ -541,9 +541,8 @@ class FaxSimulatorPlugin(strax.Plugin):
 
     def setup(self):
         self.set_config()
-
         c=self.config
-        
+
         # Update gains to the nT defaults
         self.to_pe = get_to_pe(self.run_id, c['gain_model'],
                               c['channel_map']['tpc'][1]+1)
@@ -554,8 +553,8 @@ class FaxSimulatorPlugin(strax.Plugin):
 
         #We hash the config to load resources. Channel map is immutable and cannot be hashed
         self.config['channel_map'] = dict(self.config['channel_map'])
-        self.config['channel_map']['sum_signal']=800
-        self.config['channels_bottom'] = np.arange(self.config['n_top_pmts'],self.config['n_tpc_pmts'])
+        self.config['channel_map']['sum_signal'] = 800
+        self.config['channels_bottom'] = np.arange(self.config['n_top_pmts'], self.config['n_tpc_pmts'])
 
         self.get_instructions()
         self.check_instructions()
