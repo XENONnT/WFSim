@@ -57,15 +57,15 @@
     "maximum_recombination_time": 1000.0,
 
     // S1 model
-    "s1_decay_spread": 5,
-    "s1_decay_time": 44.77,        
+    "s1_decay_spread": 5.,
+    "s1_decay_time": 44.77,
     "s1_detection_efficiency": 0.12,
 
     // S2 model
     "s2_mean_area_fraction_top": 0.627,
     "s2_secondary_sc_gain": 21.3,                          # hits
-    "s2_time_spread": 0,                                   # single_e_pulse
-    "electron_extraction_yield": 1,
+    "s2_time_spread": 0.0,                                 # single_e_pulse
+    "electron_extraction_yield": 1.0,
     "electron_lifetime_liquid": 650000.0,                  # ns;
     "electron_trapping_time": 140.0,
     "gas_drift_velocity_slope": 5400000000000.0,
