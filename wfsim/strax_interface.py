@@ -319,7 +319,7 @@ class McChainSimulator(object):
         
     def _store_meta(self,):
         ''''Store metadata after matching'''
-        #TODO: Metadata is written to the wrong folder
+        # FIXME: Metadata is written to the wrong folder
         logging.debug('Storing synced metadata')
         metas=(self.tpc_meta,self.nveto_meta)
 
@@ -529,10 +529,10 @@ class FaxSimulatorPlugin(strax.Plugin):
     rechunk_on_save = False
 
     # Simulator uses iteration semantics, so the plugin has a state
-    # TODO: this seems avoidable...
+    # FIXME: this seems avoidable...
     parallel = False
 
-    # TODO: this state is needed for sorting checks,
+    # FIXME: this state is needed for sorting checks,
     # but it prevents prevent parallelization
     last_chunk_time = -999999999999999
 
@@ -551,7 +551,7 @@ class FaxSimulatorPlugin(strax.Plugin):
         if c['seed'] != False:
             np.random.seed(c['seed'])
 
-        #We hash the config to load resources. Channel map is immutable and cannot be hashed
+        # We hash the config to load resources. Channel map is immutable and cannot be hashed
         self.config['channel_map'] = dict(self.config['channel_map'])
         self.config['channel_map']['sum_signal'] = 800
         self.config['channels_bottom'] = np.arange(self.config['n_top_pmts'], self.config['n_tpc_pmts'])
