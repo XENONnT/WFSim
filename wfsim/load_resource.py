@@ -86,9 +86,11 @@ class Resource:
             self.s2_light_yield_map = make_map(files['s2_light_yield_map'], fmt='json')
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='json.gz')
             self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
-            # TODO
-            #  config not set
-            self.gas_gap_length = lambda positions: np.ones(253)
+
+            # Gas gap warping map
+            if config['enable_gas_gap_warping']:
+                gas_gap_map = straxen.get_resource(files['gas_gap_map'], fmt='pkl')
+                self.gas_gap_length = lambda positions: np.ones(253)
 
         if config['detector'] == 'XENONnT':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
@@ -107,6 +109,13 @@ class Resource:
             gas_gap_map = straxen.get_resource(files['gas_gap_map'], fmt='pkl')
             self.gas_gap_length = lambda positions: gas_gap_map.lookup(*positions.T)
 
+            # nVeto PMT Q.E.
+            if config['neutron_veto']:
+                self.nv_pmt_qe_data = straxen.get_resource(files['nv_pmt_qe_file'], fmt='json')
+
+        # Spe area distributions
+        self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
+
         # Electron After Pulses compressed, haven't figure out how pkl.gz works
         self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
 
@@ -116,6 +125,7 @@ class Resource:
         # Noise sample
         self.noise_data = straxen.get_resource(files['noise_file'], fmt='npy')['arr_0'].flatten()
 
+        log.debug(f'{self.__class__.__name__} fully initialized')
 
 def make_map(map_file: str, fmt='text'):
     map_data = straxen.get_resource(map_file, fmt)

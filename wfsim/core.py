@@ -108,8 +108,16 @@ class Pulse(object):
             # Build a simulated waveform, length depends on min and max of photon timings
             min_timing, max_timing = np.min(
                 _channel_photon_timings), np.max(_channel_photon_timings)
-            pulse_left = int(min_timing // dt) - int(self.config['samples_to_store_before'])
-            pulse_right = int(max_timing // dt) + int(self.config['samples_to_store_after'])
+            try:
+                pulse_left = (int(min_timing // dt) 
+                          - int(self.config['samples_to_store_before'])
+                          - self.config.get('samples_before_pulse_center', 2))
+            except:
+                print(min_timing, dt, min_timing // dt)
+            int(min_timing // dt)
+            pulse_right = (int(max_timing // dt) 
+                           + int(self.config['samples_to_store_after'])
+                           + self.config.get('samples_after_pulse_center', 20))
             pulse_current = np.zeros(pulse_right - pulse_left + 1)
 
             Pulse.add_current(_channel_photon_timings.astype(int),
@@ -280,8 +288,7 @@ class S1(Pulse):
 
     def __init__(self, config):
         super().__init__(config)
-        # TODO
-        #  This config is not set for the 1T fax config
+        # FIXME: This config is not set for the 1T fax config
         self.config.setdefault('s1_decay_spread', 1)
         
         self.phase = 'liquid'  # To distinguish singlet/triplet time delay.
@@ -386,10 +393,20 @@ class S1(Pulse):
         timings *= 1 / (1 - np.random.uniform(0, 1, size)) - 1
         timings = np.clip(timings, 0, config['maximum_recombination_time'])
         size_primary = len(timings[primary])
-        timings[primary] += singlet_triplet_delays(
-            size_primary, config['s1_ER_primary_singlet_fraction'],config,phase)
-        timings[~primary] += singlet_triplet_delays(
-            size - size_primary, config['s1_ER_secondary_singlet_fraction'],config,phase)
+
+        timings[primary] += Pulse.singlet_triplet_delays(
+            size_primary, config['s1_ER_primary_singlet_fraction'], config, phase)
+
+        # Correct for the recombination time
+        # For the non-exponential distribution: see Kubota 1979, solve eqn 2 for n/n0.
+        # Alternatively, see Nest V098 source code G4S1Light.cc line 948
+        timings[~primary] *= 1 / (-1 + 1 / np.random.uniform(0, 1, size - size_primary))
+        # FIXME: Update max recombine time in the nT fax config
+        config['maximum_recombination_time'] = 1000
+        timings[~primary] = np.clip(timings[~primary], 0, config['maximum_recombination_time'])
+        timings[~primary] += Pulse.singlet_triplet_delays(
+            size - size_primary, config['s1_ER_secondary_singlet_fraction'], config, phase)
+
         return timings
 
     @staticmethod
@@ -406,8 +423,7 @@ class S2(Pulse):
 
     def __init__(self, config):
         super().__init__(config)
-        # TODO
-        #  This config is not set for the 1T fax config
+        # FIXME: This config is not set for the 1T fax config
         self.config.setdefault('s2_time_spread', 1)
 
         self.phase = 'gas'  # To distinguish singlet/triplet time delay.
@@ -579,7 +595,7 @@ class S2(Pulse):
                 _timing += np.random.normal(drift_time_mean, drift_time_stdev)
                 timings[i_electron] = _timing
 
-                # TODO: add manual fluctuation to sc gain
+                # FIXME: add manual fluctuation to sc gain
                 gains[i_electron] = sc_gain[i]
                 i_electron += 1
 
@@ -1156,7 +1172,7 @@ class RawData(object):
             n_dpe_bot = getattr(pulse, '_n_double_pe_bot', 0)
         tb['n_photon'] += n_dpe
         tb['n_photon'] -= np.sum(np.isin(channels, getattr(pulse, 'turned_off_pmts', [])))
-        #TODO this turned_off guy, check how this works with a config['turned_off_guys']
+        # FIXME: this turned_off guy, check how this works with a config['turned_off_guys']
         channels_bottom = list(
             set(self.config['channels_bottom']).difference(getattr(pulse, 'turned_off_pmts', [])))
         tb['n_photon_bottom'] = (
