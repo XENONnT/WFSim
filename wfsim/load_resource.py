@@ -39,7 +39,6 @@ class Resource:
         log.debug(f'Getting {config}')
         if config is None:
             config = dict()
-        config = deepcopy(config)
 
         files = {
             'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
