@@ -146,7 +146,7 @@ class Resource:
                 lymap.__init__(lymap.data)
                 self.s2_light_yield_map = lymap
 
-            if config['s2_luminescence_model']:
+            if config['s2_luminescence_model'] == 'garfield':
                 self.s2_luminescence = straxen.get_resource(files['s2_luminescence'], fmt='pkl.gz')
 
             if config['field_distortion_on']:
