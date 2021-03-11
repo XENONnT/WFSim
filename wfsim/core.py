@@ -79,7 +79,6 @@ class Pulse(object):
                 if self.config['detector'] == 'XENON1T':
                     _channel_photon_gains = self.config['gains'][channel] \
                     * self.uniform_to_pe_arr(np.random.random(len(_channel_photon_timings)), channel)
-
                 else:
                     _channel_photon_gains = self.config['gains'][channel] \
                     * self.uniform_to_pe_arr(np.random.random(len(_channel_photon_timings)))
