@@ -4,6 +4,8 @@ import os.path as osp
 import numpy as np
 import strax
 import straxen
+import logging
+log = logging.getLogger('load_resource')
 
 _cached_configs = dict()
 
@@ -22,7 +24,20 @@ def load_config(config):
 
 
 class Resource:
+    """
+    Get the configs needed for running WFSim. Configs can be obtained in
+        three ways:
+        1. Get it directly from the mongo database. This only needs the
+            name of the file.
+        2. Get if from the 'ntauxfiles' package. This should only be
+            used by developers because you might get a version that is
+            outdated.
+        3. Download it from the strax_auxiliary_files repository. Since
+            this is a public repository anyone can download the files
+            stored here.
+    """
     def __init__(self, config=None):
+        log.debug(f'Getting {config}')
         if config is None:
             config = dict()
         config = deepcopy(config)
@@ -65,9 +80,10 @@ class Resource:
             url_base = f'https://raw.githubusercontent.com/XENONnT/WFSim/{commit}/files'
 
         for k, v in files.items():
+            log.debug(f'Obtaining {k} from {v}')
             if v.startswith('/'):
-                print(f"WARNING: Using local file {v} for a resource. "
-                      f"Do not set this as a default or TravisCI tests will break")
+                log.warning(f"WARNING: Using local file {v} for a resource. "
+                            f"Do not set this as a default or TravisCI tests will break")
             try:
                 # First try downloading it via
                 # https://straxen.readthedocs.io/en/latest/config_storage.html#downloading-xenonnt-files-from-the-database  # noqa
@@ -81,9 +97,20 @@ class Resource:
                 downloaded_file = downloader.download_single(v)
                 files[k] = downloaded_file
             except (FileNotFoundError, ValueError, NameError, AttributeError):
-                # We cannot download the file from the database. We need to
-                # try to get a placeholder file from a URL.
-                files[k] = osp.join(url_base, v)
+                try:
+                    log.warning(f"Trying to use the private repo to load {v} locally")
+                    # You might want to use this, for example if you are a developer
+                    import ntauxfiles
+                    files[k] = ntauxfiles.get_abspath(v)
+                    log.info(f"Loading {v} is successfully from {files[k]}")
+                except (ModuleNotFoundError, ImportError, FileNotFoundError):
+                    log.info(f"ntauxfiles is not installed or does not have {v}")
+                    # We cannot download the file from the database. We need to
+                    # try to get a placeholder file from a URL.
+                    raw_url = osp.join(url_base, v)
+                    log.warning(f'{k} did not download, trying {raw_url}')
+                    files[k] = raw_url
+            log.debug(f'Downloaded {k} successfully')
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
 
         if config['detector'] == 'XENON1T':
@@ -140,11 +167,12 @@ class Resource:
         if config['neutron_veto']:
             self.nv_pmt_qe_data = straxen.get_resource(files['nv_pmt_qe_file'], fmt='json')
 
-        log.debug(f'{self.__class__.__name__} fully initialized')
+    log.debug(f'{self.__class__.__name__} fully initialized')
 
 def make_map(map_file: str, fmt='text'):
     map_data = straxen.get_resource(map_file, fmt=fmt)
     return straxen.InterpolatingMap(map_data)
+
 
 class dummy_map():
     def __init__(self, result):

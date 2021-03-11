@@ -55,9 +55,10 @@ class Pulse(object):
         self.clear_pulse_cache()
 
         # Correct for PMT Transition Time Spread (skip for pmt afterpulses)
+        # note that PMT datasheet provides FWHM TTS, so sigma = TTS/(2*sqrt(2*log(2)))=TTS/2.35482
         if '_photon_gains' not in self.__dict__:
             self._photon_timings += np.random.normal(self.config['pmt_transit_time_mean'],
-                                                     self.config['pmt_transit_time_spread'],
+                                                     self.config['pmt_transit_time_spread'] / 2.35482,
                                                      len(self._photon_timings))
 
         dt = self.config.get('sample_duration', 10) # Getting dt from the lib just once
@@ -66,11 +67,7 @@ class Pulse(object):
         counts_start = 0 # Secondary loop index for assigning channel
         for channel, counts in zip(*np.unique(self._photon_channels, return_counts=True)):
 
-            #TODO: This is temporary continue to avoid out-of-range error.
-            # It should be added a proper method for nVeto PMTs also.
-            if channel >= 2000:
-                continue
-            # Use 'counts' amount of photon for this channel 
+            # Use 'counts' amount of photon for this channel
             _channel_photon_timings = self._photon_timings[counts_start:counts_start+counts]
             counts_start += counts
             if channel in self.config['turned_off_pmts']: continue
@@ -108,6 +105,7 @@ class Pulse(object):
             # Build a simulated waveform, length depends on min and max of photon timings
             min_timing, max_timing = np.min(
                 _channel_photon_timings), np.max(_channel_photon_timings)
+
             try:
                 pulse_left = (int(min_timing // dt) 
                           - int(self.config['samples_to_store_before'])
@@ -115,6 +113,8 @@ class Pulse(object):
             except:
                 print(min_timing, dt, min_timing // dt)
             int(min_timing // dt)
+
+            
             pulse_right = (int(max_timing // dt) 
                            + int(self.config['samples_to_store_after'])
                            + self.config.get('samples_after_pulse_center', 20))
@@ -315,9 +315,9 @@ class S1(Pulse):
 
     @staticmethod
     def get_n_photons(n_photons,positions, s1_light_yield_map, config):
-        if config['detector']=='xenonnt_detector':
+        if config['detector']=='XENONnT':
             ly = np.squeeze(s1_light_yield_map(positions),
-                            axis=-1)/(1+self.config['p_double_pe_emision'])
+                            axis=-1)/(1+config['p_double_pe_emision'])
         elif config['detector']=='XENON1T':
             ly = s1_light_yield_map(positions)
             ly *= config['s1_detection_efficiency']
@@ -343,7 +343,7 @@ class S1(Pulse):
     @staticmethod
     def photon_timings(t, n_photons, recoil_type, config):
         if n_photons == 0:
-            return
+            return np.array([])
 
         if (config.get('s1_model_type') == 'simple' and 
            recoil_type in NestId._ALL):
@@ -465,7 +465,7 @@ class S2(Pulse):
 
         # Second generate photon timing and channel
         self.photon_timings(t, n_electron, z_obs, positions, sc_gain)
-        self.photon_channels(positions)
+        self.photon_channels(n_electron, z_obs, positions)
 
         super().__call__()
 
@@ -573,7 +573,7 @@ class S2(Pulse):
     def electron_timings(t, n_electron, z, sc_gain, timings, gains,
             drift_velocity_liquid,
             drift_time_gate,
-            diffusion_constant_liquid,
+            diffusion_constant_longitudinal,
             electron_trapping_time):
         assert len(timings) == np.sum(n_electron)
         assert len(gains) == np.sum(n_electron)
@@ -585,7 +585,7 @@ class S2(Pulse):
             drift_time_mean = - z[i] / \
                 drift_velocity_liquid + drift_time_gate
             _drift_time_mean = max(drift_time_mean, 0)
-            drift_time_stdev = np.sqrt(2 * diffusion_constant_liquid * _drift_time_mean)
+            drift_time_stdev = np.sqrt(2 * diffusion_constant_longitudinal * _drift_time_mean)
             drift_time_stdev /= drift_velocity_liquid
             # Calculate electron arrival times in the ELR region
 
@@ -606,7 +606,7 @@ class S2(Pulse):
         _config = [self.config[k] for k in
                    ['drift_velocity_liquid',
                     'drift_time_gate',
-                    'diffusion_constant_liquid',
+                    'diffusion_constant_longitudinal',
                     'electron_trapping_time']]
         self.electron_timings(t, n_electron, z, sc_gain, 
             self._electron_timings, self._electron_gains, *_config)
@@ -634,7 +634,7 @@ class S2(Pulse):
         threshold = np.repeat(np.random.poisson(self._electron_gains), npho).reshape((nele, npho))
         self._photon_timings = self._photon_timings[probability < threshold]
 
-        # Special index for match photon to original electron poistion
+        # Index to match photon with poistion input
         self._instruction = np.repeat(
             np.repeat(np.arange(len(t)), n_electron), npho).reshape((nele, npho))
         self._instruction = self._instruction[probability < threshold]
@@ -642,7 +642,8 @@ class S2(Pulse):
         self._photon_timings += self.singlet_triplet_delays(
             len(self._photon_timings), self.config['singlet_fraction_gas'],self.config, self.phase)
         
-        self._photon_timings += np.random.normal(0,self.config['s2_time_spread'],len(self._photon_timings))
+        self._photon_timings += np.random.normal(0, 
+            self.config['s2_time_spread'], len(self._photon_timings))
 
         # The timings generated is NOT randomly ordered, must do shuffle
         # Shuffle within each given n_electron[i]
@@ -655,8 +656,49 @@ class S2(Pulse):
                 s = slice(cumulate_npho[i-1], cumulate_npho[i])
             np.random.shuffle(self._photon_timings[s])
 
-    def photon_channels(self, points):
-        # TODO log this
+    def s2_pattern_map_diffuse(self, n_electron, z, xy):
+        """Returns an array of pattern of shape [n interaction, n PMTs]
+        pattern of each interaction is an average of n_electron patterns evaluated at
+        diffused position near xy. The diffused positions sample from 2d symmetric gaussian
+        with spread scale with sqrt of drift time.
+
+        :param n_electron: a 1d int array
+        :param z: a 1d float array
+        :param xy: a 2d float array of shape [n interaction, 2]
+        """
+        drift_time_gate = self.config['drift_time_gate']
+        drift_velocity_liquid = self.config['drift_velocity_liquid']
+        diffusion_constant_transverse = getattr(self.config, 'diffusion_constant_transverse', 0)
+
+        assert all(z < 0), 'All S2 in liquid should have z < 0'
+
+        drift_time_mean = - z / drift_velocity_liquid + drift_time_gate  # Add gate time for consistancy?
+        hdiff_stdev = np.sqrt(2 * diffusion_constant_transverse * drift_time_mean)
+
+        hdiff = np.random.normal(0, 1, (np.sum(n_electron), 2)) * np.repeat(hdiff_stdev, n_electron, axis=0).reshape((-1, 1))
+        # Should we also output this xy position in truth?
+        xy_multi = np.repeat(xy, n_electron, axis=0) + hdiff  # One entry xy per electron
+        # Remove points outside tpc, and the pattern will be the average inside tpc
+        # Should be done natually with the s2 pattern map, however, there's some bug there so we apply this hard cut
+        mask = np.sum(xy_multi ** 2, axis=1) <= self.config['tpc_radius'] ** 2
+
+        pattern = np.zeros((len(n_electron), self.resource.s2_pattern_map.data['map'].shape[-1]))
+        n0 = 0
+        # Average over electrons for each s2
+        for ix, ne in enumerate(n_electron):
+            s = slice(n0, n0+ne)
+            pattern[ix, :] = np.average(self.resource.s2_pattern_map(xy_multi[s][mask[s]]), axis=0)
+            n0 += ne
+
+        return pattern
+
+    def photon_channels(self, n_electron, z_obs, positions):
+        """Set the _photon_channels property list of length same as _photon_timings
+
+        :param n_electron: a 1d int array
+        :param z_obs: a 1d float array
+        :param positions: a 2d float array of shape [n interaction, 2] for the xy coordinate
+        """
         if len(self._photon_timings) == 0:
             self._photon_channels = []
             return 1
@@ -667,14 +709,17 @@ class S2(Pulse):
         top_index = np.arange(self.config['n_top_pmts'])
         bottom_index = np.array(self.config['channels_bottom'])
 
-        pattern = self.resource.s2_pattern_map(points)  # [position, pmt]
+        if getattr(self.config, 'diffusion_constant_transverse', 0) > 0:
+            pattern = self.s2_pattern_map_diffuse(n_electron, z_obs, positions)  # [position, pmt]
+        else:
+            pattern = self.resource.s2_pattern_map(positions)  # [position, pmt]
         if pattern.shape[1] - 1 not in bottom_index:
             pattern = np.pad(pattern, [[0, 0], [0, len(bottom_index)]], 
                 'constant', constant_values=1)
         sum_pat = np.sum(pattern, axis=1).reshape(-1, 1)
         pattern = np.divide(pattern, sum_pat, out=np.zeros_like(pattern), where=sum_pat!=0)
 
-        assert pattern.shape[0] == len(points)
+        assert pattern.shape[0] == len(positions)
         assert pattern.shape[1] == len(channels)
 
         self._photon_channels = np.array([], dtype=int)
@@ -1038,7 +1083,7 @@ class RawData(object):
 
             self.left = np.min([p['left'] for p in self._pulses_cache]) - self.config['trigger_window']
             self.right = np.max([p['right'] for p in self._pulses_cache]) + self.config['trigger_window']
-            assert self.right - self.left < 200000, "Pulse cache too long"
+            assert self.right - self.left < 1000000, "Pulse cache too long"
 
             if self.left % 2 != 0: self.left -= 1 # Seems like a digizier effect
 
