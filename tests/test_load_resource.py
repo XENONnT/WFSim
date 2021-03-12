@@ -33,3 +33,4 @@ def test_load_nt():
         "s2_pattern_map": ["constant dummy", 30e-5, [494,]],
     }
     result = load_config(config)
+    return config

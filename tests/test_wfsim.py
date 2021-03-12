@@ -3,6 +3,7 @@ import strax
 import straxen
 import wfsim
 import logging
+from .test_load_resource import test_load_nt
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -45,12 +46,12 @@ def test_sim_1T():
 
 def test_sim_nT():
     """Test the nT simulator. Works only if one has access to the XENONnT databases"""
-    if not straxen.utilix_is_configured():
-        # This means we cannot load the nT files. Most likely will work
-        # locally but not a travis job.
-        return
+
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
+        conf = straxen.contexts.xnt_common_config
+        conf['gain_model'] = ('to_pe_constant', 0.01)
+        conf_override = test_load_nt()
         st = strax.Context(
             storage=tempdir,
             config=dict(
@@ -58,7 +59,8 @@ def test_sim_nT():
                 detector='XENONnT',
                 fax_config=('https://raw.githubusercontent.com/XENONnT/WFSim'
                 '/22004e28421044452f42aaf5797be7186e07bbba/files/XENONnT_wfsim_config.json'),
-                **straxen.contexts.xnt_common_config),
+                **conf,
+                fax_config_override=conf_override),
             **straxen.contexts.common_opts)
         st.register(wfsim.RawRecordsFromFaxNT)
 
