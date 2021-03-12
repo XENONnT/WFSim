@@ -4,8 +4,12 @@ import straxen
 import wfsim
 import logging
 
-log = logging.getLogger('Tests')
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s %(name)s %(levelname)-8s %(message)s',
+    datefmt='%m-%d %H:%M')
+
+log = logging.getLogger()
 strax.mailbox.Mailbox.DEFAULT_TIMEOUT = 60
 
 run_id = '010000'
