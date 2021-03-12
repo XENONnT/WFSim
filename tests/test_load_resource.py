@@ -14,6 +14,7 @@ def test_load_1t():
         "neutron_veto": False,
     }
     result = load_config(config)
+    return result, config
 
 
 def test_load_nt():
@@ -27,10 +28,10 @@ def test_load_nt():
         "enable_noise": False,
         "field_distortion_on": False,
         "neutron_veto": False,
-        "url_base": "https://raw.githubusercontent.com/XENONnT/WFSim/ce59b93335d233570c184e13b42319210279e0fa/files",
-        "photon_area_distribution": "XENONnT_spe_distributions_1T_copy.csv",
+        "url_base": "https://raw.githubusercontent.com/XENONnT/WFSim/1a83938b43098d446f518cbbc82514ed12d607d1/files",
+        "photon_area_distribution": "XENONnT_spe_distributions_single_channel.csv",
         "s1_pattern_map": ["constant dummy", 14e-5, [494,]],
         "s2_pattern_map": ["constant dummy", 30e-5, [494,]],
     }
     result = load_config(config)
-    return config
+    return result, config
