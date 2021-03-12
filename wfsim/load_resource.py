@@ -57,8 +57,8 @@ class Resource:
         elif config['detector'] == 'XENONnT':
             files.update({
                 'photon_area_distribution': 'XENONnT_spe_distributions.csv',
-                's1_pattern_map': 'XENONnT_s1_xyz_patterns_corrected_qes_MCva43fa9b_wires.pkl',
-                's2_pattern_map': 'XENONnT_s2_xy_patterns_topbottom_corrected_qes_MCva43fa9b_wires.pkl',
+                's1_pattern_map': 'XENONnT_s1_xyz_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
+                's2_pattern_map': 'XENONnT_s2_xy_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
                 'photon_ap_cdfs': 'xnt_pmt_afterpulse_config.pkl.gz',
                 's2_luminescence': 'XENONnT_s2_garfield_luminescence_distribution_v0.pkl.gz',
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
