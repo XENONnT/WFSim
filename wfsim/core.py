@@ -417,8 +417,6 @@ class S2(Pulse):
 
     def __init__(self, config):
         super().__init__(config)
-        # This config is not set for the 1T fax config
-        self.config.setdefault('s2_time_spread', 1)
 
         self.phase = 'gas'  # To distinguish singlet/triplet time delay.
         self.luminescence_switch_threshold = 100  # When to use simplified model (NOT IN USE)

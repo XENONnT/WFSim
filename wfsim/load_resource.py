@@ -125,7 +125,7 @@ class Resource:
 
             # Gas gap warping map
             if config['enable_gas_gap_warping']:
-                self.gas_gap_length = make_map(["constant dummy", 1, [254,]])
+                self.gas_gap_length = make_map(["constant dummy", 0.25, [254,]])
 
         if config['detector'] == 'XENONnT':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
