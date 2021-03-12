@@ -516,7 +516,7 @@ class S2(Pulse):
         if self.config.get('enable_gas_gap_warping', True):
             dG = self.resource.gas_gap_length(xy)
         else:
-            dG = np.ones(shape[0]) * self.config['elr_gas_gap_length']
+            dG = np.ones(len(xy)) * self.config['elr_gas_gap_length']
         rA = self.config['anode_field_domination_distance']
         rW = self.config['anode_wire_radius']
         dL = self.config['gate_to_anode_distance'] - dG

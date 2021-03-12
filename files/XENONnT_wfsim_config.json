@@ -38,7 +38,7 @@
     "drift_field": 82.0,                                   # V/cm
     "anode_voltage": 4000.0,                               # V
     "diffusion_constant_longitudinal": 2.935e-08,          # cm^2/ns
-    "diffusion_constant_transverse": 0,                    # cm^2/ns   
+    "diffusion_constant_transverse": 2e-08,                # cm^2/ns The value is made up for testing
     "drift_time_gate": 1700.0,                             # ns; drift_diffusion
     "drift_velocity_liquid": 0.0001335,                    # cm/ns; drift_diffusion
 
