@@ -295,7 +295,7 @@ class S1(Pulse):
             # shape of recarr is a bit strange
             instruction = np.array([instruction])
 
-        _, _, t, _, x, y, z, n_photons, recoil_type, *rest = [
+        _, _, t, x, y, z, n_photons, recoil_type, *rest = [
             np.array(v).reshape(-1) for v in zip(*instruction)]
 
         positions = np.array([x, y, z]).T  # For map interpolation
@@ -496,7 +496,7 @@ class S2(Pulse):
             # shape of recarr is a bit strange
             instruction = np.array([instruction])
 
-        _, _, t, _, x, y, z, n_electron, recoil_type, *rest = [
+        _, _, t, x, y, z, n_electron, recoil_type, *rest = [
             np.array(v).reshape(-1) for v in zip(*instruction)]
         
         # Reverse engineerring FDC
