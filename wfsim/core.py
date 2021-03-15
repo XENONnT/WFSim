@@ -179,8 +179,8 @@ class Pulse(object):
         uniform_to_pe_arr = []
         for ch in spe_shapes.columns[1:]:  # skip the first element which is the 'charge' header
             if spe_shapes[ch].sum() > 0:
-                mean_spe = (spe_shapes['charge'].values * spe_shapes[ch]).sum() / spe_shapes[ch].sum()
-                scaled_bins = spe_shapes['charge'].values / mean_spe
+                # mean_spe = (spe_shapes['charge'].values * spe_shapes[ch]).sum() / spe_shapes[ch].sum()
+                scaled_bins = spe_shapes['charge'].values # / mean_spe
                 cdf = np.cumsum(spe_shapes[ch]) / np.sum(spe_shapes[ch])
             else:
                 # if sum is 0, just make some dummy axes to pass to interpolator
@@ -201,7 +201,7 @@ class Pulse(object):
 
 
     def uniform_to_pe_arr(self, p, channel=0):
-        indices = (p * 2000).astype(int)
+        indices = (p * 2000).astype(int) + 1
         return self.__uniform_to_pe_arr[channel, indices]
 
 
