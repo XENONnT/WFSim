@@ -547,8 +547,12 @@ class FaxSimulatorPlugin(strax.Plugin):
         # Update gains to the nT defaults
         self.to_pe = get_to_pe(self.run_id, c['gain_model'],
                               c['channel_map']['tpc'][1]+1)
-        c['gains'] = 1 / self.to_pe * (1e-8 * 2.25 / 2**14) / (1.6e-19 * 10 * 50)
-        c['gains'][self.to_pe==0] = 0
+
+        c['gains'] = np.divide((1e-8 * 2.25 / 2**14) / (1.6e-19 * 10 * 50),
+                               self.to_pe,
+                               out=np.zeros_like(self.to_pe, ), 
+                               where=self.to_pe!=0)
+
         if c['seed'] != False:
             np.random.seed(c['seed'])
 
