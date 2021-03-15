@@ -14,17 +14,18 @@ export, __all__ = exporter()
 __all__.append('PULSE_TYPE_NAMES')
 
 log = logging.getLogger('SimulationCore')
+log.setLevel('DEBUG')
 
 PULSE_TYPE_NAMES = ('RESERVED', 's1', 's2', 'unknown', 'pi_el', 'pmt_ap', 'pe_el')
-
 
 @export
 class NestId():
     """Nest ids for refering to different scintilation models, only ER is actually validated"""
-    NR = [0]      
-    ALPHA = [6]   
-    ER = [7, 8, 11]
-    _ALL = NR+ALPHA+ER
+    NR = [0]
+    ALPHA = [6]
+    ER = [7, 8, 11, 12]
+    LED = [20]
+    _ALL = NR + ALPHA + ER + LED
 
 @export
 class Pulse(object):
@@ -59,7 +60,7 @@ class Pulse(object):
         if '_photon_gains' not in self.__dict__:
             self._photon_timings += np.random.normal(self.config['pmt_transit_time_mean'],
                                                      self.config['pmt_transit_time_spread'] / 2.35482,
-                                                     len(self._photon_timings))
+                                                     len(self._photon_timings)).astype(np.int64)
 
         dt = self.config.get('sample_duration', 10) # Getting dt from the lib just once
         self._n_double_pe = self._n_double_pe_bot = 0 # For truth aft output
@@ -282,33 +283,50 @@ class S1(Pulse):
 
     def __init__(self, config):
         super().__init__(config)
-        # This config is not set for the 1T fax config
-        self.config.setdefault('s1_decay_spread', 1)
-        
         self.phase = 'liquid'  # To distinguish singlet/triplet time delay.
 
     def __call__(self, instruction):
+        '''Main s1 simulation function. Called by RawData for s1 simulation. 
+        Generates first number of photons in the s1, then timings and channels.
+        These arrays are fed to Pulse to generate the data.
+
+        param instructions: Array with dtype wfsim.instruction_dtype '''
         if len(instruction.shape) < 1:
             # shape of recarr is a bit strange
             instruction = np.array([instruction])
 
-        _, _, t, _, x, y, z, n_photons, recoil_type, *rest = [
+        _, _, t, x, y, z, n_photons, recoil_type, *rest = [
             np.array(v).reshape(-1) for v in zip(*instruction)]
 
         positions = np.array([x, y, z]).T  # For map interpolation
         n_photons = self.get_n_photons(n_photons=n_photons,
-                                        positions=positions,
-                                        s1_light_yield_map=self.resource.s1_light_yield_map,
-                                        config=self.config)
+                                       positions=positions,
+                                       s1_light_yield_map=self.resource.s1_light_yield_map,
+                                       config=self.config)
 
-        self._photon_timings = self.photon_timings(t, n_photons, recoil_type, self.config)
+        self._photon_timings = self.photon_timings(t=t,
+                                                   n_photons=n_photons, 
+                                                   recoil_type=recoil_type,
+                                                   config=self.config,
+                                                   phase=self.phase)
+
         # The new way iterpolation is written always require a list
-        self._photon_channels = self.photon_channels(positions, n_photons, self.config, self.resource.s1_pattern_map)
+        self._photon_channels = self.photon_channels(positions=positions,
+                                                     n_photons=n_photons,
+                                                     config=self.config, 
+                                                     s1_pattern_map=self.resource.s1_pattern_map)
 
         super().__call__()
 
     @staticmethod
     def get_n_photons(n_photons,positions, s1_light_yield_map, config):
+        '''Calculates number of detected photons based on number of photons in total and the postions
+        :param n_photons: 1d array of ints with number of photons:
+        :param postions: 2d array with xyz positions of interactions 
+        :param s1_light_yield map: interpolator instance of s1 light yield map 
+        :param config: dict wfsim config 
+        
+        return array with number photons'''
         if config['detector']=='XENONnT':
             ly = np.squeeze(s1_light_yield_map(positions),
                             axis=-1)/(1+config['p_double_pe_emision'])
@@ -319,11 +337,19 @@ class S1(Pulse):
         return n_photons
 
     @staticmethod
-    def photon_channels(points, n_photons, config, s1_pattern_map):
-        channels = np.arange(config['n_tpc_pmts'])#+1 for the channel map
-        p_per_channel = s1_pattern_map(points)
+    def photon_channels(positions, n_photons, config, s1_pattern_map):
+        '''Calculate photon arrival channels
+        :params positions: 2d array with xy positions of interactions
+        :params n_photons: 1d array of ints with number of photons to simulate
+        :params config: dict wfsim config
+        :params s1_pattern_map: interpolator instance of the s1 pattern map
+
+        returns nested array with photon channels   
+        '''
+        channels = np.arange(config['n_tpc_pmts'])  # +1 for the channel map
+        p_per_channel = s1_pattern_map(positions)
         p_per_channel[:, np.in1d(channels, config['turned_off_pmts'])] = 0
-        
+
         _photon_channels = np.array([]).astype(int)
         for ppc, n in zip(p_per_channel, n_photons):
             _photon_channels = np.append(_photon_channels,
@@ -335,57 +361,95 @@ class S1(Pulse):
         return _photon_channels
 
     @staticmethod
-    def photon_timings(t, n_photons, recoil_type, config):
-        if n_photons == 0:
-            return np.array([])
+    def photon_timings(t, n_photons, recoil_type, config, phase):
+        '''Calculate distribution of photon arrival timnigs
+        :param t: 1d array of ints
+        :param n_photons: 1d array of ints
+        :param recoil_type: 1d array of ints
+        :param config: dict wfsim config
+        :param phase: str "liquid"
 
-        if (config.get('s1_model_type') == 'simple' and 
-           recoil_type in NestId._ALL):
+        returns photon timing array'''
+        _photon_timings = np.repeat(t, n_photons)
+        if len(_photon_timings) == 0:
+            return _photon_timings.astype(int)
+        
+        if (config['s1_model_type'] == 'simple' and 
+            np.isin(recoil_type, NestId._ALL).all()):
             # Simple S1 model enabled: use it for ER and NR.
-            _photon_timings = t + np.random.exponential(config['s1_decay_time'], n_photons)
-            _photon_timings += np.random.normal(0,config['s1_decay_spread'],len(_photon_timings))
+            _photon_timings += np.random.exponential(config['s1_decay_time'], len(_photon_timings)).astype(int)
+            _photon_timings += np.random.normal(0, config['s1_decay_spread'], len(_photon_timings)).astype(int)
             return _photon_timings
 
-        #TODO Looks nice but don't know if this actually works
-        try:
-            recoil_types = [k for k in vars(NestId) if not k.startswith('_')]
-            for recoil in recoil_types:
-                if recoil in NestId.recoil:
-                    _photon_timings = t + getattr(S1, recoil_type.lower())(n_photons=n_photons,
-                                                                           config=config,
-                                                                           singlet_triplet_delays=Pulse.singlet_triplet_delays,
-                                                                           phase=self.phase)
-
-        except AttributeError:
-            raise AttributeError(f"Recoil type must be ER, NR, alpha or LED, not {recoil_type}. Check nest ids")
+        counts_start = 0
+        for i, counts in enumerate(n_photons):
+            for k in vars(NestId):
+                if k.startswith('_'): continue
+                if recoil_type[i] in getattr(NestId, k):
+                    str_recoil_type = k
+            try:
+                _photon_timings[counts_start: counts_start + counts] += \
+                    getattr(S1, str_recoil_type.lower())(
+                    size=counts,
+                    config=config,
+                    phase=phase).astype(int)
+            except AttributeError:
+                raise AttributeError(f"Recoil type must be ER, NR, alpha or LED, not {recoil_type}. Check nest ids")
+            counts_start += counts
+        return _photon_timings
 
     @staticmethod
-    def alpha(size,config, singlet_triplet_delays, phase):
-        # Neglible recombination time
-        return singlet_triplet_delays(size, config['s1_ER_alpha_singlet_fraction'],config, phase)
+    def alpha(size, config, phase):
+        '''  Calculate S1 photon timings for an alpha decay. Neglible recombination time, not validated
+        :param size: 1d array of ints, number of photons
+        :param config: dict wfsim config
+        :parma phase: str "liquid"
+        
+        return 1d array of photon timings'''
+        return Pulse.singlet_triplet_delays(size, config['s1_ER_alpha_singlet_fraction'], config, phase)
 
     @staticmethod
-    def led(size,config, **kwargs):
-        # distribute photons uniformly within the LED pulse length
+    def led(size, config, **kwargs):
+        '''  distribute photons uniformly within the LED pulse length, not validated
+        :param size: 1d array of ints, number of photons
+        :param config: dict wfsim config
+        :parma phase: str "liquid
+        
+        return 1d array of photon timings"'''
         return np.random.uniform(0, config['led_pulse_length'], size)
 
     @staticmethod
-    def er(size,config, singlet_triplet_delays, phase):
-        # How many of these are primary excimers? Others arise through recombination.
-        efield = (config['drift_field'] / (units.V / units.cm))
-        config['s1_ER_recombination_time'] = 3.5 / \
-                                                  0.18 * (1 / 20 + 0.41) * np.exp(-0.009 * efield)
+    def er(size, config, phase):
+        '''Complex ER model, not validated
+        :param size: 1d array of ints, number of photons
+        :param config: dict wfsim config
+        :parma phase: str "liquid"
+        return 1d array of photon timings
+        '''
 
-        reco_time, p_fraction, max_reco_time = (
-            config['s1_ER_recombination_time'],
-            config['s1_ER_primary_singlet_fraction'],
-            config['maximum_recombination_time'])
+        # How many of these are primary excimers? Others arise through recombination.
+        # TODO
+        # This config is not set for the nT fax config
+        config.setdefault('liquid_density', 1.872452802978054e+30)
+        density = config['liquid_density'] / (units.g / units.cm ** 3)
+        excfrac = 0.4 - 0.11131 * density - 0.0026651 * density ** 2    # primary / secondary excimers
+        excfrac = 1 / (1 + excfrac)                                     # primary / all excimers
+        # primary / all excimers that produce a photon:
+        excfrac /= 1 - (1 - excfrac) * (1 - config['s1_ER_recombination_fraction'])
+        config['s1_ER_primary_excimer_fraction'] = excfrac
+        log.debug('Inferred s1_ER_primary_excimer_fraction %s' % excfrac)
+
+        # Recombination time from NEST 2014
+        # 3.5 seems fishy, they fit an exponential to data, but in the code they use a non-exponential distribution...
+        efield = (config['drift_field'] / (units.V / units.cm))
+        reco_time = 3.5 / \
+            0.18 * (1 / 20 + 0.41) * np.exp(-0.009 * efield)
+        config['s1_ER_recombination_time'] = reco_time
+        log.debug('Inferred s1_ER_recombination_time %s' % reco_time)
 
         timings = np.random.choice([0, reco_time], size, replace=True,
-                                   p=[p_fraction, 1 - p_fraction])
+                                   p=[excfrac, 1 - excfrac])
         primary = timings == 0
-        timings *= 1 / (1 - np.random.uniform(0, 1, size)) - 1
-        timings = np.clip(timings, 0, config['maximum_recombination_time'])
         size_primary = len(timings[primary])
 
         timings[primary] += Pulse.singlet_triplet_delays(
@@ -404,8 +468,14 @@ class S1(Pulse):
         return timings
 
     @staticmethod
-    def nr(size, config, singlet_triplet_delays, phase):
-        return singlet_triplet_delays(size, config['s1_NR_singlet_fraction'], config, phase)
+    def nr(size, config, phase):
+        '''NR model model, not validated
+        :param size: 1d array of ints, number of photons
+        :param config: dict wfsim config
+        :parma phase: str "liquid"
+        return 1d array of photon timings
+        '''
+        return Pulse.singlet_triplet_delays(size, config['s1_NR_singlet_fraction'], config, phase)
 
 
 @export
@@ -426,45 +496,92 @@ class S2(Pulse):
             # shape of recarr is a bit strange
             instruction = np.array([instruction])
 
-        _, _, t, _, x, y, z, n_electron, recoil_type, *rest = [
+        _, _, t, x, y, z, n_electron, recoil_type, *rest = [
             np.array(v).reshape(-1) for v in zip(*instruction)]
         
         # Reverse engineerring FDC
         if self.config['field_distortion_on']:
-            z_obs, positions = self.inverse_field_distortion(x, y, z)
+            z_obs, positions = self.inverse_field_distortion(x, y, z, resource=self.resource)
         else:
             z_obs, positions = z, np.array([x, y]).T
 
-        if self.config['detector']=='XENONnT':
-            sc_gain = np.squeeze(self.resource.s2_light_yield_map(positions), axis=-1) \
-                * self.config['s2_secondary_sc_gain']
-        elif self.config['detector']=='XENON1T':
-            sc_gain = self.resource.s2_light_yield_map(positions) \
-                * self.config['s2_secondary_sc_gain']
+        sc_gain = self.get_s2_light_yield(positions=positions,
+                                          config=self.config,
+                                          resource=self.resource)
 
+        n_electron = self.get_electron_yield(n_electron=n_electron,
+                                             z_obs=z_obs,
+                                             config=self.config)
+
+        # Second generate photon timing and channel
+        self._photon_timings, self._instruction = self.photon_timings(t, n_electron, z_obs, positions, sc_gain,
+                                                                      config=self.config,
+                                                                      resource=self.resource,
+                                                                      phase=self.phase)
+
+        self._photon_channels, self._photon_timings = self.photon_channels(n_electron=n_electron,
+                                                                           z_obs=z_obs,
+                                                                           positions=positions,
+                                                                           _photon_timings=self._photon_timings,
+                                                                           _instruction=self._instruction,
+                                                                           config=self.config,
+                                                                           resource=self.resource)
+        super().__call__()
+
+    @staticmethod
+    def get_s2_light_yield(positions,config,resource):
+        '''Calculate s2 light yield...
+        
+        :param positions: 2d array of positions (floats)
+        :param config: dict with wfsim config
+        :param resource: instance of the resource class
+        
+        returns array of floats (mean expectation) 
+        '''
+        if config['detector']=='XENONnT':
+            sc_gain = np.squeeze(resource.s2_light_yield_map(positions), axis=-1) \
+                * config['s2_secondary_sc_gain']
+        elif config['detector']=='XENON1T':
+            sc_gain = resource.s2_light_yield_map(positions) \
+                * config['s2_secondary_sc_gain']
+        return sc_gain
+
+    @staticmethod
+    def get_electron_yield(n_electron,z_obs,config):
+        '''Drift electrons up to the gas interface and absorb them
+
+        :param n_electron: 1d array with ints as number of electrons
+        :param z_obs: 1d array of floats with the observed z positions
+        :param config: dict with wfsim config
+
+        returns 1d array ints with number of electrons
+        '''
         # Average drift time of the electrons
-        self.drift_time_mean = - z_obs / \
-            self.config['drift_velocity_liquid'] + self.config['drift_time_gate']
+        drift_time_mean = - z_obs / \
+            config['drift_velocity_liquid'] + config['drift_time_gate']
 
         # Absorb electrons during the drift
-        electron_lifetime_correction = np.exp(- 1 * self.drift_time_mean /
-            self.config['electron_lifetime_liquid'])
-        cy = self.config['electron_extraction_yield'] * electron_lifetime_correction
+        electron_lifetime_correction = np.exp(- 1 * drift_time_mean /
+            config['electron_lifetime_liquid'])
+        cy = config['electron_extraction_yield'] * electron_lifetime_correction
 
         #why are there cy greater than 1? We should check this
         cy = np.clip(cy, a_min = 0, a_max = 1)
         n_electron = np.random.binomial(n=n_electron, p=cy)
+        return n_electron
 
-        # Second generate photon timing and channel
-        self.photon_timings(t, n_electron, z_obs, positions, sc_gain)
-        self.photon_channels(n_electron, z_obs, positions)
-
-        super().__call__()
-
-    def inverse_field_distortion(self, x, y, z):
+    @staticmethod
+    def inverse_field_distortion(x, y, z, resource):
+        '''For 1T the pattern map is a data driven one so we need to reverse engineer field distortion into the simulated positions
+        :param x: 1d array of float
+        :param y: 1d array of float
+        :param z: 1d array of float
+        :param resource: instance of resource class
+        returns z: 1d array, postions 2d array 
+        '''
         positions = np.array([x, y, z]).T
         for i_iter in range(6):  # 6 iterations seems to work
-            dr = self.resource.fdc_3d(positions)
+            dr = resource.fdc_3d(positions)
             if i_iter > 0: dr = 0.5 * dr + 0.5 * dr_pre  # Average between iter
             dr_pre = dr
 
@@ -481,6 +598,10 @@ class S2(Pulse):
     @njit
     def _luminescence_timings_simple(n, dG, E0, r, dr, rr, alpha, uE, p, n_electron, shape):
         emission_time = np.zeros(shape)
+        """
+        Luminescence time distribution computation, calculates emission timings of photons from the excited electrons
+        return 1d nested array with ints
+        """
 
         ci = 0
         for i in range(n):
@@ -498,35 +619,42 @@ class S2(Pulse):
 
         return emission_time
 
-    def luminescence_timings_simple(self, xy, n_electron, shape):
+    @staticmethod
+    def luminescence_timings_simple(xy, n_electron, shape, config, resource):
         """
-        Luminescence time distribution computation
+        Luminescence time distribution computation according to simple s2 model (many many many single electrons)
+        :param xy: 1d array with positions
+        :param n_electron: 1d array with ints for number f electrons
+        :param shape: tuple with nelectron,nphotons
+        :param config: dict wfsim config
+        :param resource: instance of wfsim resource
+        returns _luminescence_timings_simple
         """
         assert len(n_electron) == len(xy), 'Input number of n_electron should have same length as positions'
         assert np.sum(n_electron) == shape[0], 'Total number of electron does not agree with shape[0]'
 
-        number_density_gas = self.config['pressure'] / \
-                             (units.boltzmannConstant * self.config['temperature'])
-        alpha = self.config['gas_drift_velocity_slope'] / number_density_gas
+        number_density_gas = config['pressure'] / \
+                             (units.boltzmannConstant * config['temperature'])
+        alpha = config['gas_drift_velocity_slope'] / number_density_gas
         uE = units.kV / units.cm
-        pressure = self.config['pressure'] / units.bar
+        pressure = config['pressure'] / units.bar
 
-        if self.config.get('enable_gas_gap_warping', True):
-            dG = self.resource.gas_gap_length(xy)
+        if config.get('enable_gas_gap_warping', True):
+            dG = resource.gas_gap_length(xy)
         else:
-            dG = np.ones(len(xy)) * self.config['elr_gas_gap_length']
-        rA = self.config['anode_field_domination_distance']
-        rW = self.config['anode_wire_radius']
-        dL = self.config['gate_to_anode_distance'] - dG
+            dG = np.ones(len(xy)) * config['elr_gas_gap_length']
+        rA = config['anode_field_domination_distance']
+        rW = config['anode_wire_radius']
+        dL = config['gate_to_anode_distance'] - dG
 
-        VG = self.config['anode_voltage'] / (1 + dL / dG / self.config['lxe_dielectric_constant'])
+        VG = config['anode_voltage'] / (1 + dL / dG / config['lxe_dielectric_constant'])
         E0 = VG / ((dG - rA) / rA + np.log(rA / rW))  # V / cm
 
         dr = 0.0001  # cm
         r = np.arange(np.max(dG), rW, -dr)
         rr = np.clip(1 / r, 1 / rA, 1 / rW)
 
-        return self._luminescence_timings_simple(len(xy), dG, E0, 
+        return S2._luminescence_timings_simple(len(xy), dG, E0, 
             r, dr, rr, alpha, uE, pressure, n_electron, shape)
 
     @staticmethod
@@ -537,18 +665,25 @@ class S2(Pulse):
             for iy in range(shape[1]):
                 index[ix, iy] = i_grid[pitch_index] + np.random.randint(n_grid[pitch_index])
 
-    def luminescence_timings_garfield(self, xy, shape):
+    @staticmethod
+    def luminescence_timings_garfield(xy, shape, resource, config):
         """
-        Luminescence time distribution computation
+        Luminescence time distribution computation according to garfield scintillation maps
+        :param xy: 1d array with positions
+        :param shape: tuple with nelectron,nphotons
+        :param config: dict wfsim config
+        :param resource: instance of wfsim resource
+
+        returns 1d (nested?) array with ints for photon timings
         """
-        assert 's2_luminescence' in self.resource.__dict__, 's2_luminescence model not found'
+        assert 's2_luminescence' in resource.__dict__, 's2_luminescence model not found'
         assert shape[0] == len(xy), 'Output shape should have same length as positions'
 
-        x_grid, n_grid = np.unique(self.resource.s2_luminescence['x'], return_counts=True)
+        x_grid, n_grid = np.unique(resource.s2_luminescence['x'], return_counts=True)
         i_grid = (n_grid.sum() - np.cumsum(n_grid[::-1]))[::-1]
 
-        tilt = getattr(self.config, 'anode_xaxis_angle', np.pi / 4)
-        pitch = getattr(self.config, 'anode_pitch', 0.5)
+        tilt = getattr(config, 'anode_xaxis_angle', np.pi / 4)
+        pitch = getattr(config, 'anode_pitch', 0.5)
         rotation_mat = np.array(((np.cos(tilt), -np.sin(tilt)), (np.sin(tilt), np.cos(tilt))))
 
         jagged = lambda relative_y: (relative_y + pitch / 2) % pitch - pitch / 2
@@ -556,9 +691,9 @@ class S2(Pulse):
 
         index = np.zeros(shape).astype(int)
 
-        self._luminescence_timings_garfield(distance, x_grid, n_grid, i_grid, shape, index)
+        S2._luminescence_timings_garfield(distance, x_grid, n_grid, i_grid, shape, index)
 
-        return self.resource.s2_luminescence['t'][index]
+        return resource.s2_luminescence['t'][index]
 
     @staticmethod
     @njit
@@ -567,6 +702,15 @@ class S2(Pulse):
             drift_time_gate,
             diffusion_constant_longitudinal,
             electron_trapping_time):
+        '''Calculate arrival times of the electrons. Data is written to the timings and gains arrays
+        :param t: 1d array of ints
+        :param n_electron:1 d array of ints
+        :param z: 1d array of floats
+        :param sc_gain: secondairy scintallation gain       
+        :param timings: empty array with length sum(n_electron)
+        :param gains: empty array with length sum(n_electron)
+        :param drift_velocity_liquid, drift_time_gate, diffusion_constant_longitudinal, electron_trapping_time: configuration values
+        '''
         assert len(timings) == np.sum(n_electron)
         assert len(gains) == np.sum(n_electron)
         assert len(sc_gain) == len(t)
@@ -591,52 +735,64 @@ class S2(Pulse):
                 gains[i_electron] = sc_gain[i]
                 i_electron += 1
 
-    def photon_timings(self, t, n_electron, z, xy, sc_gain):
+    @staticmethod
+    def photon_timings( t, n_electron, z, xy, sc_gain, config, resource, phase):
+        '''Generates photon timings for S2s. Returns a list of photon timings and instructions repeated for original electron
+        
+        :param t: 1d float array arrival time of the electrons
+        :param n_electron: 1d float array number of electrons to simulate
+        :param z: float array. Z positions of s2
+        :param xy: 1d float array, xy positions of s2
+        :param sc_gain: float, secondairy s2 gain
+        :param config: dict of the wfsim config
+        :param resource: instance of the resource class
+        :param phase: string, "gas" '''
         # First generate electron timinga
-        self._electron_timings = np.zeros(np.sum(n_electron))
-        self._electron_gains = np.zeros(np.sum(n_electron))
-        _config = [self.config[k] for k in
+        _electron_timings = np.zeros(np.sum(n_electron))
+        _electron_gains = np.zeros(np.sum(n_electron))
+        _config = [config[k] for k in
                    ['drift_velocity_liquid',
                     'drift_time_gate',
                     'diffusion_constant_longitudinal',
                     'electron_trapping_time']]
-        self.electron_timings(t, n_electron, z, sc_gain, 
-            self._electron_timings, self._electron_gains, *_config)
+        S2.electron_timings(t, n_electron, z, sc_gain, 
+            _electron_timings, _electron_gains, *_config)
 
-        # TODO log this
-        if len(self._electron_timings) < 1:
-            self._photon_timings = []
-            return 1
+        if len(_electron_timings) < 1:
+            _photon_timings = []
+            return _photon_timings, []
 
         # For vectorized calculation, artificially top #photon per electron at +4 sigma
-        nele = len(self._electron_timings)
-        npho = np.ceil(np.max(self._electron_gains) +
-                       4 * np.sqrt(np.max(self._electron_gains))).astype(int)
+        nele = len(_electron_timings)
+        npho = np.ceil(np.max(_electron_gains) +
+                       4 * np.sqrt(np.max(_electron_gains))).astype(int)
 
-        if self.config['s2_luminescence_model'] == 'simple':
-            self._photon_timings = self.luminescence_timings_simple(xy, n_electron, (nele, npho))
-        elif self.config['s2_luminescence_model'] == 'garfield':
-            self._photon_timings = self.luminescence_timings_garfield(
+        if config['s2_luminescence_model'] == 'simple':
+            _photon_timings = S2.luminescence_timings_simple(xy, n_electron, (nele, npho), 
+                                                             config=config,
+                                                             resource=resource)
+        elif config['s2_luminescence_model'] == 'garfield':
+            _photon_timings = S2.luminescence_timings_garfield(
                 np.repeat(xy, n_electron, axis=0),
-                (nele, npho))
-        self._photon_timings += np.repeat(self._electron_timings, npho).reshape((nele, npho))
+                (nele, npho),
+                config=config,
+                resource=resource)
+        _photon_timings += np.repeat(_electron_timings, npho).reshape((nele, npho))
 
         # Crop number of photons by random number generated with poisson
         probability = np.tile(np.arange(npho), nele).reshape((nele, npho))
-        threshold = np.repeat(np.random.poisson(self._electron_gains), npho).reshape((nele, npho))
-        self._photon_timings = self._photon_timings[probability < threshold]
+        threshold = np.repeat(np.random.poisson(_electron_gains), npho).reshape((nele, npho))
+        _photon_timings = _photon_timings[probability < threshold]
 
-        # Index to match photon with poistion input
-        self._instruction = np.repeat(
+        # Special index for match photon to original electron poistion
+        _instruction = np.repeat(
             np.repeat(np.arange(len(t)), n_electron), npho).reshape((nele, npho))
-        self._instruction = self._instruction[probability < threshold]
+        _instruction = _instruction[probability < threshold]
 
-        self._photon_timings += self.singlet_triplet_delays(
-            len(self._photon_timings), self.config['singlet_fraction_gas'],self.config, self.phase)
-        
-        self._photon_timings += np.random.normal(0, 
-            self.config['s2_time_spread'], len(self._photon_timings))
+        _photon_timings += Pulse.singlet_triplet_delays(
+            len(_photon_timings), config['singlet_fraction_gas'],config, phase)
 
+        _photon_timings += np.random.normal(0,config['s2_time_spread'],len(_photon_timings))
         # The timings generated is NOT randomly ordered, must do shuffle
         # Shuffle within each given n_electron[i]
         # We can do this by first finding out cumulative sum of the photons
@@ -646,9 +802,12 @@ class S2(Pulse):
                 s = slice(0, cumulate_npho[i])
             else:
                 s = slice(cumulate_npho[i-1], cumulate_npho[i])
-            np.random.shuffle(self._photon_timings[s])
+            np.random.shuffle(_photon_timings[s])
 
-    def s2_pattern_map_diffuse(self, n_electron, z, xy):
+        return _photon_timings, _instruction
+
+    @staticmethod
+    def s2_pattern_map_diffuse(n_electron, z, xy, config, resource):
         """Returns an array of pattern of shape [n interaction, n PMTs]
         pattern of each interaction is an average of n_electron patterns evaluated at
         diffused position near xy. The diffused positions sample from 2d symmetric gaussian
@@ -658,9 +817,9 @@ class S2(Pulse):
         :param z: a 1d float array
         :param xy: a 2d float array of shape [n interaction, 2]
         """
-        drift_time_gate = self.config['drift_time_gate']
-        drift_velocity_liquid = self.config['drift_velocity_liquid']
-        diffusion_constant_transverse = getattr(self.config, 'diffusion_constant_transverse', 0)
+        drift_time_gate = config['drift_time_gate']
+        drift_velocity_liquid = config['drift_velocity_liquid']
+        diffusion_constant_transverse = getattr(config, 'diffusion_constant_transverse', 0)
 
         assert all(z < 0), 'All S2 in liquid should have z < 0'
 
@@ -672,39 +831,44 @@ class S2(Pulse):
         xy_multi = np.repeat(xy, n_electron, axis=0) + hdiff  # One entry xy per electron
         # Remove points outside tpc, and the pattern will be the average inside tpc
         # Should be done natually with the s2 pattern map, however, there's some bug there so we apply this hard cut
-        mask = np.sum(xy_multi ** 2, axis=1) <= self.config['tpc_radius'] ** 2
+        mask = np.sum(xy_multi ** 2, axis=1) <= config['tpc_radius'] ** 2
 
-        pattern = np.zeros((len(n_electron), self.resource.s2_pattern_map.data['map'].shape[-1]))
+        pattern = np.zeros((len(n_electron), resource.s2_pattern_map.data['map'].shape[-1]))
         n0 = 0
         # Average over electrons for each s2
         for ix, ne in enumerate(n_electron):
             s = slice(n0, n0+ne)
-            pattern[ix, :] = np.average(self.resource.s2_pattern_map(xy_multi[s][mask[s]]), axis=0)
+            pattern[ix, :] = np.average(resource.s2_pattern_map(xy_multi[s][mask[s]]), axis=0)
             n0 += ne
 
         return pattern
 
-    def photon_channels(self, n_electron, z_obs, positions):
+    @staticmethod
+    def photon_channels(n_electron, z_obs, positions, _photon_timings, _instruction, config, resource):
         """Set the _photon_channels property list of length same as _photon_timings
 
         :param n_electron: a 1d int array
         :param z_obs: a 1d float array
         :param positions: a 2d float array of shape [n interaction, 2] for the xy coordinate
+        :param _photon_timings: 1d int array of photon timings,
+        :param _instructions: array of instructions with dtype wfsim.instructions_dtype
+        :param config: dict wfsim config
+        :param resource: instance of resource class
         """
-        if len(self._photon_timings) == 0:
-            self._photon_channels = []
-            return 1
-        
-        aft = self.config['s2_mean_area_fraction_top']
-        aft_random = self.config.get('randomize_fraction_of_s2_top_array_photons', 0)
-        channels = np.arange(self.config['n_tpc_pmts']).astype(int)
-        top_index = np.arange(self.config['n_top_pmts'])
-        bottom_index = np.array(self.config['channels_bottom'])
+        if len(_photon_timings) == 0:
+            _photon_channels = []
+            return _photon_timings, _photon_channels
 
-        if getattr(self.config, 'diffusion_constant_transverse', 0) > 0:
-            pattern = self.s2_pattern_map_diffuse(n_electron, z_obs, positions)  # [position, pmt]
+        aft = config['s2_mean_area_fraction_top']
+        aft_random = config.get('randomize_fraction_of_s2_top_array_photons', 0)
+        channels = np.arange(config['n_tpc_pmts']).astype(int)
+        top_index = np.arange(config['n_top_pmts'])
+        bottom_index = np.array(config['channels_bottom'])
+
+        if getattr(config, 'diffusion_constant_transverse', 0) > 0:
+            pattern = S2.s2_pattern_map_diffuse(n_electron, z_obs, positions)  # [position, pmt]
         else:
-            pattern = self.resource.s2_pattern_map(positions)  # [position, pmt]
+            pattern = resource.s2_pattern_map(positions)  # [position, pmt]
         if pattern.shape[1] - 1 not in bottom_index:
             pattern = np.pad(pattern, [[0, 0], [0, len(bottom_index)]], 
                 'constant', constant_values=1)
@@ -714,9 +878,9 @@ class S2(Pulse):
         assert pattern.shape[0] == len(positions)
         assert pattern.shape[1] == len(channels)
 
-        self._photon_channels = np.array([], dtype=int)
+        _buffer_photon_channels = []
         # Randomly assign to channel given probability of each channel
-        for unique_i, count in zip(*np.unique(self._instruction, return_counts=True)):
+        for unique_i, count in zip(*np.unique(_instruction, return_counts=True)):
             pat = pattern[unique_i]  # [pmt]
 
             if aft > 0:  # Redistribute pattern with user specified aft
@@ -734,12 +898,17 @@ class S2(Pulse):
                     p=pat,
                     replace=True)
 
-            self._photon_channels = np.append(self._photon_channels, _photon_channels)
-
+            _buffer_photon_channels.append(_photon_channels)
+        
+        _photon_channels = np.concatenate(_buffer_photon_channels)
         # Remove photon with channel -1
-        mask = self._photon_channels != -1
-        self._photon_channels = self._photon_channels[mask]
-        self._photon_timings = self._photon_timings[mask]
+        mask = _photon_channels != -1
+        _photon_channels = _photon_channels[mask]
+        _photon_timings = _photon_timings[mask]
+        
+        sorted_index = np.argsort(_photon_channels)
+
+        return _photon_channels[sorted_index], _photon_timings[sorted_index]
 
 
 @export
@@ -788,7 +957,7 @@ class PhotoIonization_Electron(S2):
         return instruction
 
     def _rand_position(self, n):
-        Rupper = 46
+        Rupper = self.config['tpc_radius']
 
         r = np.sqrt(np.random.uniform(0, Rupper*Rupper, n))
         angle = np.random.uniform(-np.pi, np.pi, n)
@@ -1200,7 +1369,9 @@ class RawData(object):
                 tb[f't_last_{quantum}'] = np.nan
                 tb[f't_sigma_{quantum}'] = np.nan
         
-        tb['endtime'] = np.mean(instruction['time']) if np.isnan(tb['t_last_photon']) else tb['t_last_photon']
+        #Endtime is the end of the last pulse
+        tb['endtime'] = np.mean(instruction['time']) if np.isnan(tb['t_last_photon']) else tb['t_last_photon'] + \
+            (self.config['samples_before_pulse_center']+self.config['samples_after_pulse_center']+1)*self.config['sample_duration']
         channels = getattr(pulse, '_photon_channels', [])
         if self.config.get('exclude_dpe_in_truth', False):
             n_dpe = n_dpe_bot = 0

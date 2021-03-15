@@ -9,7 +9,6 @@ log = logging.getLogger('load_resource')
 
 _cached_configs = dict()
 
-
 def load_config(config):
     """Create a Resource instance from the configuration
 
@@ -62,6 +61,7 @@ class Resource:
                 'photon_ap_cdfs': 'xnt_pmt_afterpulse_config.pkl.gz',
                 's2_luminescence': 'XENONnT_s2_garfield_luminescence_distribution_v0.pkl.gz',
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
+                'nv_pmt_qe_file': 'nveto_pmt_qe.json'
             })
         else:
             raise ValueError(f"Unsupported detector {config['detector']}")
@@ -85,6 +85,7 @@ class Resource:
             if v.startswith('/'):
                 log.warning(f"WARNING: Using local file {v} for a resource. "
                             f"Do not set this as a default or TravisCI tests will break")
+                continue
             try:
                 # First try downloading it via
                 # https://straxen.readthedocs.io/en/latest/config_storage.html
@@ -113,7 +114,7 @@ class Resource:
                     log.warning(f'{k} did not download, trying {raw_url}')
                     files[k] = raw_url
             log.debug(f'Downloaded {k} successfully')
-
+                             
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
 
         if config['detector'] == 'XENON1T':
@@ -160,6 +161,8 @@ class Resource:
         # Spe area distributions
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
 
+        #Spe area distributions
+        self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
         # Electron After Pulses compressed, haven't figure out how pkl.gz works
         if config['enable_electron_afterpulses']:
             self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
@@ -179,12 +182,10 @@ class Resource:
         log.debug(f'{self.__class__.__name__} fully initialized')
 
 def make_map(map_file, fmt='text'):
-    """
-    Fetch and make an instance of InterpolatingMap based on map_file
-
+    '''Fetch and make an instance of InterpolatingMap based on map_file
     Alternativly map_file can be a list of ["constant dummy", constant: int, shape: list]
-        return an instance of  DummyMap
-    """
+    return an instance of  DummyMap'''
+        
     if isinstance(map_file, list):
         assert map_file[0] == 'constant dummy', ('Alternative file input can only be '
             '("constant dummy", constant: int, shape: list')
