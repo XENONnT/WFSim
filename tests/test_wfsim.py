@@ -69,7 +69,7 @@ def test_sim_nT():
                 nchunk=1, event_rate=1, chunk_size=2,
                 detector='XENONnT',
                 fax_config=('https://raw.githubusercontent.com/XENONnT/WFSim'
-                '/22004e28421044452f42aaf5797be7186e07bbba/files/XENONnT_wfsim_config.json'),
+                '/a412375ad1fc85f30596b2b73cd8ffe5401de42e/files/XENONnT_wfsim_config.json'),
                 **conf,
                 fax_config_override=conf_override),
             **straxen.contexts.common_opts)
