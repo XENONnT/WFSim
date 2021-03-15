@@ -865,8 +865,8 @@ class S2(Pulse):
         top_index = np.arange(config['n_top_pmts'])
         bottom_index = np.array(config['channels_bottom'])
 
-        if getattr(config, 'diffusion_constant_transverse', 0) > 0:
-            pattern = S2.s2_pattern_map_diffuse(n_electron, z_obs, positions)  # [position, pmt]
+        if config.get('diffusion_constant_transverse', 0) > 0:
+            pattern = S2.s2_pattern_map_diffuse(n_electron, z_obs, positions, config, resource)  # [position, pmt]
         else:
             pattern = resource.s2_pattern_map(positions)  # [position, pmt]
         if pattern.shape[1] - 1 not in bottom_index:
