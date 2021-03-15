@@ -948,10 +948,9 @@ class PhotoIonization_Electron(S2):
         instruction = np.repeat(signal_pulse_instruction[0], n_electron)
 
         instruction['type'] = 4 # pi_el
-        instruction['time'] = t_zeros
+        instruction['time'] = t_zeros + self.config['drift_time_gate']
         instruction['x'], instruction['y'] = self._rand_position(n_electron)
-        instruction['z'] = - (ap_delay - self.config['drift_time_gate']) * \
-            self.config['drift_velocity_liquid']
+        instruction['z'] = - ap_delay * self.config['drift_velocity_liquid']
         instruction['amp'] = 1
 
         return instruction
@@ -998,10 +997,9 @@ class PhotoElectric_Electron(S2):
         instruction = np.repeat(signal_pulse_instruction[0], n_electron)
 
         instruction['type'] = 6 # pe_el
-        instruction['time'] = t_zeros
+        instruction['time'] = t_zeros + self.config['drift_time_gate']
         instruction['x'], instruction['y'] = self._rand_position(n_electron)
-        instruction['z'] = - (ap_delay - self.config['drift_time_gate']) * \
-            self.config['drift_velocity_liquid']
+        instruction['z'] = - ap_delay * self.config['drift_velocity_liquid']
         instruction['amp'] = 1
 
         return instruction
