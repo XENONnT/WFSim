@@ -1371,7 +1371,7 @@ class RawData(object):
         
         #Endtime is the end of the last pulse
         tb['endtime'] = np.mean(instruction['time']) if np.isnan(tb['t_last_photon']) else tb['t_last_photon'] + \
-            (self.config['samples_before_center']+self.config['samples_after_center']+1)*self.config['sample_duration']
+            (self.config['samples_before_pulse_center']+self.config['samples_after_pulse_center']+1)*self.config['sample_duration']
         channels = getattr(pulse, '_photon_channels', [])
         if self.config.get('exclude_dpe_in_truth', False):
             n_dpe = n_dpe_bot = 0
