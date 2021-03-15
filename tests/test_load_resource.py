@@ -20,7 +20,6 @@ def test_load_1t():
 def test_load_nt():
     config = {
         "detector": "XENONnT",
-        "s1_model_type": "simple",
         "s2_luminescence_model": "simple",
         "enable_gas_gap_warping": False,
         "enable_pmt_afterpulses": False,
