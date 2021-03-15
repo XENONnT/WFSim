@@ -60,7 +60,7 @@ class Pulse(object):
         if '_photon_gains' not in self.__dict__:
             self._photon_timings += np.random.normal(self.config['pmt_transit_time_mean'],
                                                      self.config['pmt_transit_time_spread'] / 2.35482,
-                                                     len(self._photon_timings))
+                                                     len(self._photon_timings)).astype(np.int64)
 
         dt = self.config.get('sample_duration', 10) # Getting dt from the lib just once
         self._n_double_pe = self._n_double_pe_bot = 0 # For truth aft output
@@ -1371,7 +1371,7 @@ class RawData(object):
         
         #Endtime is the end of the last pulse
         tb['endtime'] = np.mean(instruction['time']) if np.isnan(tb['t_last_photon']) else tb['t_last_photon'] + \
-            (self.config['samples_before_center']+self.config['samples_after_center']+1)*self.config['dt']
+            (self.config['samples_before_center']+self.config['samples_after_center']+1)*self.config['sample_duration']
         channels = getattr(pulse, '_photon_channels', [])
         if self.config.get('exclude_dpe_in_truth', False):
             n_dpe = n_dpe_bot = 0
