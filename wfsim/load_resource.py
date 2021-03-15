@@ -181,13 +181,11 @@ class Resource:
 
         log.debug(f'{self.__class__.__name__} fully initialized')
 
-    def make_map(map_file, fmt='text'):
-    """
-    Fetch and make an instance of InterpolatingMap based on map_file
-
+def make_map(map_file, fmt='text'):
+    '''Fetch and make an instance of InterpolatingMap based on map_file
     Alternativly map_file can be a list of ["constant dummy", constant: int, shape: list]
-        return an instance of  DummyMap
-    """
+    return an instance of  DummyMap'''
+        
     if isinstance(map_file, list):
         assert map_file[0] == 'constant dummy', ('Alternative file input can only be '
             '("constant dummy", constant: int, shape: list')

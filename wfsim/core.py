@@ -283,8 +283,6 @@ class S1(Pulse):
 
     def __init__(self, config):
         super().__init__(config)
-        # This config is not set for the 1T fax config
-        self.config.setdefault('s1_decay_spread', 1)
         self.phase = 'liquid'  # To distinguish singlet/triplet time delay.
 
     def __call__(self, instruction):
@@ -489,8 +487,6 @@ class S2(Pulse):
 
     def __init__(self, config):
         super().__init__(config)
-        # This config is not set for the 1T fax config
-        self.config.setdefault('s2_time_spread', 1)
 
         self.phase = 'gas'  # To distinguish singlet/triplet time delay.
         self.luminescence_switch_threshold = 100  # When to use simplified model (NOT IN USE)
@@ -646,10 +642,10 @@ class S2(Pulse):
         if config.get('enable_gas_gap_warping', True):
             dG = resource.gas_gap_length(xy)
         else:
-            dG = np.ones(len(xy)) * self.config['elr_gas_gap_length']
-        rA = self.config['anode_field_domination_distance']
-        rW = self.config['anode_wire_radius']
-        dL = self.config['gate_to_anode_distance'] - dG
+            dG = np.ones(len(xy)) * config['elr_gas_gap_length']
+        rA = config['anode_field_domination_distance']
+        rW = config['anode_wire_radius']
+        dL = config['gate_to_anode_distance'] - dG
 
         VG = config['anode_voltage'] / (1 + dL / dG / config['lxe_dielectric_constant'])
         E0 = VG / ((dG - rA) / rA + np.log(rA / rW))  # V / cm
