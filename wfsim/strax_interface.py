@@ -23,7 +23,6 @@ __all__ += ['instruction_dtype', 'truth_extra_dtype']
 instruction_dtype = [(('Waveform simulator event number.', 'event_number'), np.int32),
              (('Quanta type (S1 photons or S2 electrons)', 'type'), np.int8),
              (('Time of the interaction [ns]', 'time'), np.int64),
-             (('End time of the interaction [ns]', 'endtime'), np.int64),
              (('X position of the cluster[cm]', 'x'), np.float32),
              (('Y position of the cluster[cm]', 'y'), np.float32),
              (('Z position of the cluster[cm]', 'z'), np.float32),
@@ -35,6 +34,7 @@ instruction_dtype = [(('Waveform simulator event number.', 'event_number'), np.i
              ]
 
 truth_extra_dtype = [
+    (('End time of the interaction [ns]', 'endtime'), np.int64),
     ('n_electron', np.float),
     ('n_photon', np.float), ('n_photon_bottom', np.float),
     ('t_first_photon', np.float), ('t_last_photon', np.float),

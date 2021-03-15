@@ -1369,7 +1369,9 @@ class RawData(object):
                 tb[f't_last_{quantum}'] = np.nan
                 tb[f't_sigma_{quantum}'] = np.nan
         
-        tb['endtime'] = np.mean(instruction['time']) if np.isnan(tb['t_last_photon']) else tb['t_last_photon']
+        #Endtime is the end of the last pulse
+        tb['endtime'] = np.mean(instruction['time']) if np.isnan(tb['t_last_photon']) else tb['t_last_photon'] + \
+            (self.config['samples_before_center']+self.config['samples_after_center']+1)*self.config['dt']
         channels = getattr(pulse, '_photon_channels', [])
         if self.config.get('exclude_dpe_in_truth', False):
             n_dpe = n_dpe_bot = 0
