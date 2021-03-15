@@ -3,6 +3,8 @@ import strax
 import straxen
 import wfsim
 import logging
+import os.path as osp
+from .test_load_resource import test_load_nt
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -28,7 +30,8 @@ def test_sim_1T():
             config=dict(
                 nchunk=1, event_rate=1, chunk_size=2,
                 detector='XENON1T',
-                fax_config='https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/0b5a11195554d106c99784d8ad84805b0f42d51d/sim_files/fax_config_1t.json',  # noqa
+                fax_config=('https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files'
+                    '/0813736b133fccf658170207282668177898b47a/sim_files/fax_config_1t.json'),  # noqa
                 **straxen.contexts.x1t_common_config),
             **straxen.contexts.common_opts)
         st.register(wfsim.RawRecordsFromFax1T)
@@ -44,19 +47,31 @@ def test_sim_1T():
 
 def test_sim_nT():
     """Test the nT simulator. Works only if one has access to the XENONnT databases"""
-    if not straxen.utilix_is_configured():
-        # This means we cannot load the nT files. Most likely will work
-        # locally but not a travis job.
-        return
+
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
+        conf = straxen.contexts.xnt_common_config
+        conf['gain_model'] = ('to_pe_constant', 0.01)
+        resource, conf_override = test_load_nt()
+
+        # The SPE table in this package is for a single channel
+        # We generate the full SPE file for testing here
+        for i in range(1, 494):
+            resource.photon_area_distribution[str(i)] = \
+                resource.photon_area_distribution['0']
+        spe_file = osp.join(tempdir, 'XENONnT_spe_distributions.csv')
+        resource.photon_area_distribution.to_csv(spe_file, index=False)
+        conf_override['photon_area_distribution'] = spe_file
+
         st = strax.Context(
             storage=tempdir,
             config=dict(
                 nchunk=1, event_rate=1, chunk_size=2,
                 detector='XENONnT',
-                fax_config='fax_config_nt.json',
-                **straxen.contexts.xnt_common_config),
+                fax_config=('https://raw.githubusercontent.com/XENONnT/WFSim'
+                '/22004e28421044452f42aaf5797be7186e07bbba/files/XENONnT_wfsim_config.json'),
+                **conf,
+                fax_config_override=conf_override),
             **straxen.contexts.common_opts)
         st.register(wfsim.RawRecordsFromFaxNT)
 

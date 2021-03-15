@@ -529,10 +529,10 @@ class FaxSimulatorPlugin(strax.Plugin):
     rechunk_on_save = False
 
     # Simulator uses iteration semantics, so the plugin has a state
-    # TODO: this seems avoidable...
+    # this seems avoidable...
     parallel = False
 
-    # TODO: this state is needed for sorting checks,
+    # this state is needed for sorting checks,
     # but it prevents prevent parallelization
     last_chunk_time = -999999999999999
 
