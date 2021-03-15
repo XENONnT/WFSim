@@ -52,7 +52,7 @@ def rand_instructions(c):
     c['total_time'] = c['chunk_size'] * c['nchunk']
 
     instructions = np.zeros(2 * n, dtype=instruction_dtype)
-    uniform_times = c['total_time'] * (np.arange(n) + 0.5) / n
+    uniform_times = c['total_time'] * (np.arange(n) + 1.) / n
     instructions['time'] = np.repeat(uniform_times, 2) * int(1e9)
     instructions['event_number'] = np.digitize(instructions['time'],
          1e9 * np.arange(c['nchunk']) * c['chunk_size']) - 1
@@ -662,8 +662,9 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
 @strax.takes_config(
     strax.Option('wfsim_instructions',track=False,default=False),
     strax.Option('epix_config',track=False,default=dict()),
-    strax.Option('event_start',track=False,),
-    strax.Option('event_stop',track=False,),
+    strax.Option('event_start',default=0,track=False,),
+    strax.Option('event_stop',default=-1,track=False,
+                help='G4 id event number to stop at. If -1 process the entire file'),
     )
 class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
 
@@ -674,9 +675,30 @@ class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
             self.instructions=epix.run_epix(file=self.config['fax_file'],
                                         config=self.config,
                                         return_wfsim_instructions=True)
+            self.set_timings()
 
     def check_instructions(self):
         pass
+
+    def set_timing(self,):
+        '''Set timing information in such a way to synchronize instructions for the TPC and nVeto'''
+        logging.info("Setting timings")
+        
+        #Rate in ns^-1
+        rate = self.config['event_rate']/wfsim.units.s
+        start = self.config['event_start']
+        stop = self.config['event_stop']
+        if stop == -1:
+            stop = self.instructions['g4id'][-1]
+
+        timings= np.random.uniform(start/rate,stop/rate,stop-start).astype(np.int64)
+        timings.sort()
+
+        #For tpc we have multiple instructions per g4id. For nveto we only have one
+        counter=Counter(self.instructions_epix['g4id'])
+        i_per_id = [counter[k] for k in range(start,stop)]
+        timings_tpc=np.repeat(timings,i_per_id)
+        self.instructions_epix['time']+=timings_tpc
 
 
 
