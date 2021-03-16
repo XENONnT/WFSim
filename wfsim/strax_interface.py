@@ -14,7 +14,7 @@ import json
 from collections import Counter
 from scipy.interpolate import interp1d
 from .load_resource import load_config
-from copy import deepcopy
+
 export, __all__ = strax.exporter()
 __all__ += ['instruction_dtype', 'truth_extra_dtype']
 
@@ -226,8 +226,6 @@ class McChainSimulator(object):
          Epix needs to be imported in here to avoid circle imports"""
         logging.info("Getting instructions from epix")
         import epix
-
-        #make deepcopy cause some of the things in the setup will add unhashable stuff
         epix_config = get_resource(self.context.config['epix_config'],fmt='json')
         epix_config.update({'input_file':self.context.config['fax_file'],
                             'entry_start':self.context.config['event_start'],
@@ -676,6 +674,7 @@ class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
         if self.config['wfsim_instructions'] !=False:
             self.instructions=self.config['wfsim_instructions']  
         else:
+            import epix
             self.instructions=epix.run_epix(file=self.config['fax_file'],
                                         config=self.config,
                                         return_wfsim_instructions=True)
