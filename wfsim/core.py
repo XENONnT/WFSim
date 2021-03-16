@@ -1026,6 +1026,9 @@ class PMT_Afterpulse(Pulse):
     def __init__(self, config):
         super().__init__(config)
 
+        if not self.config['enable_pmt_afterpulses']:
+            return
+
         # Convert lists back to ndarray. As ndarray not supported by json
         for k in self.resource.uniform_to_pmt_ap.keys():
             for q in self.resource.uniform_to_pmt_ap[k].keys():
