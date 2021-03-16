@@ -1097,13 +1097,16 @@ class PMT_Afterpulse(Pulse):
             _photon_channels.append(signal_pulse._photon_channels[sel_photon_id])
             _photon_amplitude.append(np.atleast_1d(ap_amplitude))
 
-        _photon_timings = np.hstack(_photon_timings)
-        _photon_channels = np.hstack(_photon_channels).astype(int)
-        _photon_amplitude = np.hstack(_photon_amplitude)
-        _photon_gains = np.array(config['gains'])[_photon_channels] * _photon_amplitude
+        if len(_photon_timings) > 0:
+            _photon_timings = np.hstack(_photon_timings)
+            _photon_channels = np.hstack(_photon_channels).astype(int)
+            _photon_amplitude = np.hstack(_photon_amplitude)
+            _photon_gains = np.array(config['gains'])[_photon_channels] * _photon_amplitude
 
-        return _photon_timings, _photon_channels, _photon_gains
+            return _photon_timings, _photon_channels, _photon_gains
 
+        else:
+            return np.zeros(0, dtype=int), np.zeros(0, dtype=int), np.zeros(0)
 
 @export
 class RawData(object):
