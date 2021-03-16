@@ -507,7 +507,7 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  help="Terminate processing if any one mailbox receives "
                       "no result for more than this many seconds"),
     strax.Option('fax_config',
-                 default='https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/master/sim_files/fax_config_nt_design.json?token=AHCU5A5SGHD2J4LZD7X5AB3ALIEFI'),
+                 default='fax_config_nt_design.json'),
     strax.Option('gain_model',
                  default=('to_pe_per_run', 'https://github.com/XENONnT/private_nt_aux_files/blob/master/sim_files/to_pe_nt.npy?raw=true'),
                  help='PMT gain model. Specify as (model_type, model_config).'),
