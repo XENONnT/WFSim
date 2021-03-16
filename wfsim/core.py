@@ -513,7 +513,10 @@ class S2(Pulse):
                                              config=self.config)
 
         # Second generate photon timing and channel
-        self._photon_timings, self._instruction = self.photon_timings(t, n_electron, z_obs, positions, sc_gain,
+
+         
+        self._electron_timings, self._photon_timings, self._instruction = self.photon_timings(t, n_electron, z_obs,
+                                                                      positions, sc_gain,
                                                                       config=self.config,
                                                                       resource=self.resource,
                                                                       phase=self.phase)
@@ -803,7 +806,7 @@ class S2(Pulse):
                 s = slice(cumulate_npho[i-1], cumulate_npho[i])
             np.random.shuffle(_photon_timings[s])
 
-        return _photon_timings, _instruction
+        return _electron_timings, _photon_timings, _instruction
 
     @staticmethod
     def s2_pattern_map_diffuse(n_electron, z, xy, config, resource):
