@@ -384,7 +384,7 @@ class ChunkRawRecords(object):
             records_needed = int(np.ceil(pulse_length / samples_per_record))
 
             if self.rawdata.left * dt > self.chunk_time:
-                self.chunk_time = self.last_digitized_right * dt
+                self.chunk_time = (self.last_digitized_right + 1) * dt
                 yield from self.final_results()
                 self.chunk_time_pre = self.chunk_time
                 self.chunk_time += cksz
