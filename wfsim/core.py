@@ -1026,38 +1026,47 @@ class PMT_Afterpulse(Pulse):
     def __init__(self, config):
         super().__init__(config)
 
+        # Convert lists back to ndarray. As ndarray not supported by json
+        for k in self.resource.uniform_to_pmt_ap.keys():
+            for q in self.resource.uniform_to_pmt_ap[k].keys():
+                if isinstance(self.resource.uniform_to_pmt_ap[k][q], list):
+                    self.resource.uniform_to_pmt_ap[k][q] = np.array(self.resource.uniform_to_pmt_ap[k][q])
+
     def __call__(self, signal_pulse):
         if len(signal_pulse._photon_timings) == 0:
             self.clear_pulse_cache()
             return
 
-        self._photon_timings = []
-        self._photon_channels = []
-        self._photon_amplitude = []
+        self._photon_timings, self._photon_channels, self._photon_gains = \
+            self.photon_afterpulse(signal_pulse, self.resource, self.config)
 
-        self.photon_afterpulse(signal_pulse)
         super().__call__()
 
-    def photon_afterpulse(self, signal_pulse):
+    @staticmethod
+    def photon_afterpulse(signal_pulse, resource, config):
         """
         For pmt afterpulses, gain and dpe generation is a bit different from standard photons
         """
-        self.element_list = self.resource.uniform_to_pmt_ap.keys()
-        for element in self.element_list:
-            delaytime_cdf = self.resource.uniform_to_pmt_ap[element]['delaytime_cdf']
-            amplitude_cdf = self.resource.uniform_to_pmt_ap[element]['amplitude_cdf']
+        element_list = resource.uniform_to_pmt_ap.keys()
+        _photon_timings = []
+        _photon_channels = []
+        _photon_amplitude = []
+
+        for element in element_list:
+            delaytime_cdf = resource.uniform_to_pmt_ap[element]['delaytime_cdf']
+            amplitude_cdf = resource.uniform_to_pmt_ap[element]['amplitude_cdf']
 
             # Assign each photon FRIST random uniform number rU0 from (0, 1] for timing
             rU0 = 1 - np.random.rand(len(signal_pulse._photon_timings))
 
             # Select those photons with U <= max of cdf of specific channel
             cdf_max = delaytime_cdf[signal_pulse._photon_channels, -1]
-            sel_photon_id = np.where(rU0 <= cdf_max * self.config['pmt_ap_modifier'])[0]
+            sel_photon_id = np.where(rU0 <= cdf_max * config['pmt_ap_modifier'])[0]
             if len(sel_photon_id) == 0: continue
             sel_photon_channel = signal_pulse._photon_channels[sel_photon_id]
 
             # Assign selected photon SECOND random uniform number rU1 from (0, 1] for amplitude
-            rU1 = 1 - np.random.rand(len(sel_photon_id))
+            rU1 = 1 - np.random.rand(len(sel_photon_channel))
 
             # The map is made so that the indices are delay time in unit of ns
             if 'Uniform' in element:
@@ -1069,21 +1078,28 @@ class PMT_Afterpulse(Pulse):
                     np.abs(
                         delaytime_cdf[sel_photon_channel]
                         - rU0[sel_photon_id][:, None]), axis=-1)
-                            - self.config['pmt_ap_t_modifier'])
-                ap_amplitude = np.argmin(
-                    np.abs(
-                        amplitude_cdf[sel_photon_channel]
-                        - rU1[:, None]), axis=-1)/100.
+                            - config['pmt_ap_t_modifier'])
+                if len(amplitude_cdf.shape) == 2:
+                    ap_amplitude = np.argmin(
+                        np.abs(
+                            amplitude_cdf[sel_photon_channel]
+                            - rU1[:, None]), axis=-1) / 100.
+                else:
+                    ap_amplitude = np.argmin(
+                        np.abs(
+                            amplitude_cdf[None, :]
+                            - rU1[:, None]), axis=-1) / 100.
 
-            self._photon_timings += (signal_pulse._photon_timings[sel_photon_id] + ap_delay).tolist()
-            self._photon_channels += signal_pulse._photon_channels[sel_photon_id].tolist()
-            self._photon_amplitude += np.atleast_1d(ap_amplitude).tolist()
+            _photon_timings.append(signal_pulse._photon_timings[sel_photon_id] + ap_delay)
+            _photon_channels.append(signal_pulse._photon_channels[sel_photon_id])
+            _photon_amplitude.append(np.atleast_1d(ap_amplitude))
 
-        self._photon_timings = np.array(self._photon_timings)
-        self._photon_channels = np.array(self._photon_channels).astype(int)
-        self._photon_amplitude = np.array(self._photon_amplitude)
-        self._photon_gain = np.array(self.config['gains'])[self._photon_channels] \
-            * self._photon_amplitude
+        _photon_timings = np.hstack(_photon_timings)
+        _photon_channels = np.hstack(_photon_channels).astype(int)
+        _photon_amplitude = np.hstack(_photon_amplitude)
+        _photon_gains = np.array(config['gains'])[_photon_channels] * _photon_amplitude
+
+        return _photon_timings, _photon_channels, _photon_gains
 
 
 @export

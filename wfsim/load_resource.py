@@ -114,19 +114,24 @@ class Resource:
                     log.warning(f'{k} did not download, trying {raw_url}')
                     files[k] = raw_url
             log.debug(f'Downloaded {k} successfully')
-                             
-        self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
 
         if config['detector'] == 'XENON1T':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='json.gz')
             self.s1_light_yield_map = make_map(files['s1_light_yield_map'], fmt='json')
             self.s2_light_yield_map = make_map(files['s2_light_yield_map'], fmt='json')
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='json.gz')
-            self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
+
+            # Garfield luminescence timing samples
+            if config['s2_luminescence_model'] == 'garfield':
+                raise NotImplementedError
 
             # Gas gap warping map
             if config['enable_gas_gap_warping']:
                 self.gas_gap_length = make_map(["constant dummy", 0.25, [254,]])
+
+            # Photon After Pulses
+            if config['enable_pmt_afterpulses']:
+                self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
 
         if config['detector'] == 'XENONnT':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
@@ -147,29 +152,29 @@ class Resource:
                 lymap.__init__(lymap.data)
                 self.s2_light_yield_map = lymap
 
+            # Garfield luminescence timing samples
             if config['s2_luminescence_model'] == 'garfield':
                 self.s2_luminescence = straxen.get_resource(files['s2_luminescence'], fmt='pkl.gz')
-
-            if config['field_distortion_on']:
-                self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
 
             # Gas gap warping map
             if config['enable_gas_gap_warping']:
                 gas_gap_map = straxen.get_resource(files['gas_gap_map'], fmt='pkl')
                 self.gas_gap_length = lambda positions: gas_gap_map.lookup(*positions.T)
 
+            # Photon After Pulses
+            if config['enable_pmt_afterpulses']:
+                self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='json.gz')
+
         # Spe area distributions
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
 
-        #Spe area distributions
-        self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
+        # 3d field distortion map
+        if config['field_distortion_on']:
+            self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
+
         # Electron After Pulses compressed, haven't figure out how pkl.gz works
         if config['enable_electron_afterpulses']:
             self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
-
-        # Photon After Pulses
-        if config['enable_pmt_afterpulses']:
-            self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
 
         # Noise sample
         if config['enable_noise']:
