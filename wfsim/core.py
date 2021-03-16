@@ -513,8 +513,6 @@ class S2(Pulse):
                                              config=self.config)
 
         # Second generate photon timing and channel
-
-         
         self._electron_timings, self._photon_timings, self._instruction = self.photon_timings(t, n_electron, z_obs,
                                                                       positions, sc_gain,
                                                                       config=self.config,
@@ -762,7 +760,7 @@ class S2(Pulse):
 
         if len(_electron_timings) < 1:
             _photon_timings = []
-            return _photon_timings, []
+            return _electron_timings, _photon_timings, []
 
         # For vectorized calculation, artificially top #photon per electron at +4 sigma
         nele = len(_electron_timings)
