@@ -45,9 +45,9 @@ truth_extra_dtype = [
 log = logging.getLogger('SimulationCore')
 
 def rand_instructions(c):
-    '''Random instruction generator function. This will be called by wfsim if you do not specify 
+    """Random instruction generator function. This will be called by wfsim if you do not specify 
     specific instructions.
-    :params c: wfsim configuration dict'''
+    :params c: wfsim configuration dict"""
     n = c['nevents'] = c['event_rate'] * c['chunk_size'] * c['nchunk']
     c['total_time'] = c['chunk_size'] * c['nchunk']
 
@@ -72,9 +72,9 @@ def rand_instructions(c):
     return instructions
 
 def read_optical(c):
-    '''Function will be executed when wfsim in run in optical mode. This function expects c['fax_file'] 
+    """Function will be executed when wfsim in run in optical mode. This function expects c['fax_file'] 
     to be a root file from optical mc
-    :params c: wfsim configuration dict'''
+    :params c: wfsim configuration dict"""
     file = c['fax_file']
     data = uproot.open(file)
     try:
@@ -119,12 +119,12 @@ def read_optical(c):
     return ins, channels, timings
         
 def _read_optical_nveto(config, events):
-    '''Helper function for nveto to read photon channels and timings from G4 and apply QE's
+    """Helper function for nveto to read photon channels and timings from G4 and apply QE's
     :params c: dict, wfsim configuration
     :params e: g4 root file
     
     returns 2 nested arrays
-    '''
+    """
     nV_pmt_id_offset = config['channel_map']['nveto'][0]
     constant_hc = 1239.841984 # (eV*nm) to calculate (wavelength lambda) = h * c / energy
     channels = [[channel - nV_pmt_id_offset for channel in array] for array in events["pmthitID"].array(library="np")]
@@ -182,7 +182,7 @@ def instruction_from_csv(filename):
 
 @export
 class McChainSimulator(object):
-    ''' Simulator wrapper class to be used for full chain simulator. 
+    """ Simulator wrapper class to be used for full chain simulator. 
         Expected fax_file input is a g4 root file.
         Does three things:
 
@@ -195,9 +195,9 @@ class McChainSimulator(object):
     Usage: 
         simulator = wfsim.McChainSimulator(st,run_id)
         simulator.run_chain()
-        '''
+        """
     def __init__(self,strax_context,run_id) -> None:
-        '''Sets configuration. '''
+        """Sets configuration. """
         self.context = strax_context
         self.file = self.context.config['fax_file']
         self.targets = ('raw_records',)
@@ -206,7 +206,7 @@ class McChainSimulator(object):
             self.targets = ('raw_records','raw_records_nv')
 
     def _set_max(self,):
-        '''If no event_stop is specified set it to the maximum (-1=do all events)'''
+        """If no event_stop is specified set it to the maximum (-1=do all events)"""
         if self.context.config['event_stop']==-1:
             self.context.set_config(dict(event_stop=\
                 np.max(self.instructions_epix['g4id'][-1],self.instructions_nveto['g4id'][-1])+1))
@@ -214,16 +214,16 @@ class McChainSimulator(object):
             pass
 
     def _instructions_from_epix_cut(self,):
-        '''Cut away events not within event_start & event_stop'''
+        """Cut away events not within event_start & event_stop"""
         mask=(self.instructions_epix['g4id']<self.context.config['event_stop'])&\
              (self.instructions_epix['g4id']>=self.context.config['event_start'])
         self.instructions_epix = self.instructions_epix[mask]
 
 
     def instructions_from_epix(self,):
-        '''Run epix and save instructions as self.instruction.
+        """Run epix and save instructions as self.instruction.
          For the moment we'll just process the whole file and then throw out all events we won't use
-         Epix needs to be imported in here to avoid circle imports'''
+         Epix needs to be imported in here to avoid circle imports"""
         logging.info("Getting instructions from epix")
         import epix
 
@@ -245,7 +245,7 @@ class McChainSimulator(object):
         
 
     def set_timing(self,):
-        '''Set timing information in such a way to synchronize instructions for the TPC and nVeto'''
+        """Set timing information in such a way to synchronize instructions for the TPC and nVeto"""
         logging.info("Setting timings")
         
         #Rate in ns^-1
@@ -265,7 +265,7 @@ class McChainSimulator(object):
             self.instructions_nveto['time']=timings[self.instructions_nveto['g4id']-start]
     
     def set_configuration(self,):
-        '''Set chunking configuration and feeds instructions to wfsim'''
+        """Set chunking configuration and feeds instructions to wfsim"""
         max_events_per_chunk=500#is this hard coding really nessecairy...
         chunk_size = np.ceil(max_events_per_chunk/self.context.config['event_rate'])
         nchunk = np.ceil((self.context.config['event_stop']-self.context.config['event_start'])/ \
@@ -279,8 +279,8 @@ class McChainSimulator(object):
                                          wfsim_nveto_timings=self.nveto_timings))
 
     def set_instructions(self,):
-        '''Gets instructions from epix and neutron veto if needed. 
-        Afterwards sets the correct timings and configuration'''
+        """Gets instructions from epix and neutron veto if needed. 
+        Afterwards sets the correct timings and configuration"""
         self.instructions_from_epix()
         if self.context.config['neutron_veto']:
             self.instructions_from_nveto()
@@ -290,9 +290,9 @@ class McChainSimulator(object):
         np.save('./instructions_nveto.npy',self.instructions_nveto)
 
     def run_strax(self,run_id):
-        '''Runs wfsim up to raw records for tpc and if requisted the nveto.
+        """Runs wfsim up to raw records for tpc and if requisted the nveto.
             All this setting neutron_veto=True/False is needed to get wfsim to do the right thing
-        '''
+        """
         self.context.set_config(dict(neutron_veto=False))
         self.context.make(run_id,'raw_records')
 
@@ -303,8 +303,8 @@ class McChainSimulator(object):
             self.context.make(run_id,'raw_records_nv')
         
     def _sync_meta(self,):
-        '''Sync metadata between tpc and nveto. The start and end times of the metadata must match for
-            something strax wants. Check which ever one starts first, make that the start of both. Same for end'''
+        """Sync metadata between tpc and nveto. The start and end times of the metadata must match for
+            something strax wants. Check which ever one starts first, make that the start of both. Same for end"""
         logging.debug('Syncing metadata')
 
         #First run start and stop
@@ -318,8 +318,8 @@ class McChainSimulator(object):
             [max((self.tpc_meta['chunks'][-1]['end'],self.nveto_meta['chunks'][-1]['end']))]*2
         
     def _store_meta(self,):
-        ''''Store metadata after matching'''
-        #TODO Metadata is written to the wrong folder
+        """Store metadata after matching"""
+        # Metadata is written to the wrong folder TODO
         logging.debug('Storing synced metadata')
         metas=(self.tpc_meta,self.nveto_meta)
 
@@ -332,14 +332,14 @@ class McChainSimulator(object):
                 f.write(json.dumps(metas[ix], **json_options))
     
     def sync_meta(self,run_id):
-        '''Sync metadata outputs from the tpc and the nveto.'''
+        """Sync metadata outputs from the tpc and the nveto."""
         self.tpc_meta=self.context.get_meta(run_id,'raw_records')
         self.nveto_meta=self.context.get_meta(run_id,'raw_records_nv')
         self._sync_meta()
         self._store_meta()
 
     def run_chain(self):
-        '''Main function. Sets instructions needed, runs wfsim and synch metadata'''
+        """Main function. Sets instructions needed, runs wfsim and synch metadata"""
         logging.info(f"Setting instructions")
         self.set_instructions()
         logging.info(f"Simulating data")
@@ -547,8 +547,12 @@ class FaxSimulatorPlugin(strax.Plugin):
         # Update gains to the nT defaults
         self.to_pe = get_to_pe(self.run_id, c['gain_model'],
                               c['channel_map']['tpc'][1]+1)
-        c['gains'] = 1 / self.to_pe * (1e-8 * 2.25 / 2**14) / (1.6e-19 * 10 * 50)
-        c['gains'][self.to_pe==0] = 0
+
+        c['gains'] = np.divide((1e-8 * 2.25 / 2**14) / (1.6e-19 * 10 * 50),
+                               self.to_pe,
+                               out=np.zeros_like(self.to_pe, ), 
+                               where=self.to_pe!=0)
+
         if c['seed'] != False:
             np.random.seed(c['seed'])
 
@@ -681,7 +685,7 @@ class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
         pass
 
     def set_timing(self,):
-        '''Set timing information in such a way to synchronize instructions for the TPC and nVeto'''
+        """Set timing information in such a way to synchronize instructions for the TPC and nVeto"""
         logging.info("Setting timings")
         
         #Rate in ns^-1

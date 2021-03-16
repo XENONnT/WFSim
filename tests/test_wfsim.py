@@ -28,7 +28,7 @@ def test_sim_1T():
         st = strax.Context(
             storage=tempdir,
             config=dict(
-                nchunk=1, event_rate=1, chunk_size=2,
+                nchunk=2, event_rate=1, chunk_size=1,
                 detector='XENON1T',
                 fax_config=('https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files'
                     '/0813736b133fccf658170207282668177898b47a/sim_files/fax_config_1t.json'),  # noqa
