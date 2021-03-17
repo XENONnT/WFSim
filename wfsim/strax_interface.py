@@ -14,7 +14,7 @@ import json
 from collections import Counter
 from scipy.interpolate import interp1d
 from .load_resource import load_config
-
+from copy import deepcopy
 export, __all__ = strax.exporter()
 __all__ += ['instruction_dtype', 'truth_extra_dtype']
 
@@ -226,6 +226,8 @@ class McChainSimulator(object):
          Epix needs to be imported in here to avoid circle imports"""
         logging.info("Getting instructions from epix")
         import epix
+
+        #make deepcopy cause some of the things in the setup will add unhashable stuff
         epix_config = get_resource(self.context.config['epix_config'],fmt='json')
         epix_config.update({'input_file':self.context.config['fax_file'],
                             'entry_start':self.context.config['event_start'],
@@ -382,7 +384,7 @@ class ChunkRawRecords(object):
             records_needed = int(np.ceil(pulse_length / samples_per_record))
 
             if self.rawdata.left * dt > self.chunk_time:
-                self.chunk_time = self.last_digitized_right * dt
+                self.chunk_time = (self.last_digitized_right+1) * dt  #Strange off by 1  error sometimes shows up
                 yield from self.final_results()
                 self.chunk_time_pre = self.chunk_time
                 self.chunk_time += cksz
@@ -663,7 +665,8 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
 @export
 @strax.takes_config(
     strax.Option('wfsim_instructions',track=False,default=False),
-    strax.Option('epix_config',track=False,default=dict()),
+    strax.Option('epix_config',track=False,default=str(),
+                help='Path to epix configuration'),
     strax.Option('event_start',default=0,track=False,),
     strax.Option('event_stop',default=-1,track=False,
                 help='G4 id event number to stop at. If -1 process the entire file'),
@@ -675,8 +678,9 @@ class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
             self.instructions=self.config['wfsim_instructions']  
         else:
             import epix
+            epix_config = get_resource(self.config['epix_config'])
             self.instructions=epix.run_epix(file=self.config['fax_file'],
-                                        config=self.config,
+                                        config=epix_config,
                                         return_wfsim_instructions=True)
             self.set_timings()
 
