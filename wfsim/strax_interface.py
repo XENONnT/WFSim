@@ -702,10 +702,10 @@ class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
         timings.sort()
 
         #For tpc we have multiple instructions per g4id. For nveto we only have one
-        counter=Counter(self.instructions_epix['g4id'])
+        counter=Counter(self.instructions['g4id'])
         i_per_id = [counter[k] for k in range(start,stop)]
         timings_tpc=np.repeat(timings,i_per_id)
-        self.instructions_epix['time']+=timings_tpc
+        self.instructions['time']+=timings_tpc
 
 
 
