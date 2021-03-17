@@ -642,7 +642,7 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
 
     def infer_dtype(self):
         dtype = {data_type:strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH)
-                for data_type in self.provides if data_type is not 'truth'}
+                for data_type in self.provides if data_type != 'truth'}
         dtype['truth']=instruction_dtype + truth_extra_dtype
         return dtype
 
@@ -708,7 +708,6 @@ class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
         self.instructions['time']+=timings_tpc
 
 
-
 @export
 class RawRecordsFromFax1T(RawRecordsFromFaxNT):
     provides = ('raw_records', 'truth')
@@ -747,7 +746,6 @@ class RawRecordsFromFaxnVeto(RawRecordsFromFaxOptical):
         overrides = self.config['fax_config_override']
         if overrides is not None:
             c.update(overrides)
-
 
     def compute(self):
         result = super().compute()
