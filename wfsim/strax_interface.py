@@ -414,6 +414,7 @@ class ChunkRawRecords(object):
                 self.current_digitized_right = self.rawdata.right
 
         self.last_digitized_right = self.current_digitized_right
+        self.chunk_time = (self.last_digitized_right + 1) * dt
         yield from self.final_results()
 
     def final_results(self):
