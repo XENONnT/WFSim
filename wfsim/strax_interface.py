@@ -131,7 +131,7 @@ def _read_optical_nveto(config, events):
     timings = events["pmthitTime"].array(library="np")*1e9
     wavelengths = [[constant_hc / energy for energy in array] for array in events["pmthitEnergy"].array(library="np")]
     collection_efficiency = config['nv_pmt_ce_factor']
-    resource = load_config(config=dict(detector='XENONnT',neutron_veto=True))
+    resource = load_config(config)
     nv_pmt_qe_data = resource.nv_pmt_qe_data
     wavelength_x = np.array(nv_pmt_qe_data['nv_pmt_qe_wavelength'])
     nveto_pmt_qe = np.array([v for k, v in nv_pmt_qe_data['nv_pmt_qe'].items()])
