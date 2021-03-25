@@ -271,7 +271,7 @@ class Pulse(object):
 
         delay = np.random.choice([t1, t3], size, replace=True,
                                  p=[singlet_ratio, 1 - singlet_ratio])
-        return np.random.exponential(1, size) * delay
+        return (np.random.exponential(1, size) * delay).astype(int)
 
 
 @export
@@ -596,7 +596,7 @@ class S2(Pulse):
     @staticmethod
     @njit
     def _luminescence_timings_simple(n, dG, E0, r, dr, rr, alpha, uE, p, n_electron, shape):
-        emission_time = np.zeros(shape)
+        emission_time = np.zeros(shape, dtype=int)
         """
         Luminescence time distribution computation, calculates emission timings of photons from the excited electrons
         return 1d nested array with ints
@@ -613,7 +613,7 @@ class S2(Pulse):
             y = np.cumsum(dy[j:])
 
             probabilities = np.random.rand(ne, shape[1])
-            emission_time[ci:ci+ne, :] = np.interp(probabilities, y / y[-1], t)
+            emission_time[ci:ci+ne, :] = np.interp(probabilities, y / y[-1], t).astype(int)
             ci += ne
 
         return emission_time
@@ -692,7 +692,7 @@ class S2(Pulse):
 
         S2._luminescence_timings_garfield(distance, x_grid, n_grid, i_grid, shape, index)
 
-        return resource.s2_luminescence['t'][index]
+        return resource.s2_luminescence['t'][index].astype(int)
 
     @staticmethod
     @njit
@@ -728,7 +728,7 @@ class S2(Pulse):
                 _timing = t[i] + \
                     np.random.exponential(electron_trapping_time)
                 _timing += np.random.normal(drift_time_mean, drift_time_stdev)
-                timings[i_electron] = _timing
+                timings[i_electron] = int(_timing)
 
                 # add manual fluctuation to sc gain
                 gains[i_electron] = sc_gain[i]
@@ -747,8 +747,8 @@ class S2(Pulse):
         :param resource: instance of the resource class
         :param phase: string, "gas" """
         # First generate electron timinga
-        _electron_timings = np.zeros(np.sum(n_electron))
-        _electron_gains = np.zeros(np.sum(n_electron))
+        _electron_timings = np.zeros(np.sum(n_electron), dtype=int)
+        _electron_gains = np.zeros(np.sum(n_electron), dtype=float)
         _config = [config[k] for k in
                    ['drift_velocity_liquid',
                     'drift_time_gate',
@@ -758,8 +758,7 @@ class S2(Pulse):
             _electron_timings, _electron_gains, *_config)
 
         if len(_electron_timings) < 1:
-            _photon_timings = []
-            return _electron_timings, _photon_timings, []
+            return np.zeros(0, dtype=int), np.zeros(0, dtype=int), np.zeros(0)
 
         # For vectorized calculation, artificially top #photon per electron at +4 sigma
         nele = len(_electron_timings)
@@ -776,6 +775,7 @@ class S2(Pulse):
                 (nele, npho),
                 config=config,
                 resource=resource)
+
         _photon_timings += np.repeat(_electron_timings, npho).reshape((nele, npho))
 
         # Crop number of photons by random number generated with poisson
@@ -789,9 +789,9 @@ class S2(Pulse):
         _instruction = _instruction[probability < threshold]
 
         _photon_timings += Pulse.singlet_triplet_delays(
-            len(_photon_timings), config['singlet_fraction_gas'],config, phase)
+            len(_photon_timings), config['singlet_fraction_gas'], config, phase)
 
-        _photon_timings += np.random.normal(0,config['s2_time_spread'],len(_photon_timings))
+        _photon_timings += np.random.normal(0, config['s2_time_spread'], len(_photon_timings)).astype(int)
         # The timings generated is NOT randomly ordered, must do shuffle
         # Shuffle within each given n_electron[i]
         # We can do this by first finding out cumulative sum of the photons
