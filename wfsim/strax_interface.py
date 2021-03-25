@@ -205,21 +205,6 @@ class McChainSimulator(object):
         if self.context.config['neutron_veto']:
             self.targets = ('raw_records','raw_records_nv')
 
-    def _set_max(self,):
-        """If no event_stop is specified set it to the maximum (-1=do all events)"""
-        if self.context.config['event_stop']==-1:
-            self.context.set_config(dict(event_stop=\
-                np.max(self.instructions_epix['g4id'][-1],self.instructions_nveto['g4id'][-1])+1))
-        else:
-            pass
-
-    def _instructions_from_epix_cut(self,):
-        """Cut away events not within event_start & event_stop"""
-        mask=(self.instructions_epix['g4id']<self.context.config['event_stop'])&\
-             (self.instructions_epix['g4id']>=self.context.config['event_start'])
-        self.instructions_epix = self.instructions_epix[mask]
-
-
     def instructions_from_epix(self,):
         """Run epix and save instructions as self.instruction.
          For the moment we'll just process the whole file and then throw out all events we won't use
@@ -235,14 +220,11 @@ class McChainSimulator(object):
                             'source_rate':0})
         epix_config = epix.run_epix.setup(epix_config)
         self.instructions_epix=epix.run_epix.main(epix_config,return_wfsim_instructions=True)
-        self._set_max()
-        self._instructions_from_epix_cut()
 
     def instructions_from_nveto(self,):
         logging.info("Getting nveto instructions")
         self.context.config['nv_pmt_ce_factor'] = 1.0
         self.instructions_nveto, self.nveto_channels, self.nveto_timings=read_optical(self.context.config)
-        
 
     def set_timing(self,):
         """Set timing information in such a way to synchronize instructions for the TPC and nVeto"""
