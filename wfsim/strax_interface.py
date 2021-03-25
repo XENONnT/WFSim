@@ -213,11 +213,11 @@ class McChainSimulator(object):
         import epix
 
         #make deepcopy cause some of the things in the setup will add unhashable stuff
-        epix_config = get_resource(self.context.config['epix_config'],fmt='json')
-        epix_config.update({'input_file':self.context.config['fax_file'],
-                            'entry_start':self.context.config['event_start'],
-                            'entry_stop':self.context.config['event_stop'],
-                            'source_rate':0})
+        epix_config = self.context.config['epix_config'] # dictionary directly fed to context
+        #epix_config.update({'input_file':self.context.config['fax_file'],
+        #                    'entry_start':self.context.config['event_start'],
+        #                    'entry_stop':self.context.config['event_stop'],
+        #                    'source_rate':0})
         epix_config = epix.run_epix.setup(epix_config)
         self.instructions_epix=epix.run_epix.main(epix_config,return_wfsim_instructions=True)
 
