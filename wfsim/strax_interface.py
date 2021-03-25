@@ -287,7 +287,6 @@ class McChainSimulator(object):
         self.set_timing()
         self.set_configuration()
         np.save('./instructions.npy',self.instructions_epix)
-        np.save('./instructions_nveto.npy',self.instructions_nveto)
 
     def run_strax(self,run_id):
         """Runs wfsim up to raw records for tpc and if requisted the nveto.
