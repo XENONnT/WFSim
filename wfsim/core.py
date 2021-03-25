@@ -115,7 +115,7 @@ class Pulse(object):
                            + self.config.get('samples_after_pulse_center', 20))
             pulse_current = np.zeros(pulse_right - pulse_left + 1)
 
-            Pulse.add_current(_channel_photon_timings.astype(int),
+            Pulse.add_current(_channel_photon_timings.astype(np.int64),
                               _channel_photon_gains,
                               pulse_left,
                               dt,
@@ -201,7 +201,7 @@ class Pulse(object):
 
 
     def uniform_to_pe_arr(self, p, channel=0):
-        indices = (p * 2000).astype(int) + 1
+        indices = (p * 2000).astype(np.int64) + 1
         return self.__uniform_to_pe_arr[channel, indices]
 
 
@@ -271,7 +271,7 @@ class Pulse(object):
 
         delay = np.random.choice([t1, t3], size, replace=True,
                                  p=[singlet_ratio, 1 - singlet_ratio])
-        return (np.random.exponential(1, size) * delay).astype(int)
+        return (np.random.exponential(1, size) * delay).astype(np.int64)
 
 
 @export
@@ -350,7 +350,7 @@ class S1(Pulse):
         p_per_channel = s1_pattern_map(positions)
         p_per_channel[:, np.in1d(channels, config['turned_off_pmts'])] = 0
 
-        _photon_channels = np.array([]).astype(int)
+        _photon_channels = np.array([]).astype(np.int64)
         for ppc, n in zip(p_per_channel, n_photons):
             _photon_channels = np.append(_photon_channels,
                     np.random.choice(
@@ -372,13 +372,13 @@ class S1(Pulse):
         returns photon timing array"""
         _photon_timings = np.repeat(t, n_photons)
         if len(_photon_timings) == 0:
-            return _photon_timings.astype(int)
+            return _photon_timings.astype(np.int64)
         
         if (config['s1_model_type'] == 'simple' and 
             np.isin(recoil_type, NestId._ALL).all()):
             # Simple S1 model enabled: use it for ER and NR.
-            _photon_timings += np.random.exponential(config['s1_decay_time'], len(_photon_timings)).astype(int)
-            _photon_timings += np.random.normal(0, config['s1_decay_spread'], len(_photon_timings)).astype(int)
+            _photon_timings += np.random.exponential(config['s1_decay_time'], len(_photon_timings)).astype(np.int64)
+            _photon_timings += np.random.normal(0, config['s1_decay_spread'], len(_photon_timings)).astype(np.int64)
             return _photon_timings
 
         counts_start = 0
@@ -392,7 +392,7 @@ class S1(Pulse):
                     getattr(S1, str_recoil_type.lower())(
                     size=counts,
                     config=config,
-                    phase=phase).astype(int)
+                    phase=phase).astype(np.int64)
             except AttributeError:
                 raise AttributeError(f"Recoil type must be ER, NR, alpha or LED, not {recoil_type}. Check nest ids")
             counts_start += counts
@@ -596,7 +596,7 @@ class S2(Pulse):
     @staticmethod
     @njit
     def _luminescence_timings_simple(n, dG, E0, r, dr, rr, alpha, uE, p, n_electron, shape):
-        emission_time = np.zeros(shape, dtype=int)
+        emission_time = np.zeros(shape, np.int64)
         """
         Luminescence time distribution computation, calculates emission timings of photons from the excited electrons
         return 1d nested array with ints
@@ -613,7 +613,7 @@ class S2(Pulse):
             y = np.cumsum(dy[j:])
 
             probabilities = np.random.rand(ne, shape[1])
-            emission_time[ci:ci+ne, :] = np.interp(probabilities, y / y[-1], t).astype(int)
+            emission_time[ci:ci+ne, :] = np.interp(probabilities, y / y[-1], t).astype(np.int64)
             ci += ne
 
         return emission_time
@@ -681,18 +681,18 @@ class S2(Pulse):
         x_grid, n_grid = np.unique(resource.s2_luminescence['x'], return_counts=True)
         i_grid = (n_grid.sum() - np.cumsum(n_grid[::-1]))[::-1]
 
-        tilt = getattr(config, 'anode_xaxis_angle', np.pi / 4)
-        pitch = getattr(config, 'anode_pitch', 0.5)
+        tilt = config.get('anode_xaxis_angle', np.pi / 4)
+        pitch = config.get('anode_pitch', 0.5)
         rotation_mat = np.array(((np.cos(tilt), -np.sin(tilt)), (np.sin(tilt), np.cos(tilt))))
 
         jagged = lambda relative_y: (relative_y + pitch / 2) % pitch - pitch / 2
         distance = jagged(np.matmul(xy, rotation_mat)[:, 1])  # shortest distance from any wire
 
-        index = np.zeros(shape).astype(int)
+        index = np.zeros(shape, np.int64)
 
         S2._luminescence_timings_garfield(distance, x_grid, n_grid, i_grid, shape, index)
 
-        return resource.s2_luminescence['t'][index].astype(int)
+        return resource.s2_luminescence['t'][index].astype(np.int64)
 
     @staticmethod
     @njit
@@ -747,8 +747,8 @@ class S2(Pulse):
         :param resource: instance of the resource class
         :param phase: string, "gas" """
         # First generate electron timinga
-        _electron_timings = np.zeros(np.sum(n_electron), dtype=int)
-        _electron_gains = np.zeros(np.sum(n_electron), dtype=float)
+        _electron_timings = np.zeros(np.sum(n_electron), np.int64)
+        _electron_gains = np.zeros(np.sum(n_electron), np.float64)
         _config = [config[k] for k in
                    ['drift_velocity_liquid',
                     'drift_time_gate',
@@ -758,12 +758,12 @@ class S2(Pulse):
             _electron_timings, _electron_gains, *_config)
 
         if len(_electron_timings) < 1:
-            return np.zeros(0, dtype=int), np.zeros(0, dtype=int), np.zeros(0)
+            return np.zeros(0, np.int64), np.zeros(0, np.int64), np.zeros(0)
 
         # For vectorized calculation, artificially top #photon per electron at +4 sigma
         nele = len(_electron_timings)
         npho = np.ceil(np.max(_electron_gains) +
-                       4 * np.sqrt(np.max(_electron_gains))).astype(int)
+                       4 * np.sqrt(np.max(_electron_gains))).astype(np.int64)
 
         if config['s2_luminescence_model'] == 'simple':
             _photon_timings = S2.luminescence_timings_simple(xy, n_electron, (nele, npho), 
@@ -791,7 +791,7 @@ class S2(Pulse):
         _photon_timings += Pulse.singlet_triplet_delays(
             len(_photon_timings), config['singlet_fraction_gas'], config, phase)
 
-        _photon_timings += np.random.normal(0, config['s2_time_spread'], len(_photon_timings)).astype(int)
+        _photon_timings += np.random.normal(0, config['s2_time_spread'], len(_photon_timings)).astype(np.int64)
         # The timings generated is NOT randomly ordered, must do shuffle
         # Shuffle within each given n_electron[i]
         # We can do this by first finding out cumulative sum of the photons
@@ -864,7 +864,7 @@ class S2(Pulse):
 
         aft = config['s2_mean_area_fraction_top']
         aft_random = config.get('randomize_fraction_of_s2_top_array_photons', 0)
-        channels = np.arange(config['n_tpc_pmts']).astype(int)
+        channels = np.arange(config['n_tpc_pmts']).astype(np.int64)
         top_index = np.arange(config['n_top_pmts'])
         bottom_index = np.array(config['channels_bottom'])
 
@@ -1099,14 +1099,14 @@ class PMT_Afterpulse(Pulse):
 
         if len(_photon_timings) > 0:
             _photon_timings = np.hstack(_photon_timings)
-            _photon_channels = np.hstack(_photon_channels).astype(int)
+            _photon_channels = np.hstack(_photon_channels).astype(np.int64)
             _photon_amplitude = np.hstack(_photon_amplitude)
             _photon_gains = np.array(config['gains'])[_photon_channels] * _photon_amplitude
 
             return _photon_timings, _photon_channels, _photon_gains
 
         else:
-            return np.zeros(0, dtype=int), np.zeros(0, dtype=int), np.zeros(0)
+            return np.zeros(0, np.int64), np.zeros(0, np.int64), np.zeros(0)
 
 @export
 class RawData(object):
@@ -1285,7 +1285,7 @@ class RawData(object):
                 self._channel_mask['mask'][ch] = True
                 self._channel_mask['left'][ch] = min(_pulse['left'], self._channel_mask['left'][ch])
                 self._channel_mask['right'][ch] = max(_pulse['right'], self._channel_mask['right'][ch])
-                adc_wave = - np.trunc(_pulse['current'] * self.current_2_adc).astype(int)
+                adc_wave = - np.trunc(_pulse['current'] * self.current_2_adc).astype(np.int64)
                 _slice = slice(_pulse['left'] - self.left, _pulse['right'] - self.left + 1)
                 
                 self._raw_data[ch, _slice] += adc_wave
