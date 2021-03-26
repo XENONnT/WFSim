@@ -215,7 +215,7 @@ class McChainSimulator(object):
         logging.info("Getting instructions from epix")
         import epix
 
-        epix_config = self.context.config['epix_config'] # dictionary directly fed to context
+        epix_config = deepcopy(self.context.config['epix_config']) # dictionary directly fed to context
         epix_config = epix.run_epix.setup(epix_config)
         self.instructions_epix=epix.run_epix.main(epix_config,return_wfsim_instructions=True)
 
