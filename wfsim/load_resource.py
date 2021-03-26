@@ -164,7 +164,7 @@ class Resource:
                              
             # Photon After Pulses (nT file is different format)
             if config['enable_pmt_afterpulses']:
-                self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='json')    
+                self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='json.gz')    
 
         # Spe area distributions
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
