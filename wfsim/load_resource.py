@@ -59,7 +59,7 @@ class Resource:
                 's1_pattern_map': 'XENONnT_s1_xyz_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
                 's2_pattern_map': 'XENONnT_s2_xy_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
                 'photon_ap_cdfs': 'xnt_pmt_afterpulse_config.pkl.gz',
-                's2_luminescence': 'XENONnT_s2_garfield_luminescence_distribution_v0.pkl.gz',
+                's2_luminescence': 'XENONnT_GARFIELD_B1d5n_C30n_G1n_A6d5p_T1d5n_PMTs1d5n_FSR0d95n.npz',
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
                 'nv_pmt_qe_file': 'nveto_pmt_qe.json'
             })
@@ -148,7 +148,13 @@ class Resource:
                 self.s2_light_yield_map = lymap
 
             if config['s2_luminescence_model'] == 'garfield':
-                self.s2_luminescence = straxen.get_resource(files['s2_luminescence'], fmt='pkl.gz')
+                s2_luminescence_map = straxen.get_resource(files['s2_luminescence'], fmt='npz')
+		s2_luminescence_map = s2_luminescence_map['arr_0']
+		# Get directly the map for the simulated level
+		lls = np.arange(3.216, 6.8, 0.5) # available levels (mm)
+		ll = (config['gate_to_anode_distance'] - config['elr_gas_gap_length'])*10 # mm
+                ll = min(lls, key=lambda x:abs(x-ll))
+                self.s2_luminescence = s2_luminescence_map[s2_luminescence_map['ll']==ll]
 
             if config['field_distortion_on']:
                 self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
