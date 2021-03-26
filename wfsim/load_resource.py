@@ -149,10 +149,10 @@ class Resource:
 
             if config['s2_luminescence_model'] == 'garfield':
                 s2_luminescence_map = straxen.get_resource(files['s2_luminescence'], fmt='npz')
-		s2_luminescence_map = s2_luminescence_map['arr_0']
-		# Get directly the map for the simulated level
-		lls = np.arange(3.216, 6.8, 0.5) # available levels (mm)
-		ll = (config['gate_to_anode_distance'] - config['elr_gas_gap_length'])*10 # mm
+                s2_luminescence_map = s2_luminescence_map['arr_0']
+                # Get directly the map for the simulated level
+                lls = np.arange(3.216, 6.8, 0.5) # available levels (mm)
+                ll = (config['gate_to_anode_distance'] - config['elr_gas_gap_length'])*10 # mm
                 ll = min(lls, key=lambda x:abs(x-ll))
                 self.s2_luminescence = s2_luminescence_map[s2_luminescence_map['ll']==ll]
 
