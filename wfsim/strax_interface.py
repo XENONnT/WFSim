@@ -384,7 +384,7 @@ class ChunkRawRecords(object):
             records_needed = int(np.ceil(pulse_length / samples_per_record))
 
             if self.rawdata.left * dt > self.chunk_time:
-                self.chunk_time = self.last_digitized_right * dt
+                self.chunk_time = (self.last_digitized_right + 1) * dt
                 yield from self.final_results()
                 self.chunk_time_pre = self.chunk_time
                 self.chunk_time += cksz
@@ -414,6 +414,7 @@ class ChunkRawRecords(object):
                 self.current_digitized_right = self.rawdata.right
 
         self.last_digitized_right = self.current_digitized_right
+        self.chunk_time = (self.last_digitized_right + 1) * dt
         yield from self.final_results()
 
     def final_results(self):
@@ -507,7 +508,7 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
                  help="Terminate processing if any one mailbox receives "
                       "no result for more than this many seconds"),
     strax.Option('fax_config',
-                 default='https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/master/sim_files/fax_config_nt.json?token=AHCU5AZMPZABYSGVRLDACR3ABAZUA'),
+                 default='fax_config_nt_design.json'),
     strax.Option('gain_model',
                  default=('to_pe_per_run', 'https://github.com/XENONnT/private_nt_aux_files/blob/master/sim_files/to_pe_nt.npy?raw=true'),
                  help='PMT gain model. Specify as (model_type, model_config).'),
@@ -642,7 +643,7 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
 
     def infer_dtype(self):
         dtype = {data_type:strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH)
-                for data_type in self.provides if data_type is not 'truth'}
+                for data_type in self.provides if data_type != 'truth'}
         dtype['truth']=instruction_dtype + truth_extra_dtype
         return dtype
 
@@ -665,7 +666,8 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
 @export
 @strax.takes_config(
     strax.Option('wfsim_instructions',track=False,default=False),
-    strax.Option('epix_config',track=False,default=dict()),
+    strax.Option('epix_config',track=False,default=str(),
+                help='Path to epix configuration'),
     strax.Option('event_start',default=0,track=False,),
     strax.Option('event_stop',default=-1,track=False,
                 help='G4 id event number to stop at. If -1 process the entire file'),
@@ -676,8 +678,10 @@ class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
         if self.config['wfsim_instructions'] !=False:
             self.instructions=self.config['wfsim_instructions']  
         else:
+            import epix
+            epix_config = get_resource(self.config['epix_config'])
             self.instructions=epix.run_epix(file=self.config['fax_file'],
-                                        config=self.config,
+                                        config=epix_config,
                                         return_wfsim_instructions=True)
             self.set_timings()
 
@@ -699,11 +703,10 @@ class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
         timings.sort()
 
         #For tpc we have multiple instructions per g4id. For nveto we only have one
-        counter=Counter(self.instructions_epix['g4id'])
+        counter=Counter(self.instructions['g4id'])
         i_per_id = [counter[k] for k in range(start,stop)]
         timings_tpc=np.repeat(timings,i_per_id)
-        self.instructions_epix['time']+=timings_tpc
-
+        self.instructions['time']+=timings_tpc
 
 
 @export
@@ -744,7 +747,6 @@ class RawRecordsFromFaxnVeto(RawRecordsFromFaxOptical):
         overrides = self.config['fax_config_override']
         if overrides is not None:
             c.update(overrides)
-
 
     def compute(self):
         result = super().compute()

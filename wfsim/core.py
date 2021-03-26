@@ -513,10 +513,11 @@ class S2(Pulse):
                                              config=self.config)
 
         # Second generate photon timing and channel
-        self._electron_timings, self._photon_timings, self._instruction = self.photon_timings(t, n_electron, z_obs, positions, sc_gain,
-                                                                                              config=self.config,
-                                                                                              resource=self.resource,
-                                                                                              phase=self.phase)
+        self._electron_timings, self._photon_timings, self._instruction = self.photon_timings(t, n_electron, z_obs,
+                                                                      positions, sc_gain,
+                                                                      config=self.config,
+                                                                      resource=self.resource,
+                                                                      phase=self.phase)
 
         self._photon_channels, self._photon_timings = self.photon_channels(n_electron=n_electron,
                                                                            z_obs=z_obs,
