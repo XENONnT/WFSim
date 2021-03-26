@@ -125,7 +125,7 @@ class Resource:
             self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
 
             # Gas gap warping map
-            if config['enable_gas_gap_warping']:
+            if config.get('enable_gas_gap_warping',False):
                 self.gas_gap_length = make_map(["constant dummy", 0.25, [254,]])
 
         if config['detector'] == 'XENONnT':
@@ -147,14 +147,14 @@ class Resource:
                 lymap.__init__(lymap.data)
                 self.s2_light_yield_map = lymap
 
-            if config['s2_luminescence_model'] == 'garfield':
+            if config.get('s2_luminescence_model',False)== 'garfield':
                 self.s2_luminescence = straxen.get_resource(files['s2_luminescence'], fmt='pkl.gz')
 
-            if config['field_distortion_on']:
+            if config.get('field_distortion_on',False):
                 self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
 
             # Gas gap warping map
-            if config['enable_gas_gap_warping']:
+            if config.get('enable_gas_gap_warping',False):
                 gas_gap_map = straxen.get_resource(files['gas_gap_map'], fmt='pkl')
                 self.gas_gap_length = lambda positions: gas_gap_map.lookup(*positions.T)
 
@@ -164,19 +164,19 @@ class Resource:
         #Spe area distributions
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
         # Electron After Pulses compressed, haven't figure out how pkl.gz works
-        if config['enable_electron_afterpulses']:
+        if config.get('enable_electron_afterpulses',False):
             self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
 
         # Photon After Pulses
-        if config['enable_pmt_afterpulses']:
+        if config.get('enable_pmt_afterpulses',False):
             self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
 
         # Noise sample
-        if config['enable_noise']:
+        if config.get('enable_noise',False):
             self.noise_data = straxen.get_resource(files['noise_file'], fmt='npy')['arr_0'].flatten()
 
         # nVeto PMT Q.E.
-        if config['neutron_veto']:
+        if config.get('neutron_veto',False):
             self.nv_pmt_qe_data = straxen.get_resource(files['nv_pmt_qe_file'], fmt='json')
 
         log.debug(f'{self.__class__.__name__} fully initialized')
