@@ -509,6 +509,7 @@ class S2(Pulse):
                                           resource=self.resource)
 
         n_electron = self.get_electron_yield(n_electron=n_electron,
+                                             positions=positions,
                                              z_obs=z_obs,
                                              config=self.config)
 
@@ -529,7 +530,7 @@ class S2(Pulse):
         super().__call__()
 
     @staticmethod
-    def get_s2_light_yield(positions,config,resource):
+    def get_s2_light_yield(positions, config, resource):
         """Calculate s2 light yield...
         
         :param positions: 2d array of positions (floats)
@@ -547,10 +548,11 @@ class S2(Pulse):
         return sc_gain
 
     @staticmethod
-    def get_electron_yield(n_electron,z_obs,config):
+    def get_electron_yield(n_electron, positions, z_obs, config):
         """Drift electrons up to the gas interface and absorb them
 
         :param n_electron: 1d array with ints as number of electrons
+        :param positions: 2d array of positions (floats)
         :param z_obs: 1d array of floats with the observed z positions
         :param config: dict with wfsim config
 
@@ -565,7 +567,11 @@ class S2(Pulse):
             config['electron_lifetime_liquid'])
         cy = config['electron_extraction_yield'] * electron_lifetime_correction
 
-        #why are there cy greater than 1? We should check this
+        # Remove electrons in insensitive volumne
+        survival_probability = self.resource.survival_probability(positions)
+        cy *= survival_probability
+
+        # why are there cy greater than 1? We should check this
         cy = np.clip(cy, a_min = 0, a_max = 1)
         n_electron = np.random.binomial(n=n_electron, p=cy)
         return n_electron

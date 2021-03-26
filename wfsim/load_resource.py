@@ -158,6 +158,10 @@ class Resource:
                 gas_gap_map = straxen.get_resource(files['gas_gap_map'], fmt='pkl')
                 self.gas_gap_length = lambda positions: gas_gap_map.lookup(*positions.T)
 
+            # Insensitive volume
+            if config['enable_insensitive_volume']:
+                self.survival_probability = make_map(files['survival_probability'], fmt='json.gz')
+
         # Spe area distributions
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
 
