@@ -127,6 +127,10 @@ class Resource:
             # Gas gap warping map
             if config['enable_gas_gap_warping']:
                 self.gas_gap_length = make_map(["constant dummy", 0.25, [254,]])
+                             
+            # Photon After Pulses
+            if config['enable_pmt_afterpulses']:
+                self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
 
         if config['detector'] == 'XENONnT':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
@@ -157,6 +161,10 @@ class Resource:
             if config['enable_gas_gap_warping']:
                 gas_gap_map = straxen.get_resource(files['gas_gap_map'], fmt='pkl')
                 self.gas_gap_length = lambda positions: gas_gap_map.lookup(*positions.T)
+                             
+            # Photon After Pulses (nT file is different format)
+            if config['enable_pmt_afterpulses']:
+                self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='json')    
 
         # Spe area distributions
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
@@ -167,9 +175,6 @@ class Resource:
         if config['enable_electron_afterpulses']:
             self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
 
-        # Photon After Pulses
-        if config['enable_pmt_afterpulses']:
-            self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
 
         # Noise sample
         if config['enable_noise']:
