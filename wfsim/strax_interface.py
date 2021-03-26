@@ -195,7 +195,7 @@ class McChainSimulator(object):
     Usage: 
         simulator = wfsim.McChainSimulator(st,run_id)
         simulator.run_chain()
-        """
+    """
     def __init__(self,strax_context,run_id) -> None:
         """Sets configuration. """
         self.context = strax_context
@@ -206,18 +206,16 @@ class McChainSimulator(object):
             self.targets = ('raw_records','raw_records_nv')
 
     def instructions_from_epix(self,):
-        """Run epix and save instructions as self.instruction.
-         For the moment we'll just process the whole file and then throw out all events we won't use
-         Epix needs to be imported in here to avoid circle imports"""
+        """
+        Run epix and save instructions as self.instructions_epix
+        epix_config with all the epix run arguments is passed as a dictionary, where
+        source_rate must be set to 0 (epix default), since time handling is done outside epix
+        epix needs to be imported in here to avoid circle imports
+        """
         logging.info("Getting instructions from epix")
         import epix
 
-        #make deepcopy cause some of the things in the setup will add unhashable stuff
         epix_config = self.context.config['epix_config'] # dictionary directly fed to context
-        #epix_config.update({'input_file':self.context.config['fax_file'],
-        #                    'entry_start':self.context.config['event_start'],
-        #                    'entry_stop':self.context.config['event_stop'],
-        #                    'source_rate':0})
         epix_config = epix.run_epix.setup(epix_config)
         self.instructions_epix=epix.run_epix.main(epix_config,return_wfsim_instructions=True)
 
