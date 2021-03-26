@@ -114,19 +114,24 @@ class Resource:
                     log.warning(f'{k} did not download, trying {raw_url}')
                     files[k] = raw_url
             log.debug(f'Downloaded {k} successfully')
-                             
-        self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
 
         if config['detector'] == 'XENON1T':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='json.gz')
             self.s1_light_yield_map = make_map(files['s1_light_yield_map'], fmt='json')
             self.s2_light_yield_map = make_map(files['s2_light_yield_map'], fmt='json')
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='json.gz')
-            self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
+
+            # Garfield luminescence timing samples
+            if config['s2_luminescence_model'] == 'garfield':
+                raise NotImplementedError
 
             # Gas gap warping map
             if config['enable_gas_gap_warping']:
                 self.gas_gap_length = make_map(["constant dummy", 0.25, [254,]])
+
+            # Photon After Pulses
+            if config['enable_pmt_afterpulses']:
+                self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
 
         if config['detector'] == 'XENONnT':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
@@ -147,11 +152,9 @@ class Resource:
                 lymap.__init__(lymap.data)
                 self.s2_light_yield_map = lymap
 
+            # Garfield luminescence timing samples
             if config['s2_luminescence_model'] == 'garfield':
                 self.s2_luminescence = straxen.get_resource(files['s2_luminescence'], fmt='pkl.gz')
-
-            if config['field_distortion_on']:
-                self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
 
             # Gas gap warping map
             if config['enable_gas_gap_warping']:
@@ -162,18 +165,20 @@ class Resource:
             if config['enable_insensitive_volume']:
                 self.survival_probability = make_map(files['survival_probability'], fmt='json.gz')
 
+            # Photon After Pulses
+            if config['enable_pmt_afterpulses']:
+                self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='json.gz')
+
         # Spe area distributions
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
 
-        #Spe area distributions
-        self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
+        # 3d field distortion map
+        if config['field_distortion_on']:
+            self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
+
         # Electron After Pulses compressed, haven't figure out how pkl.gz works
         if config['enable_electron_afterpulses']:
             self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
-
-        # Photon After Pulses
-        if config['enable_pmt_afterpulses']:
-            self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
 
         # Noise sample
         if config['enable_noise']:
@@ -220,3 +225,28 @@ class DummyMap():
         shape[-1] = 1
 
         return DummyMap(const, shape)
+
+def clear_cached_configs():
+    """Loop over the config cache and release some of the memory
+    DO NOT use this function unless you know what you are doing
+    Mostly because I don't fully understand how this works
+    But also, many objects are still occupying memory due to obscure references
+    """
+
+    def deep_clear(d, depth=5):
+        if depth <= 0:
+            return
+
+        if isinstance(d, straxen.InterpolatingMap):
+            deep_clear(d.__dict__, depth=depth)
+
+        elif isinstance(d, straxen.InterpolateAndExtrapolate):
+            deep_clear(d.__dict__, depth=depth)
+
+        elif isinstance(d, dict):
+            for key, item in d.items():
+                deep_clear(item, depth=depth-1)
+                d[key] = None
+
+    for h, r in _cached_configs.items():
+        deep_clear(r.__dict__)
