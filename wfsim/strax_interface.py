@@ -182,20 +182,21 @@ def instruction_from_csv(filename):
 
 @export
 class McChainSimulator(object):
-    """ Simulator wrapper class to be used for full chain simulator. 
-        Expected fax_file input is a g4 root file.
-        Does three things:
-
-    1. Process root file with epix
-    1b process neutron veto instructions & synchronize timings between nveto and tpc    
-    2 Run simulation
-    3 Synchronize metadata of tpc and nveto to have the same run start and stop times
-
+    """
+    Simulator wrapper class to be used for full chain simulator. 
+    Expected fax_file input is a g4 root file.
+    
+    Does three things:
+    1  Process root file with epix
+    1b Process nVeto instructions & synchronize timings between nVeto and TPC
+    2  Run simulation
+    3  Synchronize metadata of TPC and nVeto to have the same run start and stop times
 
     Usage: 
         simulator = wfsim.McChainSimulator(st,run_id)
         simulator.run_chain()
     """
+
     def __init__(self,strax_context,run_id) -> None:
         """Sets configuration. """
         self.context = strax_context
@@ -209,7 +210,8 @@ class McChainSimulator(object):
         """
         Run epix and save instructions as self.instructions_epix
         epix_config with all the epix run arguments is passed as a dictionary, where
-        source_rate must be set to 0 (epix default), since time handling is done outside epix
+        source_rate must be set to 0 (epix default), since time handling is done outside epix.
+        
         epix needs to be imported in here to avoid circle imports
         """
         logging.info("Getting instructions from epix")
@@ -228,7 +230,7 @@ class McChainSimulator(object):
         """Set timing information in such a way to synchronize instructions for the TPC and nVeto"""
         logging.info("Setting timings")
         
-        #Rate in ns^-1
+        # Convert rate from Hz to ns^-1
         rate = self.context.config['event_rate']/wfsim.units.s
         start = self.context.config['event_start']
         stop = self.context.config['event_stop']
@@ -236,7 +238,7 @@ class McChainSimulator(object):
         timings= np.random.uniform(start/rate,stop/rate,stop-start).astype(np.int64)
         timings.sort()
 
-        #For tpc we have multiple instructions per g4id. For nveto we only have one
+        # For tpc we have multiple instructions per g4id. For nveto we only have one
         counter=Counter(self.instructions_epix['g4id'])
         i_per_id = [counter[k] for k in range(start,stop)]
         timings_tpc=np.repeat(timings,i_per_id)
@@ -246,7 +248,7 @@ class McChainSimulator(object):
     
     def set_configuration(self,):
         """Set chunking configuration and feeds instructions to wfsim"""
-        max_events_per_chunk=500#is this hard coding really nessecairy...
+        max_events_per_chunk=500 #is this hard coding really nessecairy...
         chunk_size = np.ceil(max_events_per_chunk/self.context.config['event_rate'])
         nchunk = np.ceil((self.context.config['event_stop']-self.context.config['event_start'])/ \
                             (chunk_size*self.context.config['event_rate']))
@@ -282,15 +284,18 @@ class McChainSimulator(object):
             self.context.make(run_id,'raw_records_nv')
         
     def _sync_meta(self,):
-        """Sync metadata between tpc and nveto. The start and end times of the metadata must match for
-            something strax wants. Check which ever one starts first, make that the start of both. Same for end"""
+        """
+        Sync metadata between TPC and nVeto, since strax requires identical start and endtimes.
+        Check, for the first chunk of both, which one starts first and make that time the initial one for both.
+        Same process with the endtime of the last chunk.
+        """
         logging.debug('Syncing metadata')
 
-        #First run start and stop
+        # First run start and stop
         self.tpc_meta['start'], self.nveto_meta['start'] = [min((self.tpc_meta['start'],self.nveto_meta['start']))]*2
         self.tpc_meta['end'], self.nveto_meta['end'] = [max((self.tpc_meta['end'],self.nveto_meta['end']))]*2
         
-        #Second first and last chunk start/stop
+        # Second first and last chunk start/stop
         self.tpc_meta['chunks'][0]['start'], self.nveto_meta['chunks'][0]['start'] = \
             [min((self.tpc_meta['chunks'][0]['start'],self.nveto_meta['chunks'][0]['start']))]*2
         self.tpc_meta['chunks'][-1]['end'], self.nveto_meta['chunks'][0]['end'] = \
