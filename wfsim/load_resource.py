@@ -182,7 +182,7 @@ class Resource:
 
         # nVeto PMT Q.E.
         if config['neutron_veto']:
-            self.nv_pmt_qe_data = straxen.get_resource(files['nv_pmt_qe_file'], fmt='json')
+            self.nv_pmt_qe_data = straxen.get_resource(files['nv_pmt_qe_file'], fmt='json.gz')
 
         log.debug(f'{self.__class__.__name__} fully initialized')
 
