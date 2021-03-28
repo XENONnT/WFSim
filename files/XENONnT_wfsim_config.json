@@ -22,7 +22,7 @@
         "diffusion_transverse_perp_radius_map": false},
 
     // Resource
-    "url_base": "https://raw.githubusercontent.com/XENONnT/WFSim/ce59b93335d233570c184e13b42319210279e0fa/files",
+    "url_base": "https://raw.githubusercontent.com/XENONnT/WFSim/e890b18f3caab9889a166273580b06f56da5ac58/files",
     "photon_area_distribution": "XENONnT_spe_distributions_1T_copy.csv",
     "s1_pattern_map": ["constant dummy", 14e-5, [494,]],
     "s2_pattern_map": ["constant dummy", 30e-5, [494,]],
