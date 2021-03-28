@@ -511,7 +511,8 @@ class S2(Pulse):
         n_electron = self.get_electron_yield(n_electron=n_electron,
                                              positions=positions,
                                              z_obs=z_obs,
-                                             config=self.config)
+                                             config=self.config,
+                                             resource=self.resource)
 
         # Second generate photon timing and channel
         self._electron_timings, self._photon_timings, self._instruction = self.photon_timings(t, n_electron, z_obs,
@@ -528,6 +529,37 @@ class S2(Pulse):
                                                                            config=self.config,
                                                                            resource=self.resource)
         super().__call__()
+
+    @staticmethod
+    def get_s2_drift_time_params(z_obs, positions, config, resource):
+        """Calculate s2 drift time mean and spread
+
+        :param positions: 1d array of z (floats)
+        :param positions: 2d array of positions (floats)
+        :param config: dict with wfsim config
+        :param resource: instance of the resource class
+
+        returns two arrays of floats (mean drift time, drift time spread) 
+        """
+
+        if config['enable_field_dependencies']['drift_speed_map']:
+            drift_velocity_liquid = resource.field_dependencies_map(z_obs, positions, map_name='drift_speed_map')  # mm/µs
+            drift_velocity_liquid *= 1e-4  # cm/ns
+        else:
+            drift_velocity_liquid = config['drift_velocity_liquid']
+
+        if config['enable_field_dependencies']['diffusion_longitudinal_map']:
+            diffusion_constant_longitudinal = resource.field_dependencies_map(z_obs, positions, map_name='diffusion_longitudinal_map')  # cm²/s
+            diffusion_constant_longitudinal *= 1e-9  # cm²/ns
+        else:
+            diffusion_constant_longitudinal = config['diffusion_constant_longitudinal']
+
+        drift_time_mean = - z_obs / \
+            drift_velocity_liquid + config['drift_time_gate']
+        _drift_time_mean = np.clip(drift_time_mean, 0, np.inf)
+        drift_time_spread = np.sqrt(2 * diffusion_constant_longitudinal * _drift_time_mean)
+        drift_time_spread /= drift_velocity_liquid
+        return drift_time_mean, drift_time_spread
 
     @staticmethod
     def get_s2_light_yield(positions, config, resource):
@@ -548,7 +580,7 @@ class S2(Pulse):
         return sc_gain
 
     @staticmethod
-    def get_electron_yield(n_electron, positions, z_obs, config):
+    def get_electron_yield(n_electron, positions, z_obs, config, resource):
         """Drift electrons up to the gas interface and absorb them
 
         :param n_electron: 1d array with ints as number of electrons
@@ -559,8 +591,7 @@ class S2(Pulse):
         returns 1d array ints with number of electrons
         """
         # Average drift time of the electrons
-        drift_time_mean = - z_obs / \
-            config['drift_velocity_liquid'] + config['drift_time_gate']
+        drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z_obs, positions, config, resource)
 
         # Absorb electrons during the drift
         electron_lifetime_correction = np.exp(- 1 * drift_time_mean /
@@ -568,8 +599,9 @@ class S2(Pulse):
         cy = config['electron_extraction_yield'] * electron_lifetime_correction
 
         # Remove electrons in insensitive volumne
-        survival_probability = self.resource.survival_probability(positions)
-        cy *= survival_probability
+        if config['enable_field_dependencies']['survival_probability_map']:
+            survival_probability = resource.field_dependencies_map(z_obs, positions, map_name='survival_probability_map')
+            cy *= survival_probability
 
         # why are there cy greater than 1? We should check this
         cy = np.clip(cy, a_min = 0, a_max = 1)
@@ -703,19 +735,17 @@ class S2(Pulse):
 
     @staticmethod
     @njit
-    def electron_timings(t, n_electron, z, sc_gain, timings, gains,
-            drift_velocity_liquid,
-            drift_time_gate,
-            diffusion_constant_longitudinal,
+    def electron_timings(t, n_electron, drift_time_mean, drift_time_spread, sc_gain, timings, gains,
             electron_trapping_time):
         """Calculate arrival times of the electrons. Data is written to the timings and gains arrays
         :param t: 1d array of ints
         :param n_electron:1 d array of ints
-        :param z: 1d array of floats
+        :param drift_time_mean: 1d array of floats
+        :param drift_time_spread: 1d array of floats
         :param sc_gain: secondairy scintallation gain       
         :param timings: empty array with length sum(n_electron)
         :param gains: empty array with length sum(n_electron)
-        :param drift_velocity_liquid, drift_time_gate, diffusion_constant_longitudinal, electron_trapping_time: configuration values
+        :param electron_trapping_time: configuration values
         """
         assert len(timings) == np.sum(n_electron)
         assert len(gains) == np.sum(n_electron)
@@ -723,26 +753,18 @@ class S2(Pulse):
 
         i_electron = 0
         for i in np.arange(len(t)):
-            # Diffusion model from Sorensen 2011
-            drift_time_mean = - z[i] / \
-                drift_velocity_liquid + drift_time_gate
-            _drift_time_mean = max(drift_time_mean, 0)
-            drift_time_stdev = np.sqrt(2 * diffusion_constant_longitudinal * _drift_time_mean)
-            drift_time_stdev /= drift_velocity_liquid
             # Calculate electron arrival times in the ELR region
-
             for _ in np.arange(n_electron[i]):
-                _timing = t[i] + \
-                    np.random.exponential(electron_trapping_time)
-                _timing += np.random.normal(drift_time_mean, drift_time_stdev)
-                timings[i_electron] = int(_timing)
+                _timing = np.random.exponential(electron_trapping_time)
+                _timing += np.random.normal(drift_time_mean[i], drift_time_stdev[i])
+                timings[i_electron] = t[i] + int(_timing)
 
                 # add manual fluctuation to sc gain
                 gains[i_electron] = sc_gain[i]
                 i_electron += 1
 
     @staticmethod
-    def photon_timings( t, n_electron, z, xy, sc_gain, config, resource, phase):
+    def photon_timings(t, n_electron, z, xy, sc_gain, config, resource, phase):
         """Generates photon timings for S2s. Returns a list of photon timings and instructions repeated for original electron
         
         :param t: 1d float array arrival time of the electrons
@@ -756,13 +778,10 @@ class S2(Pulse):
         # First generate electron timinga
         _electron_timings = np.zeros(np.sum(n_electron), np.int64)
         _electron_gains = np.zeros(np.sum(n_electron), np.float64)
-        _config = [config[k] for k in
-                   ['drift_velocity_liquid',
-                    'drift_time_gate',
-                    'diffusion_constant_longitudinal',
-                    'electron_trapping_time']]
+        drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z, xy, config, resource)
         S2.electron_timings(t, n_electron, z, sc_gain, 
-            _electron_timings, _electron_gains, *_config)
+            _electron_timings, _electron_gains, 
+            config['electron_trapping_time'])
 
         if len(_electron_timings) < 1:
             return np.zeros(0, np.int64), np.zeros(0, np.int64), np.zeros(0)
