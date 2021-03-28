@@ -646,9 +646,10 @@ class S2(Pulse):
             ne = n_electron[i]
             dt = dr / (alpha * E0[i] * rr)
             dy = E0[i] * rr / uE - 0.8 * p  # arXiv:physics/0702142
+            avgt = np.cumsum(dt) * dy / np.sum(dy)
 
             j = np.argmax(r <= dG[i])
-            t = np.cumsum(dt[j:])
+            t = np.cumsum(dt[j:]) - avgt
             y = np.cumsum(dy[j:])
 
             probabilities = np.random.rand(ne, shape[1])
@@ -731,7 +732,7 @@ class S2(Pulse):
 
         S2._luminescence_timings_garfield(distance, x_grid, n_grid, i_grid, shape, index)
 
-        return resource.s2_luminescence['t'][index].astype(np.int64)
+        return resource.s2_luminescence['t'][index].astype(np.int64) - int(np.average(resource.s2_luminescence['t']))
 
     @staticmethod
     @njit
@@ -756,7 +757,7 @@ class S2(Pulse):
             # Calculate electron arrival times in the ELR region
             for _ in np.arange(n_electron[i]):
                 _timing = np.random.exponential(electron_trapping_time)
-                _timing += np.random.normal(drift_time_mean[i], drift_time_stdev[i])
+                _timing += np.random.normal(drift_time_mean[i], drift_time_spread[i])
                 timings[i_electron] = t[i] + int(_timing)
 
                 # add manual fluctuation to sc gain
@@ -779,7 +780,7 @@ class S2(Pulse):
         _electron_timings = np.zeros(np.sum(n_electron), np.int64)
         _electron_gains = np.zeros(np.sum(n_electron), np.float64)
         drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z, xy, config, resource)
-        S2.electron_timings(t, n_electron, z, sc_gain, 
+        S2.electron_timings(t, n_electron, drift_time_mean, drift_time_spread, sc_gain, 
             _electron_timings, _electron_gains, 
             config['electron_trapping_time'])
 
