@@ -27,7 +27,7 @@ def test_load_nt():
         "enable_noise": False,
         "field_distortion_on": False,
         "neutron_veto": False,
-        "url_base": "https://raw.githubusercontent.com/XENONnT/WFSim/1a83938b43098d446f518cbbc82514ed12d607d1/files",
+        "url_base": "https://raw.githubusercontent.com/XENONnT/WFSim/e890b18f3caab9889a166273580b06f56da5ac58/files",
         "photon_area_distribution": "XENONnT_spe_distributions_single_channel.csv",
         "s1_pattern_map": ["constant dummy", 14e-5, [494,]],
         "s2_pattern_map": ["constant dummy", 30e-5, [494,]],
