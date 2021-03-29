@@ -126,11 +126,11 @@ class Resource:
                 raise NotImplementedError
 
             # Gas gap warping map
-            if config.get('enable_gas_gap_warping',False):
+            if config.get('enable_gas_gap_warping', False):
                 self.gas_gap_length = make_map(["constant dummy", 0.25, [254,]])
 
             # Photon After Pulses
-            if config.get('enable_pmt_afterpulses',False):
+            if config.get('enable_pmt_afterpulses', False):
                 self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
 
         if config['detector'] == 'XENONnT':
@@ -153,19 +153,19 @@ class Resource:
                 self.s2_light_yield_map = lymap
 
             # Garfield luminescence timing samples
-            if config.get('s2_luminescence_model',False)== 'garfield':
+            if config.get('s2_luminescence_model', False)== 'garfield':
                 self.s2_luminescence = straxen.get_resource(files['s2_luminescence'], fmt='pkl.gz')
 
-            if config.get('field_distortion_on',False):
+            if config.get('field_distortion_on', False):
                 self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
 
             # Gas gap warping map
-            if config.get('enable_gas_gap_warping',False):
+            if config.get('enable_gas_gap_warping', False):
                 gas_gap_map = straxen.get_resource(files['gas_gap_map'], fmt='pkl')
                 self.gas_gap_length = lambda positions: gas_gap_map.lookup(*positions.T)
 
             # Photon After Pulses
-            if config.get('enable_pmt_afterpulses',False):
+            if config.get('enable_pmt_afterpulses', False):
                 self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='json.gz')
 
         # Spe area distributions
@@ -176,15 +176,15 @@ class Resource:
             self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
 
         # Electron After Pulses compressed, haven't figure out how pkl.gz works
-        if config.get('enable_electron_afterpulses',False):
+        if config.get('enable_electron_afterpulses', False):
             self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
 
         # Noise sample
-        if config.get('enable_noise',False):
+        if config.get('enable_noise', False):
             self.noise_data = straxen.get_resource(files['noise_file'], fmt='npy')['arr_0'].flatten()
 
         # nVeto PMT Q.E.
-        if config.get('neutron_veto',False):
+        if config.get('neutron_veto', False):
             self.nv_pmt_qe_data = straxen.get_resource(files['nv_pmt_qe_file'], fmt='json')
 
         log.debug(f'{self.__class__.__name__} fully initialized')
