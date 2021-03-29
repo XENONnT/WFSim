@@ -646,7 +646,7 @@ class S2(Pulse):
             ne = n_electron[i]
             dt = dr / (alpha * E0[i] * rr)
             dy = E0[i] * rr / uE - 0.8 * p  # arXiv:physics/0702142
-            avgt = np.cumsum(dt) * dy / np.sum(dy)
+            avgt = np.sum(np.cumsum(dt) * dy) / np.sum(dy)
 
             j = np.argmax(r <= dG[i])
             t = np.cumsum(dt[j:]) - avgt
