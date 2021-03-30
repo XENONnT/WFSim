@@ -88,15 +88,25 @@ class RawDataOptical(wfsim.RawData):
                         stop_at_this_group = True # Stop group iteration
                         _instb_run = np.array_split(instb_run, len(instb_run))
                     else: _instb_run = [instb_run] # Small trick to make truth small
-
+                    print(_instb_run)
                     # Run pulse simulation for real
                     for instb_run in _instb_run:
-                        for instb_secondary in self.sim_data(instruction=instb[instb_run],
-                                                             channels=channels[instb[instb_run]['event_number'][0]],
-                                                             timings=instb[instb_run]['time'] + timings[instb[instb_run]['event_number'][0]]):
-                            ib = np.where(~instb_filled)[0][:len(instb_secondary)]
-                            instb[ib] = instb_secondary
-                            instb_filled[ib] = True
+                        if len(instb_run)==1: 
+                            for instb_secondary in self.sim_data(instruction=instb[instb_run],
+                                                                channels=channels[instb[instb_run]['event_number'][0]],
+                                                                timings=instb[instb_run]['time'] + timings[instb[instb_run]['event_number'][0]]):
+                                ib = np.where(~instb_filled)[0][:len(instb_secondary)]
+                                instb[ib] = instb_secondary
+                                instb_filled[ib] = True
+                        else:
+                            for i in instb_run:
+                                i=np.array([i])
+                                for instb_secondary in self.sim_data(instruction=instb[i],
+                                                                channels=channels[instb[i]['event_number'][0]],
+                                                                timings=instb[i]['time'] + timings[instb[i]['event_number'][0]]):
+                                    ib = np.where(~instb_filled)[0][:len(instb_secondary)]
+                                    instb[ib] = instb_secondary
+                                    instb_filled[ib] = True
 
                         if len(truth_buffer): # Extract truth info
                             self.get_truth(instb[instb_run], truth_buffer)
