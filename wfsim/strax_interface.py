@@ -156,7 +156,7 @@ def _read_optical_nveto(config, events):
             new_channels.append(channel)
             new_timings.append(timings[ievent][j])
         new_channels_all.append(np.array(new_channels))
-        new_timings_all.append(np.array(new_timings))
+        new_timings_all.append(np.array(new_timings).astype(np.int))
     return np.asarray(new_channels_all), np.asarray(new_timings_all)
 
 
@@ -248,8 +248,8 @@ class McChainSimulator(object):
     
     def set_configuration(self,):
         """Set chunking configuration and feeds instructions to wfsim"""
-        max_events_per_chunk=500 #is this hard coding really nessecairy...
-        chunk_size = np.ceil(max_events_per_chunk/self.context.config['event_rate'])
+        max_events_per_chunk=50 #is this hard coding really nessecairy...
+        chunk_size = max_events_per_chunk/self.context.config['event_rate']
         nchunk = np.ceil((self.context.config['event_stop']-self.context.config['event_start'])/ \
                             (chunk_size*self.context.config['event_rate']))
         self.context.set_config(dict(chunk_size=chunk_size, nchunk=nchunk,))
@@ -268,7 +268,6 @@ class McChainSimulator(object):
             self.instructions_from_nveto()
         self.set_timing()
         self.set_configuration()
-        np.save('./instructions.npy',self.instructions_epix)
 
     def run_strax(self,run_id):
         """Runs wfsim up to raw records for tpc and if requisted the nveto.
