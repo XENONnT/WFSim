@@ -682,7 +682,7 @@ class S2(Pulse):
         distance = jagged(np.matmul(xy, rotation_mat)[:, 1])  # shortest distance from any wire
 
         index_row = [np.argmin(np.abs(d - resource.s2_luminescence['x'])) for d in distance]
-        index_row = np.repeat(index_row, n_electron)
+        index_row = np.repeat(index_row, n_electron).astype(np.int64)
         index_col = np.random.randint(0, resource.s2_luminescence['t'].shape[1], shape, np.int64)
 
         return resource.s2_luminescence['t'][index_row[:, None], index_col].astype(np.int64)
