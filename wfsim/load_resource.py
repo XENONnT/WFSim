@@ -61,7 +61,7 @@ class Resource:
                 'photon_ap_cdfs': 'xnt_pmt_afterpulse_config.pkl.gz',
                 's2_luminescence': 'XENONnT_s2_garfield_luminescence_distribution_v0.pkl.gz',
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
-                'nv_pmt_qe_file': 'nveto_pmt_qe.json'
+                'nv_pmt_qe': 'nveto_pmt_qe.json'
             })
         else:
             raise ValueError(f"Unsupported detector {config['detector']}")
@@ -182,7 +182,7 @@ class Resource:
 
         # nVeto PMT Q.E.
         if config['neutron_veto']:
-            self.nv_pmt_qe_data = straxen.get_resource(files['nv_pmt_qe_file'], fmt='json')
+            self.nv_pmt_qe = straxen.get_resource(files['nv_pmt_qe'], fmt='json')
 
         log.debug(f'{self.__class__.__name__} fully initialized')
 
