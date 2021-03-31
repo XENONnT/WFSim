@@ -154,13 +154,12 @@ class Resource:
 
             # Garfield luminescence timing samples
             if config['s2_luminescence_model'] == 'garfield':
-                s2_luminescence_map = straxen.get_resource(files['s2_luminescence'], fmt='npz')
-                s2_luminescence_map = s2_luminescence_map['arr_0']
+                s2_luminescence_map = straxen.get_resource(files['s2_luminescence'], fmt='npy')['arr_0']
                 # Get directly the map for the simulated level
-                lls = np.arange(0.3216, 0.68, 0.05) # available levels (cm)
-                ll = config['gate_to_anode_distance'] - config['elr_gas_gap_length'] # cm
-                ll = min(lls, key=lambda x:abs(x-ll))
-                self.s2_luminescence = s2_luminescence_map[s2_luminescence_map['ll']==ll]
+                liquid_level_available = np.unique(s2_luminescence_map['ll'])  # available levels (cm)
+                liquid_level = config['gate_to_anode_distance'] - config['elr_gas_gap_length']  # cm
+                liquid_level = min(liquid_level_available , key=lambda x:abs(x - liquid_level))
+                self.s2_luminescence = s2_luminescence_map[s2_luminescence_map['ll']==liquid_level]
 
             # Gas gap warping map
             if config['enable_gas_gap_warping']:

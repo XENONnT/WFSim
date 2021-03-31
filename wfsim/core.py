@@ -658,29 +658,21 @@ class S2(Pulse):
             r, dr, rr, alpha, uE, pressure, n_electron, shape)
 
     @staticmethod
-    @njit
-    def _luminescence_timings_garfield(distance, x_grid, n_grid, i_grid, shape, index):
-        for ix in range(shape[0]):
-            pitch_index = np.argmin(np.abs(distance[ix] - x_grid))
-            for iy in range(shape[1]):
-                index[ix, iy] = i_grid[pitch_index] + np.random.randint(n_grid[pitch_index])
-
-    @staticmethod
-    def luminescence_timings_garfield(xy, shape, resource, config):
+    def luminescence_timings_garfield(xy, n_electron, shape, config, resource):
         """
         Luminescence time distribution computation according to garfield scintillation maps
         :param xy: 1d array with positions
+        :param n_electron: 1d array with ints for number f electrons
         :param shape: tuple with nelectron,nphotons
         :param config: dict wfsim config
         :param resource: instance of wfsim resource
 
-        returns 1d (nested?) array with ints for photon timings
+        returns 2d array with ints for photon timings of input param 'shape'
         """
         assert 's2_luminescence' in resource.__dict__, 's2_luminescence model not found'
-        assert shape[0] == len(xy), 'Output shape should have same length as positions'
-
-        x_grid, n_grid = np.unique(resource.s2_luminescence['x'], return_counts=True)
-        i_grid = (n_grid.sum() - np.cumsum(n_grid[::-1]))[::-1]
+        assert len(n_electron) == len(xy), 'Input number of n_electron should have same length as positions'
+        assert np.sum(n_electron) == shape[0], 'Total number of electron does not agree with shape[0]'
+        assert len(resource.s2_luminescence['t'].shape) == 2, 'Timing data is expected to have D2'
 
         tilt = config.get('anode_xaxis_angle', np.pi / 4)
         pitch = config.get('anode_pitch', 0.5)
@@ -689,11 +681,11 @@ class S2(Pulse):
         jagged = lambda relative_y: (relative_y + pitch / 2) % pitch - pitch / 2
         distance = jagged(np.matmul(xy, rotation_mat)[:, 1])  # shortest distance from any wire
 
-        index = np.zeros(shape, np.int64)
+        index_row = [np.argmin(np.abs(d - resource.s2_luminescence['x'])) for d in distance]
+        index_row = np.repeat(index_row, n_electron)
+        index_col = np.random.randint(0, resource.s2_luminescence['t'].shape[1], shape, np.int64)
 
-        S2._luminescence_timings_garfield(distance, x_grid, n_grid, i_grid, shape, index)
-
-        return resource.s2_luminescence['t'][index].astype(np.int64)
+        return resource.s2_luminescence['t'][index_row[:, None], index_col].astype(np.int64)
 
     @staticmethod
     @njit
@@ -772,8 +764,7 @@ class S2(Pulse):
                                                              resource=resource)
         elif config['s2_luminescence_model'] == 'garfield':
             _photon_timings = S2.luminescence_timings_garfield(
-                np.repeat(xy, n_electron, axis=0),
-                (nele, npho),
+                xy, n_electron, (nele, npho),
                 config=config,
                 resource=resource)
 
