@@ -157,8 +157,8 @@ class Resource:
                 s2_luminescence_map = straxen.get_resource(files['s2_luminescence'], fmt='npz')
                 s2_luminescence_map = s2_luminescence_map['arr_0']
                 # Get directly the map for the simulated level
-                lls = np.arange(3.216, 6.8, 0.5) # available levels (mm)
-                ll = (config['gate_to_anode_distance'] - config['elr_gas_gap_length'])*10 # mm
+                lls = np.arange(0.3216, 0.68, 0.05) # available levels (cm)
+                ll = config['gate_to_anode_distance'] - config['elr_gas_gap_length'] # cm
                 ll = min(lls, key=lambda x:abs(x-ll))
                 self.s2_luminescence = s2_luminescence_map[s2_luminescence_map['ll']==ll]
 
