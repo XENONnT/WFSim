@@ -665,11 +665,11 @@ class RawRecordsFromFaxNT(FaxSimulatorPlugin):
 
 @export
 @strax.takes_config(
-    strax.Option('wfsim_instructions',track=False,default=False),
-    strax.Option('epix_config',track=False,default=str(),
+    strax.Option('wfsim_instructions', track=False, default=False),
+    strax.Option('epix_config', track=False, default=str(),
                 help='Path to epix configuration'),
-    strax.Option('event_start',default=0,track=False,),
-    strax.Option('event_stop',default=-1,track=False,
+    strax.Option('event_start', default=0, track=False,),
+    strax.Option('event_stop', default=-1, track=False,
                 help='G4 id event number to stop at. If -1 process the entire file'),
     )
 class RawRecordsFromFaxEpix(RawRecordsFromFaxNT):
@@ -729,10 +729,10 @@ class RawRecordsFromFaxOptical(RawRecordsFromFaxNT):
 
 @export
 @strax.takes_config(
-    strax.Option('wfsim_nveto_instructions',track=False,default=False),
-    strax.Option('wfsim_nveto_channels',track=False,default=False),
-    strax.Option('wfsim_nveto_timings',track=False,default=False),
-    strax.Option('fax_config_nveto',default=None,track=True,),
+    strax.Option('wfsim_nveto_instructions', track=False, default=False),
+    strax.Option('wfsim_nveto_channels', track=False, default=False),
+    strax.Option('wfsim_nveto_timings', track=False, default=False),
+    strax.Option('fax_config_nveto', default=None, track=True,),
     )
 class RawRecordsFromFaxnVeto(RawRecordsFromFaxOptical):
     provides = ('raw_records_nv', 'truth')
