@@ -504,7 +504,7 @@ class ChunkRawRecordsOptical(ChunkRawRecords):
     strax.Option('nchunk', default=10, track=False,
                  help="Number of chunks to simulate"),
     strax.Option('right_raw_extension', default=50000),
-    strax.Option('timeout', default=1800,
+    strax.Option('timeout', default=1800, track=False,
                  help="Terminate processing if any one mailbox receives "
                       "no result for more than this many seconds"),
     strax.Option('fax_config',
