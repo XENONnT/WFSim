@@ -242,6 +242,7 @@ class McChainSimulator(object):
     def instructions_from_nveto(self,):
         logging.info("Getting nveto instructions")
         self.context.config['nv_pmt_ce'] = 1.0
+        self.context.config['nv_pmt_abs'] = 1.0
         self.instructions_nveto, self.nveto_channels, self.nveto_timings=read_optical(self.context.config)
         
 
@@ -744,7 +745,7 @@ class RawRecordsFromFaxnVeto(RawRecordsFromFaxOptical):
     def set_config(self,):
         c = self.config
         # assert c['fax_config_nveto'], "You must specify a nveto config file!"
-        c.update(get_resource(c['fax_config'], fmt='json'))
+        c.update(get_resource(c['fax_config_nveto'], fmt='json'))
         overrides = self.config['fax_config_override']
         if overrides is not None:
             c.update(overrides)

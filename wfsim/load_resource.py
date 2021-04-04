@@ -133,7 +133,7 @@ class Resource:
             if config['enable_pmt_afterpulses']:
                 self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
 
-        if config['detector'] == 'XENONnT':
+        if config['detector'] == 'XENONnT' and not config['neutron_veto']:
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
             if isinstance(self.s1_pattern_map, DummyMap):
                 self.s1_light_yield_map = self.s1_pattern_map.reduce_last_dim()
@@ -169,19 +169,19 @@ class Resource:
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
 
         # 3d field distortion map
-        if config['field_distortion_on']:
+        if config.get('field_distortion_on'):
             self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
 
         # Electron After Pulses compressed, haven't figure out how pkl.gz works
-        if config['enable_electron_afterpulses']:
+        if config.get('enable_electron_afterpulses'):
             self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
 
         # Noise sample
-        if config['enable_noise']:
+        if config.get('enable_noise'):
             self.noise_data = straxen.get_resource(files['noise_file'], fmt='npy')['arr_0'].flatten()
 
         # nVeto PMT Q.E.
-        if config['neutron_veto']:
+        if config.get('neutron_veto'):
             self.nv_pmt_qe = straxen.get_resource(files['nv_pmt_qe'], fmt='json')
 
         log.debug(f'{self.__class__.__name__} fully initialized')
