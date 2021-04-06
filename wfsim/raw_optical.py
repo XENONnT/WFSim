@@ -88,7 +88,7 @@ class RawDataOptical(wfsim.RawData):
                         stop_at_this_group = True # Stop group iteration
                         _instb_run = np.array_split(instb_run, len(instb_run))
                     else: _instb_run = [instb_run] # Small trick to make truth small
-                    print(_instb_run)
+                    # print(_instb_run)
                     # Run pulse simulation for real
                     for instb_run in _instb_run:
                         if len(instb_run)==1: 
