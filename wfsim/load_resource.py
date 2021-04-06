@@ -58,8 +58,8 @@ class Resource:
                 'photon_area_distribution': 'XENONnT_spe_distributions_20210305.csv',
                 's1_pattern_map': 'XENONnT_s1_xyz_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
                 's2_pattern_map': 'XENONnT_s2_xy_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
-                'photon_ap_cdfs': 'XENONnT_pmt_afterpulse_config_012605.json.gz',
-                's2_luminescence': 'XENONnT_s2_garfield_luminescence_distribution_v0.pkl.gz',
+                'photon_ap_cdfs': 'xnt_pmt_afterpulse_config.pkl.gz',
+                's2_luminescence': 'XENONnT_GARFIELD_B1d5n_C30n_G1n_A6d5p_T1d5n_PMTs1d5n_FSR0d95n.npz',
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
                 'nv_pmt_qe': 'nveto_pmt_qe.json'
             })
@@ -151,8 +151,14 @@ class Resource:
                 lymap.__init__(lymap.data)
                 self.s2_light_yield_map = lymap
 
+            # Garfield luminescence timing samples
             if config.get('s2_luminescence_model', False) == 'garfield':
-                self.s2_luminescence = straxen.get_resource(files['s2_luminescence'], fmt='pkl.gz')
+                s2_luminescence_map = straxen.get_resource(files['s2_luminescence'], fmt='npy')['arr_0']
+                # Get directly the map for the simulated level
+                liquid_level_available = np.unique(s2_luminescence_map['ll'])  # available levels (cm)
+                liquid_level = config['gate_to_anode_distance'] - config['elr_gas_gap_length']  # cm
+                liquid_level = min(liquid_level_available , key=lambda x:abs(x - liquid_level))
+                self.s2_luminescence = s2_luminescence_map[s2_luminescence_map['ll']==liquid_level]
 
             if config.get('field_distortion_on', False):
                 self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
