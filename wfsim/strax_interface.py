@@ -248,7 +248,7 @@ class McChainSimulator(object):
     
     def set_configuration(self,):
         """Set chunking configuration and feeds instructions to wfsim"""
-        max_events_per_chunk=50 #is this hard coding really nessecairy...
+        max_events_per_chunk=20 #is this hard coding really nessecairy...
         chunk_size = max_events_per_chunk/self.context.config['event_rate']
         nchunk = np.ceil((self.context.config['event_stop']-self.context.config['event_start'])/ \
                             (chunk_size*self.context.config['event_rate']))
@@ -342,7 +342,7 @@ class ChunkRawRecords(object):
         log.debug(f'Raw data is set')
         self.record_buffer = np.zeros(5000000,
                                       dtype=strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH)) # 2*250 ms buffer
-        self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)])
+        self.truth_buffer = np.zeros(100000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)])
 
         self.blevel = buffer_filled_level = 0
         log.debug(f'Starting {self.__class__.__name__} initiated')
@@ -569,7 +569,7 @@ class FaxSimulatorPlugin(strax.Plugin):
         pass
 
     def _sort_check(self, result):
-        if len(result) == 0: return
+        if len(result) <= 1: return
         if result['time'][0] < self.last_chunk_time + 1000:
             raise RuntimeError(
                 "Simulator returned chunks with insufficient spacing. "
