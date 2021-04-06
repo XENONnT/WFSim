@@ -58,7 +58,7 @@ class Resource:
                 'photon_area_distribution': 'XENONnT_spe_distributions_20210305.csv',
                 's1_pattern_map': 'XENONnT_s1_xyz_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
                 's2_pattern_map': 'XENONnT_s2_xy_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
-                'photon_ap_cdfs': 'xnt_pmt_afterpulse_config.pkl.gz',
+                'photon_ap_cdfs': 'XENONnT_pmt_afterpulse_config_012605.json.gz',
                 's2_luminescence': 'XENONnT_s2_garfield_luminescence_distribution_v0.pkl.gz',
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
                 'nv_pmt_qe_file': 'nveto_pmt_qe.json'
