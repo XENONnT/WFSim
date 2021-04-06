@@ -130,11 +130,12 @@ def _read_optical_nveto(config, events):
     channels = [[channel - nV_pmt_id_offset for channel in array] for array in events["pmthitID"].array(library="np")]
     timings = events["pmthitTime"].array(library="np")*1e9
     wavelengths = [[constant_hc / energy for energy in array] for array in events["pmthitEnergy"].array(library="np")]
-    collection_efficiency = config['nv_pmt_ce_factor']
+    collection_efficiency = config['nv_pmt_ce']
+    absorption_efficiency = config['nv_pmt_abs']
     resource = load_config(config=dict(detector='XENONnT',neutron_veto=True))
-    nv_pmt_qe_data = resource.nv_pmt_qe_data
-    wavelength_x = np.array(nv_pmt_qe_data['nv_pmt_qe_wavelength'])
-    nveto_pmt_qe = np.array([v for k, v in nv_pmt_qe_data['nv_pmt_qe'].items()])
+    nv_pmt_qe = resource.nv_pmt_qe
+    wavelength_x = np.array(nv_pmt_qe['nv_pmt_qe_wavelength'])
+    nveto_pmt_qe = np.array([v for k, v in nv_pmt_qe['nv_pmt_qe'].items()])
     interp_func = [interp1d(wavelength_x, qe, kind='linear', fill_value='extrapolate') for qe in nveto_pmt_qe]
     new_channels_all = []
     new_timings_all = []
@@ -151,7 +152,7 @@ def _read_optical_nveto(config, events):
                 continue
             wavelength = wavelengths[ievent][j]
             qe = interp_func[channel](wavelength)
-            if rand > qe * collection_efficiency:
+            if rand > qe * collection_efficiency * absorption_efficiency:
                 continue
             new_channels.append(channel)
             new_timings.append(timings[ievent][j])
@@ -223,7 +224,6 @@ class McChainSimulator(object):
 
     def instructions_from_nveto(self,):
         logging.info("Getting nveto instructions")
-        self.context.config['nv_pmt_ce_factor'] = 1.0
         self.instructions_nveto, self.nveto_channels, self.nveto_timings=read_optical(self.context.config)
 
     def set_timing(self,):
@@ -726,7 +726,7 @@ class RawRecordsFromFaxnVeto(RawRecordsFromFaxOptical):
     def set_config(self,):
         c = self.config
         # assert c['fax_config_nveto'], "You must specify a nveto config file!"
-        c.update(get_resource(c['fax_config'], fmt='json'))
+        c.update(get_resource(c['fax_config_nveto'], fmt='json'))
         overrides = self.config['fax_config_override']
         if overrides is not None:
             c.update(overrides)
