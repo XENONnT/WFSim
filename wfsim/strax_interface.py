@@ -241,8 +241,6 @@ class McChainSimulator(object):
 
     def instructions_from_nveto(self,):
         logging.info("Getting nveto instructions")
-        self.context.config['nv_pmt_ce'] = 1.0
-        self.context.config['nv_pmt_abs'] = 1.0
         self.instructions_nveto, self.nveto_channels, self.nveto_timings=read_optical(self.context.config)
         
 
