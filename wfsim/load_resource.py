@@ -125,64 +125,60 @@ class Resource:
             self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
 
             # Gas gap warping map
-            if config.get('enable_gas_gap_warping',False):
+            if config.get('enable_gas_gap_warping', False):
                 self.gas_gap_length = make_map(["constant dummy", 0.25, [254,]])
 
             # Photon After Pulses
-            if config.get('enable_pmt_afterpulses',False):
+            if config.get('enable_pmt_afterpulses', False):
                 self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
 
-        if config.get('detector','XENONnT') == 'XENONnT' and not config.get('neutron_veto', False):
-            self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
-            if isinstance(self.s1_pattern_map, DummyMap):
-                self.s1_light_yield_map = self.s1_pattern_map.reduce_last_dim()
+        if config.get('detector','XENONnT') == 'XENONnT':
+            if config.get('neutron_veto', False):
+                self.nv_pmt_qe = straxen.get_resource(files['nv_pmt_qe'], fmt='json')
             else:
-                lymap = deepcopy(self.s1_pattern_map)
-                lymap.data['map'] = np.sum(lymap.data['map'][:][:][:], axis=3, keepdims=True)
-                lymap.__init__(lymap.data)
-                self.s1_light_yield_map = lymap
+                self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
+                if isinstance(self.s1_pattern_map, DummyMap):
+                    self.s1_light_yield_map = self.s1_pattern_map.reduce_last_dim()
+                else:
+                    lymap = deepcopy(self.s1_pattern_map)
+                    lymap.data['map'] = np.sum(lymap.data['map'][:][:][:], axis=3, keepdims=True)
+                    lymap.__init__(lymap.data)
+                    self.s1_light_yield_map = lymap
 
-            self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='pkl')
-            if isinstance(self.s2_pattern_map, DummyMap):
-                self.s2_light_yield_map = self.s2_pattern_map.reduce_last_dim()
-            else:
-                lymap = deepcopy(self.s2_pattern_map)
-                lymap.data['map'] = np.sum(lymap.data['map'][:][:], axis=2, keepdims=True)
-                lymap.__init__(lymap.data)
-                self.s2_light_yield_map = lymap
+                self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='pkl')
+                if isinstance(self.s2_pattern_map, DummyMap):
+                    self.s2_light_yield_map = self.s2_pattern_map.reduce_last_dim()
+                else:
+                    lymap = deepcopy(self.s2_pattern_map)
+                    lymap.data['map'] = np.sum(lymap.data['map'][:][:], axis=2, keepdims=True)
+                    lymap.__init__(lymap.data)
+                    self.s2_light_yield_map = lymap
 
-            if config.get('s2_luminescence_model',False)== 'garfield':
-                self.s2_luminescence = straxen.get_resource(files['s2_luminescence'], fmt='pkl.gz')
+                if config.get('s2_luminescence_model',False)== 'garfield':
+                    self.s2_luminescence = straxen.get_resource(files['s2_luminescence'], fmt='pkl.gz')
 
-            if config.get('field_distortion_on',False):
-                self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
+                if config.get('field_distortion_on',False):
+                    self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
 
-            # Gas gap warping map
-            if config.get('enable_gas_gap_warping',False):
-                gas_gap_map = straxen.get_resource(files['gas_gap_map'], fmt='pkl')
-                self.gas_gap_length = lambda positions: gas_gap_map.lookup(*positions.T)
+                # Gas gap warping map
+                if config.get('enable_gas_gap_warping',False):
+                    gas_gap_map = straxen.get_resource(files['gas_gap_map'], fmt='pkl')
+                    self.gas_gap_length = lambda positions: gas_gap_map.lookup(*positions.T)
 
-            # Photon After Pulses
-            if config.get('enable_pmt_afterpulses',False):
-                 self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='json.gz')
+                # Photon After Pulses
+                if config.get('enable_pmt_afterpulses',False):
+                     self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='json.gz')
 
-        # Spe area distributions
+        # SPE area distributions
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
 
-        #Spe area distributions
-        self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
         # Electron After Pulses compressed, haven't figure out how pkl.gz works
         if config.get('enable_electron_afterpulses',False):
             self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
 
-
         # Noise sample
         if config.get('enable_noise',False):
             self.noise_data = straxen.get_resource(files['noise_file'], fmt='npy')['arr_0'].flatten()
-
-        # nVeto PMT Q.E.
-        if config.get('neutron_veto',False):
-            self.nv_pmt_qe = straxen.get_resource(files['nv_pmt_qe'], fmt='json')
 
         log.debug(f'{self.__class__.__name__} fully initialized')
 
