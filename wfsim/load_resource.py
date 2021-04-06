@@ -132,42 +132,43 @@ class Resource:
             if config.get('enable_pmt_afterpulses', False):
                 self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
 
-        if config.get('detector','XENONnT') == 'XENONnT':
+        if config.get('detector', 'XENONnT') == 'XENONnT':
+            self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
+            if isinstance(self.s1_pattern_map, DummyMap):
+                self.s1_light_yield_map = self.s1_pattern_map.reduce_last_dim()
+            else:
+                lymap = deepcopy(self.s1_pattern_map)
+                lymap.data['map'] = np.sum(lymap.data['map'][:][:][:], axis=3, keepdims=True)
+                lymap.__init__(lymap.data)
+                self.s1_light_yield_map = lymap
+
+            self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='pkl')
+            if isinstance(self.s2_pattern_map, DummyMap):
+                self.s2_light_yield_map = self.s2_pattern_map.reduce_last_dim()
+            else:
+                lymap = deepcopy(self.s2_pattern_map)
+                lymap.data['map'] = np.sum(lymap.data['map'][:][:], axis=2, keepdims=True)
+                lymap.__init__(lymap.data)
+                self.s2_light_yield_map = lymap
+
+            if config.get('s2_luminescence_model', False) == 'garfield':
+                self.s2_luminescence = straxen.get_resource(files['s2_luminescence'], fmt='pkl.gz')
+
+            if config.get('field_distortion_on', False):
+                self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
+
+            # Gas gap warping map
+            if config.get('enable_gas_gap_warping', False):
+                gas_gap_map = straxen.get_resource(files['gas_gap_map'], fmt='pkl')
+                self.gas_gap_length = lambda positions: gas_gap_map.lookup(*positions.T)
+
+            # Photon After Pulses
+            if config.get('enable_pmt_afterpulses', False):
+                 self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='json.gz')
+
+            # Neutron veto PMT QE as function of wavelength
             if config.get('neutron_veto', False):
                 self.nv_pmt_qe = straxen.get_resource(files['nv_pmt_qe'], fmt='json')
-            else:
-                self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
-                if isinstance(self.s1_pattern_map, DummyMap):
-                    self.s1_light_yield_map = self.s1_pattern_map.reduce_last_dim()
-                else:
-                    lymap = deepcopy(self.s1_pattern_map)
-                    lymap.data['map'] = np.sum(lymap.data['map'][:][:][:], axis=3, keepdims=True)
-                    lymap.__init__(lymap.data)
-                    self.s1_light_yield_map = lymap
-
-                self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='pkl')
-                if isinstance(self.s2_pattern_map, DummyMap):
-                    self.s2_light_yield_map = self.s2_pattern_map.reduce_last_dim()
-                else:
-                    lymap = deepcopy(self.s2_pattern_map)
-                    lymap.data['map'] = np.sum(lymap.data['map'][:][:], axis=2, keepdims=True)
-                    lymap.__init__(lymap.data)
-                    self.s2_light_yield_map = lymap
-
-                if config.get('s2_luminescence_model',False)== 'garfield':
-                    self.s2_luminescence = straxen.get_resource(files['s2_luminescence'], fmt='pkl.gz')
-
-                if config.get('field_distortion_on',False):
-                    self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
-
-                # Gas gap warping map
-                if config.get('enable_gas_gap_warping',False):
-                    gas_gap_map = straxen.get_resource(files['gas_gap_map'], fmt='pkl')
-                    self.gas_gap_length = lambda positions: gas_gap_map.lookup(*positions.T)
-
-                # Photon After Pulses
-                if config.get('enable_pmt_afterpulses',False):
-                     self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='json.gz')
 
         # SPE area distributions
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')

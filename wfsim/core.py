@@ -6,7 +6,7 @@ from scipy.interpolate import interp1d
 from tqdm import tqdm
 
 from .load_resource import load_config, DummyMap
-from strax import exporter
+from strax import exporter, deterministic_hash
 from . import units
 from .utils import find_intervals_below_threshold
 
@@ -17,6 +17,9 @@ log = logging.getLogger('SimulationCore')
 log.setLevel('DEBUG')
 
 PULSE_TYPE_NAMES = ('RESERVED', 's1', 's2', 'unknown', 'pi_el', 'pmt_ap', 'pe_el')
+_cached_pmt_current_templates = {}
+_cached_uniform_to_pe_arr = {}
+
 
 @export
 class NestId():
@@ -26,6 +29,7 @@ class NestId():
     ER = [7, 8, 11, 12]
     LED = [20]
     _ALL = NR + ALPHA + ER + LED
+
 
 @export
 class Pulse(object):
@@ -138,6 +142,12 @@ class Pulse(object):
         _pmt_current_templates[i] : photon timing fall between [10*m+i, 10*m+i+1)
         (i, m are integers)
         """
+        h = deterministic_hash(self.config)
+        if h in _cached_pmt_current_templates:
+            self._pmt_current_templates = _cached_pmt_current_templates[h]
+            return
+
+        log.debug('Create spe waveform templates with %s ns resolution' % pmt_pulse_time_rounding)
 
         # Interpolate on cdf ensures that each spe pulse would sum up to 1 pe*sample duration^-1
         pe_pulse_function = interp1d(
@@ -166,11 +176,16 @@ class Pulse(object):
             pmt_current *= (1 / sample_duration) / np.sum(pmt_current)  # pe / 10 ns
             templates.append(pmt_current)
         self._pmt_current_templates = np.array(templates)
-
-        log.debug('Create spe waveform templates with %s ns resolution' % pmt_pulse_time_rounding)
-
+        _cached_pmt_current_templates[h] = self._pmt_current_templates
 
     def init_spe_scaling_factor_distributions(self):
+        h = deterministic_hash(self.config)
+        if h in _cached_uniform_to_pe_arr:
+            self.__uniform_to_pe_arr = _cached_uniform_to_pe_arr[h]
+            return
+
+        log.debug('Initialize spe scaling factor distributions')
+
         # Extract the spe pdf from a csv file into a pandas dataframe
         spe_shapes = self.resource.photon_area_distribution
 
@@ -196,8 +211,7 @@ class Pulse(object):
 
         if len(uniform_to_pe_arr):
             self.__uniform_to_pe_arr = np.stack(uniform_to_pe_arr)
-
-        log.debug('Initialize spe scaling factor distributions')
+            _cached_uniform_to_pe_arr[h] = self.__uniform_to_pe_arr
 
 
     def uniform_to_pe_arr(self, p, channel=0):
@@ -1025,10 +1039,10 @@ class PMT_Afterpulse(Pulse):
     """
 
     def __init__(self, config):
-        super().__init__(config)
-
         if not self.config['enable_pmt_afterpulses']:
             return
+
+        super().__init__(config)
 
         # Convert lists back to ndarray. As ndarray not supported by json
         for k in self.resource.uniform_to_pmt_ap.keys():
@@ -1123,7 +1137,7 @@ class RawData(object):
         )
         self.resource = load_config(self.config)
 
-    def __call__(self, instructions, truth_buffer=None, **kwargs):
+    def __call__(self, instructions, truth_buffer=None, progress_bar=True, **kwargs):
         if truth_buffer is None:
             truth_buffer = []
 
@@ -1152,7 +1166,8 @@ class RawData(object):
         instb_filled = np.zeros_like(instb, dtype=bool) # Mask of where buffer is filled
 
         # ik those are illegible, messy logic. lmk if you have a better way
-        pbar = tqdm(total=len(inst_queue), desc='Simulating Raw Records')
+        if progress_bar:
+            pbar = tqdm(total=len(inst_queue), desc='Simulating Raw Records')
         while not self.source_finished:
 
             # A) Add a new instruction into buffer
@@ -1163,7 +1178,8 @@ class RawData(object):
                 ib = np.where(~instb_filled)[0][:len(ixs)] # The index of first empty slot in buffer
                 instb[ib] = instructions[ixs]
                 instb_filled[ib] = True
-                pbar.update(1)
+                if progress_bar:
+                    pbar.update(1)
             except: pass
 
             # B) Cluster instructions again with gap size <= rext
@@ -1211,7 +1227,8 @@ class RawData(object):
                 yield from self.ZLE()
                 
             self.source_finished = len(inst_queue) == 0 and np.sum(instb_filled) == 0
-        pbar.close()
+        if progress_bar:
+            pbar.close()
 
     @staticmethod
     def symtype(ptype):
@@ -1468,3 +1485,32 @@ class RawData(object):
             for ix in range(left, right+1):
                 if data[ch, ix] < 0:
                     data[ch, ix] = 0
+
+
+@export
+class RawDataOptical(RawData):
+
+    def __init__(self, config, channels=[], timings=[]):
+        self.config = config
+        self.pulses = dict(
+            s1=wfsim.Pulse(config),
+            pi_el=wfsim.PhotoIonization_Electron(config),
+            pe_el=wfsim.PhotoElectric_Electron(config),
+            pmt_ap=wfsim.PMT_Afterpulse(config))
+        self.resource = load_config(self.config)
+        self.channels = channels
+        self.timings = timings
+
+    def sim_primary(self, primary_pulse, instruction):
+        ixs = [np.arange(inst['_first'], inst['_last'] + 1) for inst in instruction]
+
+        if len(ixs) == 0:
+            self.pulses[primary_pulse].clear_pulse_cache()
+        else:
+            ixs = np.hstack(ixs).astype(int)
+
+            # By channel sorting is needed due to a speed boosting trick in pulse generation
+            sorted_index = np.argsort(self.channels[ixs])
+            self.pulses[primary_pulse]._photon_channels = self.channels[ixs][sorted_index]
+            self.pulses[primary_pulse]._photon_timings = self.timings[ixs][sorted_index]
+            self.pulses[primary_pulse]()
