@@ -17,7 +17,7 @@ logging.basicConfig(handlers=[
     # logging.handlers.WatchedFileHandler('wfsim.log'),
     logging.StreamHandler()])
 log = logging.getLogger('wfsim.core')
-log.setLevel('DEBUG')
+log.setLevel('INFO')
 
 PULSE_TYPE_NAMES = ('RESERVED', 's1', 's2', 'unknown', 'pi_el', 'pmt_ap', 'pe_el')
 _cached_pmt_current_templates = {}
@@ -1278,6 +1278,8 @@ class RawData(object):
 
             self.left = np.min([p['left'] for p in self._pulses_cache]) - self.config['trigger_window']
             self.right = np.max([p['right'] for p in self._pulses_cache]) + self.config['trigger_window']
+            l = self.right - self.left
+            log.info(f'Digitizing pulse from {self.left} - {self.right} of {l} samples')
             assert self.right - self.left < 1000000, "Pulse cache too long"
 
             if self.left % 2 != 0: self.left -= 1 # Seems like a digizier effect

@@ -214,6 +214,7 @@ class ChunkRawRecords(object):
         # Save the constants as privates
         self.blevel = buffer_filled_level = 0
         self.chunk_time_pre = time_ling - rext if time_ling else np.min(instructions['time']) - rext
+        self.chunk_time_pre = (self.chunk_time_pre // cksz) * cksz
         self.chunk_time = self.chunk_time_pre + cksz # Starting chunk
         self.current_digitized_right = self.last_digitized_right = 0
         for channel, left, right, data in self.rawdata(instructions=instructions,
@@ -222,7 +223,11 @@ class ChunkRawRecords(object):
             pulse_length = right - left + 1
             records_needed = int(np.ceil(pulse_length / samples_per_record))
 
-            if self.rawdata.left * dt > self.chunk_time:
+            if self.rawdata.right != self.current_digitized_right:
+                self.last_digitized_right = self.current_digitized_right
+                self.current_digitized_right = self.rawdata.right
+
+            if self.rawdata.left * dt > self.chunk_time + rext:
                 if (self.last_digitized_right + 1) * dt > self.chunk_time:
                     extend = (self.last_digitized_right + 1) * dt - self.chunk_time
                     self.chunk_time += extend 
@@ -251,9 +256,6 @@ class ChunkRawRecords(object):
             self.record_buffer[s]['data'] = np.pad(data,
                 (0, records_needed * samples_per_record - pulse_length), 'constant').reshape((-1, samples_per_record))
             self.blevel += records_needed
-            if self.rawdata.right != self.current_digitized_right:
-                self.last_digitized_right = self.current_digitized_right
-                self.current_digitized_right = self.rawdata.right
 
         self.last_digitized_right = self.current_digitized_right
         self.chunk_time = max((self.last_digitized_right + 1) * dt, self.chunk_time_pre + dt)
@@ -262,10 +264,10 @@ class ChunkRawRecords(object):
     def final_results(self):
         records = self.record_buffer[:self.blevel] # No copying the records from buffer
         log.debug(f'Yielding chunk from {self.rawdata.__class__.__name__} between {self.chunk_time_pre} - {self.chunk_time}')
-        log.debug(f'Truncating data at sample {self.last_digitized_right}')
         maska = records['time'] <= self.last_digitized_right * self.config['sample_duration']
+        maxrtime = records['time'].max()
+        log.debug(f'Truncating data at sample {self.last_digitized_right} while last records start at {maxrtime}')
         records = records[maska]
-
         records = strax.sort_by_time(records) # Do NOT remove this line
 
         # Yield an appropriate amount of stuff from the truth buffer

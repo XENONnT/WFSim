@@ -23,6 +23,7 @@ def load_config(config):
         return _cached_configs[h]
     result = Resource(config)
     _cached_configs[h] = result
+    log.debug(f'Caching config file set {h}')
     return result
 
 
