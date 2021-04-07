@@ -13,7 +13,10 @@ from .utils import find_intervals_below_threshold
 export, __all__ = exporter()
 __all__.append('PULSE_TYPE_NAMES')
 
-log = logging.getLogger('SimulationCore')
+logging.basicConfig(handlers=[
+    # logging.handlers.WatchedFileHandler('wfsim.log'),
+    logging.StreamHandler()])
+log = logging.getLogger('wfsim.core')
 log.setLevel('DEBUG')
 
 PULSE_TYPE_NAMES = ('RESERVED', 's1', 's2', 'unknown', 'pi_el', 'pmt_ap', 'pe_el')
@@ -37,7 +40,7 @@ class Pulse(object):
 
     def __init__(self, config):
         self.config = config
-        self.config.update(getattr(self.config, self.__class__.__name__, {}))
+        self.config.update(self.config.get(self.__class__.__name__, {}))
         self.resource = load_config(config)
 
         self.init_pmt_current_templates()
@@ -147,8 +150,6 @@ class Pulse(object):
             self._pmt_current_templates = _cached_pmt_current_templates[h]
             return
 
-        log.debug('Create spe waveform templates with %s ns resolution' % pmt_pulse_time_rounding)
-
         # Interpolate on cdf ensures that each spe pulse would sum up to 1 pe*sample duration^-1
         pe_pulse_function = interp1d(
             self.config.get('pe_pulse_ts'),
@@ -178,13 +179,13 @@ class Pulse(object):
         self._pmt_current_templates = np.array(templates)
         _cached_pmt_current_templates[h] = self._pmt_current_templates
 
+        log.debug('Spe waveform templates created with %s ns resolution, cached with key %s' % (pmt_pulse_time_rounding, h))
+
     def init_spe_scaling_factor_distributions(self):
         h = deterministic_hash(self.config)
         if h in _cached_uniform_to_pe_arr:
             self.__uniform_to_pe_arr = _cached_uniform_to_pe_arr[h]
             return
-
-        log.debug('Initialize spe scaling factor distributions')
 
         # Extract the spe pdf from a csv file into a pandas dataframe
         spe_shapes = self.resource.photon_area_distribution
@@ -213,6 +214,7 @@ class Pulse(object):
             self.__uniform_to_pe_arr = np.stack(uniform_to_pe_arr)
             _cached_uniform_to_pe_arr[h] = self.__uniform_to_pe_arr
 
+        log.debug('Spe scaling factors created, cached with key %s' %h)
 
     def uniform_to_pe_arr(self, p, channel=0):
         indices = (p * 2000).astype(np.int64) + 1
@@ -1030,7 +1032,7 @@ class PMT_Afterpulse(Pulse):
     """
 
     def __init__(self, config):
-        if not self.config['enable_pmt_afterpulses']:
+        if not config['enable_pmt_afterpulses']:
             return
 
         super().__init__(config)
@@ -1484,24 +1486,27 @@ class RawDataOptical(RawData):
     def __init__(self, config, channels=[], timings=[]):
         self.config = config
         self.pulses = dict(
-            s1=wfsim.Pulse(config),
-            pi_el=wfsim.PhotoIonization_Electron(config),
-            pe_el=wfsim.PhotoElectric_Electron(config),
-            pmt_ap=wfsim.PMT_Afterpulse(config))
-        self.resource = load_config(self.config)
+            s1=Pulse(config),
+            pi_el=PhotoIonization_Electron(config),
+            pe_el=PhotoElectric_Electron(config),
+            pmt_ap=PMT_Afterpulse(config))
+        self.resource = load_config(config)
         self.channels = channels
         self.timings = timings
 
     def sim_primary(self, primary_pulse, instruction):
-        ixs = [np.arange(inst['_first'], inst['_last'] + 1) for inst in instruction]
+        if primary_pulse == 's1':
+            ixs = [np.arange(inst['_first'], inst['_last']) for inst in instruction]
+            event_time = np.repeat(instruction['time'], instruction['_last'] - instruction['_first'])
 
-        if len(ixs) == 0:
-            self.pulses[primary_pulse].clear_pulse_cache()
-        else:
-            ixs = np.hstack(ixs).astype(int)
-
-            # By channel sorting is needed due to a speed boosting trick in pulse generation
-            sorted_index = np.argsort(self.channels[ixs])
-            self.pulses[primary_pulse]._photon_channels = self.channels[ixs][sorted_index]
-            self.pulses[primary_pulse]._photon_timings = self.timings[ixs][sorted_index]
-            self.pulses[primary_pulse]()
+            if len(ixs) == 0:
+                self.pulses[primary_pulse].clear_pulse_cache()
+            else:
+                ixs = np.hstack(ixs).astype(int)
+                # By channel sorting is needed due to a speed boosting trick in pulse generation
+                sorted_index = np.argsort(self.channels[ixs])
+                self.pulses[primary_pulse]._photon_channels = self.channels[ixs][sorted_index]
+                self.pulses[primary_pulse]._photon_timings = (self.timings[ixs] + event_time)[sorted_index]
+                self.pulses[primary_pulse]()
+        elif primary_pulse in ['pi_el', 'pe_el']:
+            self.pulses[primary_pulse](instruction)

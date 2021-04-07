@@ -5,7 +5,11 @@ import numpy as np
 import strax
 import straxen
 import logging
-log = logging.getLogger('load_resource')
+logging.basicConfig(handlers=[
+    # logging.handlers.WatchedFileHandler('wfsim.log'),
+    logging.StreamHandler()])
+log = logging.getLogger('wfsim.resource')
+log.setLevel('DEBUG')
 
 _cached_configs = dict()
 
@@ -14,7 +18,7 @@ def load_config(config):
 
     Uses a cache to avoid re-creating instances from the same config
     """
-    h = strax.deterministic_hash(config)
+    h = strax.deterministic_hash(Resource._files(config))
     if h in _cached_configs:
         return _cached_configs[h]
     result = Resource(config)
@@ -34,15 +38,20 @@ class Resource:
             Download from a private repository if credentials 
             are properly setup
     """
-    def __init__(self, config=None):
-        log.debug(f'Getting {config}')
+    @staticmethod
+    def _files(config):
+        """
+        Find and complete all file paths
+
+        returns dictionary mapping item name to path
+        """
         if config is None:
             config = dict()
 
         files = {
             'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
-            'noise_file': 'x1t_noise_170203_0850_00_small.npz',
-        }
+            'noise_file': 'x1t_noise_170203_0850_00_small.npz',}
+
         if config['detector'] == 'XENON1T':
             files.update({
                 'photon_area_distribution': 'XENON1T_spe_distributions.csv',
@@ -53,6 +62,7 @@ class Resource:
                 'photon_ap_cdfs': 'x1t_pmt_afterpulse_config.pkl.gz',
                 'fdc_3d': 'XENON1T_FDC_SR1_data_driven_time_dependent_3d_correction_tf_nn_part1_v1.json.gz',
             })
+
         elif config['detector'] == 'XENONnT':
             files.update({
                 'photon_area_distribution': 'XENONnT_spe_distributions_20210305.csv',
@@ -63,6 +73,7 @@ class Resource:
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
                 'nv_pmt_qe': 'nveto_pmt_qe.json'
             })
+
         else:
             raise ValueError(f"Unsupported detector {config['detector']}")
 
@@ -72,14 +83,20 @@ class Resource:
 
         commit = 'master'  # Replace this by a commit hash if you feel solid and responsible
         if config.get('url_base', False):
-            url_base = config['url_base']
+            files['url_base'] = config['url_base']
         elif config['detector'] == "XENON1T":
-            url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/sim_files'
+            files['url_base'] = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/sim_files'
         elif config['detector'] == "XENONnT":
-            url_base = f'https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/{commit}/sim_files'
+            files['url_base'] = f'https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/{commit}/sim_files'
+
+        return files
+        
+    def __init__(self, config=None):
+        files = self._files(config)
+        log.debug(f'Getting {files}')
 
         for k, v in files.items():
-            if isinstance(v, list):
+            if k == 'url_base':
                 continue
             log.debug(f'Obtaining {k} from {v}')
             if v.startswith('/'):
@@ -110,11 +127,11 @@ class Resource:
                     log.info(f"ntauxfiles is not installed or does not have {v}")
                     # We cannot download the file from the database. We need to
                     # try to get a placeholder file from a URL.
-                    raw_url = osp.join(url_base, v)
+                    raw_url = osp.join(files['url_base'], v)
                     log.warning(f'{k} did not download, trying {raw_url}')
                     files[k] = raw_url
             log.debug(f'Downloaded {k} successfully')
-                             
+
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
 
         if config['detector'] == 'XENON1T':
@@ -200,6 +217,7 @@ def make_map(map_file, fmt='text'):
         return DummyMap(map_file[1], map_file[2])
 
     elif isinstance(map_file, str):
+        log.debug(f'Initialize map interpolator for file {map_file}')
         map_data = straxen.get_resource(map_file, fmt=fmt)
         return straxen.InterpolatingMap(map_data)
     

@@ -28,8 +28,8 @@ instruction_dtype = [(('Waveform simulator event number.', 'event_number'), np.i
              (('Volume id giving the detector subvolume', 'vol_id'), np.int32)
              ]
 
-optical_extra_dtype = [(('Index of first optical input', '_first'), np.int32),
-    (('Index of last optical input (including the last)', '_last'), np.int32),]
+optical_extra_dtype = [(('first optical input index', '_first'), np.int32),
+    (('last optical input index +1', '_last'), np.int32),]
 
 truth_extra_dtype = [
     (('End time of the interaction [ns]', 'endtime'), np.int64),
@@ -40,8 +40,11 @@ truth_extra_dtype = [
     ('t_first_electron', np.float), ('t_last_electron', np.float),
     ('t_mean_electron', np.float), ('t_sigma_electron', np.float)]
 
-
-log = logging.getLogger('SimulationCore')
+logging.basicConfig(handlers=[
+    # logging.handlers.WatchedFileHandler('wfsim.log'),
+    logging.StreamHandler()])
+log = logging.getLogger('wfsim.interface')
+log.setLevel('DEBUG')
 
 
 def rand_instructions(c):
@@ -189,17 +192,19 @@ class ChunkRawRecords(object):
     def __init__(self, config, rawdata_generator=RawData, **kwargs):
         log.debug(f'Starting {self.__class__.__name__}')
         self.config = config
-        log.debug(f'Setting raw data with {rawdata_generator.__class__.__name__}')
+        log.debug(f'Setting raw data with {rawdata_generator.__name__}')
         self.rawdata = rawdata_generator(self.config, **kwargs)
         self.record_buffer = np.zeros(5000000,
             dtype=strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH))  # 2*250 ms buffer
         self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)])
 
         self.blevel = buffer_filled_level = 0
-        log.debug(f'Starting {self.__class__.__name__} initiated')
 
-    def __call__(self, instructions, **kwargs):
-        log.debug(f'{self.__class__.__name__} called')
+    def __call__(self, instructions, time_ling=None, **kwargs):
+        """
+        :param instructions: Structured array with instruction dtype in strax_interface module
+        :param time_ling: Starting time of the first chunk
+        """
         samples_per_record = strax.DEFAULT_RECORD_LENGTH
         dt = self.config['sample_duration']
         buffer_length = len(self.record_buffer)
@@ -208,7 +213,7 @@ class ChunkRawRecords(object):
 
         # Save the constants as privates
         self.blevel = buffer_filled_level = 0
-        self.chunk_time_pre = np.min(instructions['time']) - rext
+        self.chunk_time_pre = time_ling - rext if time_ling else np.min(instructions['time']) - rext
         self.chunk_time = self.chunk_time_pre + cksz # Starting chunk
         self.current_digitized_right = self.last_digitized_right = 0
         for channel, left, right, data in self.rawdata(instructions=instructions,
@@ -218,7 +223,10 @@ class ChunkRawRecords(object):
             records_needed = int(np.ceil(pulse_length / samples_per_record))
 
             if self.rawdata.left * dt > self.chunk_time:
-                self.chunk_time = (self.last_digitized_right + 1) * dt
+                if (self.last_digitized_right + 1) * dt > self.chunk_time:
+                    extend = (self.last_digitized_right + 1) * dt - self.chunk_time
+                    self.chunk_time += extend 
+                    log.debug(f'Chunk during event, extending {extend} ns')
                 yield from self.final_results()
                 self.chunk_time_pre = self.chunk_time
                 self.chunk_time += cksz
@@ -253,6 +261,8 @@ class ChunkRawRecords(object):
 
     def final_results(self):
         records = self.record_buffer[:self.blevel] # No copying the records from buffer
+        log.debug(f'Yielding chunk from {self.rawdata.__class__.__name__} between {self.chunk_time_pre} - {self.chunk_time}')
+        log.debug(f'Truncating data at sample {self.last_digitized_right}')
         maska = records['time'] <= self.last_digitized_right * self.config['sample_duration']
         records = records[maska]
 
@@ -324,7 +334,7 @@ class ChunkRawRecords(object):
                  help="Duration of each chunk in seconds"),
     strax.Option('nchunk', default=10, track=False,
                  help="Number of chunks to simulate"),
-    strax.Option('right_raw_extension', default=50000),
+    strax.Option('right_raw_extension', default=500000),
     strax.Option('timeout', default=1800,
                  help="Terminate processing if any one mailbox receives "
                       "no result for more than this many seconds"),
@@ -404,16 +414,23 @@ class SimulatorPlugin(strax.Plugin):
         # Set in inheriting class
         pass
 
-    def _sort_check(self, result):
-        if len(result) == 0: return
-        if result['time'][0] < self.last_chunk_time + 1000:
-            raise RuntimeError(
-                "Simulator returned chunks with insufficient spacing. "
-                f"Last chunk's max time was {self.last_chunk_time}, "
-                f"this chunk's first time is {result['time'][0]}.")
-        if np.diff(result['time']).min() < 0:
-            raise RuntimeError("Simulator returned non-sorted records!")
-        self.last_chunk_time = result['time'].max()
+    def _sort_check(self, results):
+        if not isinstance(results, list):
+            results = [results]
+        last_chunk_time = self.last_chunk_time
+        for result in results:
+            if len(result) == 0: continue
+            if result['time'][0] < self.last_chunk_time + 1000:
+                raise RuntimeError(
+                    "Simulator returned chunks with insufficient spacing. "
+                    f"Last chunk's max time was {self.last_chunk_time}, "
+                    f"this chunk's first time is {result['time'][0]}.")
+            if len(result) == 1: continue
+            if np.diff(result['time']).min() < 0:
+                raise RuntimeError("Simulator returned non-sorted records!")
+            
+            last_chunk_time = max(result['time'].max(), self.last_chunk_time)
+        self.last_chunk_time = last_chunk_time
 
     def is_ready(self,chunk_i):
         """Overwritten to mimic online input plugin.
@@ -498,7 +515,6 @@ class RawRecordsFromMcChain(SimulatorPlugin):
 
     def set_timing(self,):
         """Set timing information in such a way to synchronize instructions for the TPC and nVeto"""
-        logging.info("Setting timings")
 
         # If no event_stop is specified set it to the maximum (-1=do all events)
         if self.config['entry_stop'] == -1:
@@ -516,8 +532,6 @@ class RawRecordsFromMcChain(SimulatorPlugin):
         # For tpc we have multiple instructions per g4id.
         if 'raw_records' in self.provides:
             i_timings = np.searchsorted(np.unique(self.g4id), self.instructions_epix['g4id'])
-            print(len(timings), len(i_timings))
-            print(timings[i_timings])
             self.instructions_epix['time'] += timings[i_timings]
         # nveto instruction doesn't carry physical time delay, so the time is overwritten
         if 'raw_records_nv' in self.provides:
@@ -551,7 +565,6 @@ class RawRecordsFromMcChain(SimulatorPlugin):
         
         epix needs to be imported in here to avoid circle imports
         """
-        logging.info("Getting instructions from epix")
 
         self.g4id = []
         if 'raw_records' in self.provides:
@@ -566,12 +579,19 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                 epix.run_epix.setup(epix_config),
                 return_wfsim_instructions=True)
             self.g4id.append(self.instructions_epix['g4id'])
+            log.debug("Epix produced %d instructions in tpc" %(len(self.instructions_epix)))
 
         if 'raw_records_nv' in self.provides:
             self.config['nv_pmt_ce_factor'] = 1.0
             self.instructions_nveto, self.nveto_channels, self.nveto_timings =\
                 read_optical(self.config)
+            # Why epix removes many of the g4ids?
+            min_g4id = np.min(self.g4id[0]) if len(self.g4id) > 0 else 0
+            nv_inst_to_keep = self.instructions_nveto['g4id'] >= min_g4id
+            nv_inst_to_keep &= (self.instructions_nveto['_last'] - self.instructions_nveto['_first']) > 0
+            self.instructions_nveto = self.instructions_nveto[nv_inst_to_keep]
             self.g4id.append(self.instructions_nveto['g4id'])
+            log.debug("Epix produced %d instructions in nv" %(len(self.instructions_nveto)))
 
         self.g4id = np.unique(np.concatenate(self.g4id))
         self.set_timing()
@@ -579,7 +599,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
     def _setup(self):
         if 'raw_records' in self.provides:
             self.sim = ChunkRawRecords(self.config)
-            self.sim_iter = self.sim(self.instructions_epix)
+            self.sim_iter = self.sim(self.instructions_epix, progress_bar=False)
         if 'raw_records_nv' in self.provides:
             self.sim_nv = ChunkRawRecords(self.config,
                                           rawdata_generator=RawDataOptical,
@@ -590,7 +610,12 @@ class RawRecordsFromMcChain(SimulatorPlugin):
 
             assert '_first' in self.instructions_nveto.dtype.names, 'Require indexing info in optical instruction see optical extra dtype'
             assert all(self.instructions_nveto['type'] == 1), 'Only s1 type is supported for generating rawdata from optical input'
-            self.sim_nv_iter = self.sim_nv(self.instructions_nveto,)
+            time_ling = np.min(self.instructions_epix['time']) if 'raw_records' in self.provides else None
+            time_ling_nv = np.min(self.instructions_nveto['time'])
+            log.debug(f'Forcing first nveto chunk start at {time_ling} while nveto instruction start at {time_ling_nv}')
+            self.sim_nv_iter = self.sim_nv(self.instructions_nveto,
+                                           time_ling=time_ling,
+                                           progress_bar=False)
 
     def infer_dtype(self):
         dtype = dict([(data_type, instruction_dtype + truth_extra_dtype) if 'truth' in data_type
@@ -602,34 +627,34 @@ class RawRecordsFromMcChain(SimulatorPlugin):
         if 'raw_records' in self.provides:
             try:
                 result = next(self.sim_iter)
-                self._sort_check(result['raw_records'])
             except StopIteration:
                 raise RuntimeError("Bug in chunk count computation")
 
         if 'raw_records_nv' in self.provides:
             try:
                 result_nv = next(self.sim_nv_iter)
-                self._sort_check(result_nv['raw_records'])
-                result_nv['raw_records']['channel'] += config['channel_map']['nveto'][0]
+                result_nv['raw_records']['channel'] += self.config['channel_map']['nveto'][0]
             except StopIteration:
                 raise RuntimeError("Bug in chunk count computation")            
 
-        out = {}
+        chunk = {}
         for data_type in self.provides:
             if 'nv' in data_type:
-                out[data_type] = self.chunk(
+                chunk[data_type] = self.chunk(
                     start=self.sim_nv.chunk_time_pre,
                     end=self.sim_nv.chunk_time,
                     data=result_nv[data_type.strip('_nv')],
                     data_type=data_type)
             else:
-                out[data_type] = self.chunk(
+                chunk[data_type] = self.chunk(
                     start=self.sim.chunk_time_pre,
                     end=self.sim.chunk_time,
                     data=result[data_type],
                     data_type=data_type)
 
-        return out
+        self._sort_check([chunk[data_type].data for data_type in self.provides])
+
+        return chunk
 
     def source_finished(self):
         """Return whether all instructions has been used."""
