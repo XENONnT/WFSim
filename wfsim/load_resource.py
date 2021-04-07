@@ -59,7 +59,7 @@ class Resource:
                 's1_pattern_map': 'XENONnT_s1_xyz_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
                 's2_pattern_map': 'XENONnT_s2_xy_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
                 'photon_ap_cdfs': 'XENONnT_pmt_afterpulse_config_012605.json.gz',
-                's2_luminescence': 'XENONnT_s2_garfield_luminescence_distribution_v0.pkl.gz',
+                's2_luminescence': 'XENONnT_GARFIELD_B1d5n_C30n_G1n_A6d5p_T1d5n_PMTs1d5n_FSR0d95n.npz',
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
                 'nv_pmt_qe': 'nveto_pmt_qe.json'
             })
@@ -132,7 +132,7 @@ class Resource:
             if config.get('enable_pmt_afterpulses', False):
                 self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
 
-        if config.get('detector','XENONnT') == 'XENONnT':
+        if config.get('detector', 'XENONnT') == 'XENONnT':
             if config.get('neutron_veto', False):
                 self.nv_pmt_qe = straxen.get_resource(files['nv_pmt_qe'], fmt='json')
             else:
