@@ -200,10 +200,10 @@ class ChunkRawRecords(object):
 
         self.blevel = buffer_filled_level = 0
 
-    def __call__(self, instructions, time_ling=None, **kwargs):
+    def __call__(self, instructions, time_zero=None, **kwargs):
         """
         :param instructions: Structured array with instruction dtype in strax_interface module
-        :param time_ling: Starting time of the first chunk
+        :param time_zero: Starting time of the first chunk
         """
         samples_per_record = strax.DEFAULT_RECORD_LENGTH
         dt = self.config['sample_duration']
@@ -213,7 +213,7 @@ class ChunkRawRecords(object):
 
         # Save the constants as privates
         self.blevel = buffer_filled_level = 0
-        self.chunk_time_pre = time_ling - rext if time_ling else np.min(instructions['time']) - rext
+        self.chunk_time_pre = time_zero - rext if time_zero else np.min(instructions['time']) - rext
         self.chunk_time_pre = (self.chunk_time_pre // cksz) * cksz
         self.chunk_time = self.chunk_time_pre + cksz # Starting chunk
         self.current_digitized_right = self.last_digitized_right = 0
@@ -510,6 +510,7 @@ class RawRecordsFromFax1T(RawRecordsFromFaxNT):
     strax.Option('entry_start', default=0, track=False,),
     strax.Option('entry_stop', default=-1, track=False,
                 help='G4 id event number to stop at. If -1 process the entire file'),
+    strax.Option('fax_config_nveto', default=None, track=True,),
     )
 class RawRecordsFromMcChain(SimulatorPlugin):
     provides = ('raw_records', 'raw_records_he', 'raw_records_aqmon', 'raw_records_nv', 'truth', 'truth_nv')
@@ -603,7 +604,9 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             self.sim = ChunkRawRecords(self.config)
             self.sim_iter = self.sim(self.instructions_epix, progress_bar=False)
         if 'raw_records_nv' in self.provides:
-            self.sim_nv = ChunkRawRecords(self.config,
+            self.config_nveto = deepcopy(self.config)
+            self.config_nveto.update(straxen.get_resource(self.config_nveto['fax_config_nveto'], fmt='json'))
+            self.sim_nv = ChunkRawRecords(self.config_nveto,
                                           rawdata_generator=RawDataOptical,
                                           channels=self.nveto_channels,
                                           timings=self.nveto_timings,)
@@ -612,11 +615,11 @@ class RawRecordsFromMcChain(SimulatorPlugin):
 
             assert '_first' in self.instructions_nveto.dtype.names, 'Require indexing info in optical instruction see optical extra dtype'
             assert all(self.instructions_nveto['type'] == 1), 'Only s1 type is supported for generating rawdata from optical input'
-            time_ling = np.min(self.instructions_epix['time']) if 'raw_records' in self.provides else None
-            time_ling_nv = np.min(self.instructions_nveto['time'])
-            log.debug(f'Forcing first nveto chunk start at {time_ling} while nveto instruction start at {time_ling_nv}')
+            time_zero = np.min(self.instructions_epix['time']) if 'raw_records' in self.provides else None
+            time_zero_nv = np.min(self.instructions_nveto['time'])
+            log.debug(f'Forcing first nveto chunk start at {time_zero} while nveto instruction start at {time_zero_nv}')
             self.sim_nv_iter = self.sim_nv(self.instructions_nveto,
-                                           time_ling=time_ling,
+                                           time_zero=time_zero,
                                            progress_bar=False)
 
     def infer_dtype(self):
@@ -666,3 +669,8 @@ class RawRecordsFromMcChain(SimulatorPlugin):
         if 'raw_records_nv' in self.provides:
             source_finished &= self.sim_nv.source_finished()
         return source_finished
+
+
+class RawRecordsFromFaxnVeto(RawRecordsFromMcChain):
+    provides = ('raw_records_nv', 'truth_nv')
+    data_kind = immutabledict(zip(provides, provides))
