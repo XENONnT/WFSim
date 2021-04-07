@@ -25,8 +25,8 @@ _cached_uniform_to_pe_arr = {}
 
 
 @export
-class NestId():
-    """Nest ids for refering to different scintilation models, only ER is actually validated"""
+class NestId:
+    """Nest ids for referring to different scintillation models, only ER is actually validated"""
     NR = [0]
     ALPHA = [6]
     ER = [7, 8, 11, 12]
@@ -49,8 +49,7 @@ class Pulse(object):
         
         self.clear_pulse_cache()
 
-
-    def __call__(self):
+    def __call__(self, *args):
         """
         PMTs' response to incident photons
         Use _photon_timings, _photon_channels to build pulses
@@ -59,36 +58,34 @@ class Pulse(object):
                 ('_photon_channels' not in self.__dict__):
             raise NotImplementedError
         
-        # The pulse cache should be immediately transfered after call this function
+        # The pulse cache should be immediately transferred after call this function
         self.clear_pulse_cache()
 
-        # Correct for PMT Transition Time Spread (skip for pmt afterpulses)
+        # Correct for PMT Transition Time Spread (skip for pmt after-pulses)
         # note that PMT datasheet provides FWHM TTS, so sigma = TTS/(2*sqrt(2*log(2)))=TTS/2.35482
         if '_photon_gains' not in self.__dict__:
             self._photon_timings += np.random.normal(self.config['pmt_transit_time_mean'],
                                                      self.config['pmt_transit_time_spread'] / 2.35482,
                                                      len(self._photon_timings)).astype(np.int64)
 
-        dt = self.config.get('sample_duration', 10) # Getting dt from the lib just once
-        self._n_double_pe = self._n_double_pe_bot = 0 # For truth aft output
+        dt = self.config.get('sample_duration', 10)  # Getting dt from the lib just once
+        self._n_double_pe = self._n_double_pe_bot = 0  # For truth aft output
 
-        counts_start = 0 # Secondary loop index for assigning channel
+        counts_start = 0  # Secondary loop index for assigning channel
         for channel, counts in zip(*np.unique(self._photon_channels, return_counts=True)):
 
             # Use 'counts' amount of photon for this channel
             _channel_photon_timings = self._photon_timings[counts_start:counts_start+counts]
             counts_start += counts
-            if channel in self.config['turned_off_pmts']: continue
+            if channel in self.config['turned_off_pmts']:
+                continue
 
             # If gain of each photon is not specifically assigned
             # Sample from spe scaling factor distribution and to individual gain
             # In contrast to pmt afterpulse that should have gain determined before this step
             if '_photon_gains' not in self.__dict__:
-                if self.config['detector'] == 'XENON1T':
-                    _channel_photon_gains = self.config['gains'][channel] \
-                    * self.uniform_to_pe_arr(np.random.random(len(_channel_photon_timings)), channel)
-                else:
-                    _channel_photon_gains = self.config['gains'][channel] \
+
+                _channel_photon_gains = self.config['gains'][channel] \
                     * self.uniform_to_pe_arr(np.random.random(len(_channel_photon_timings)))
 
                 # Add some double photoelectron emission by adding another sampled gain
@@ -98,14 +95,12 @@ class Pulse(object):
                 if channel in self.config['channels_bottom']:
                     self._n_double_pe_bot += n_double_pe
 
-                #_dpe_index = np.random.randint(len(_channel_photon_timings),
-                #                               size=n_double_pe)
                 if self.config['detector'] == 'XENON1T':
                     _channel_photon_gains[:n_double_pe] += self.config['gains'][channel] \
-                    * self.uniform_to_pe_arr(np.random.random(n_double_pe), channel)
+                        * self.uniform_to_pe_arr(np.random.random(n_double_pe), channel)
                 else:
                     _channel_photon_gains[:n_double_pe] += self.config['gains'][channel] \
-                    * self.uniform_to_pe_arr(np.random.random(n_double_pe))
+                        * self.uniform_to_pe_arr(np.random.random(n_double_pe))
             else:
                 _channel_photon_gains = np.array(self._photon_gains[self._photon_channels == channel])
 
@@ -114,8 +109,8 @@ class Pulse(object):
                 _channel_photon_timings), np.max(_channel_photon_timings)
 
             pulse_left = (int(min_timing // dt) 
-                      - int(self.config['samples_to_store_before'])
-                      - self.config.get('samples_before_pulse_center', 2))
+                          - int(self.config['samples_to_store_before'])
+                          - self.config.get('samples_before_pulse_center', 2))
 
             pulse_right = (int(max_timing // dt) 
                            + int(self.config['samples_to_store_after'])
@@ -137,7 +132,6 @@ class Pulse(object):
                 right    = pulse_right,
                 duration = pulse_right - pulse_left + 1,
                 current  = pulse_current,))
-
 
     def init_pmt_current_templates(self):
         """
@@ -179,7 +173,8 @@ class Pulse(object):
         self._pmt_current_templates = np.array(templates)
         _cached_pmt_current_templates[h] = self._pmt_current_templates
 
-        log.debug('Spe waveform templates created with %s ns resolution, cached with key %s' % (pmt_pulse_time_rounding, h))
+        log.debug('Spe waveform templates created with %s ns resolution, cached with key %s'
+                  % (pmt_pulse_time_rounding, h))
 
     def init_spe_scaling_factor_distributions(self):
         h = deterministic_hash(self.config)
@@ -196,7 +191,7 @@ class Pulse(object):
         for ch in spe_shapes.columns[1:]:  # skip the first element which is the 'charge' header
             if spe_shapes[ch].sum() > 0:
                 # mean_spe = (spe_shapes['charge'].values * spe_shapes[ch]).sum() / spe_shapes[ch].sum()
-                scaled_bins = spe_shapes['charge'].values # / mean_spe
+                scaled_bins = spe_shapes['charge'].values  # / mean_spe
                 cdf = np.cumsum(spe_shapes[ch]) / np.sum(spe_shapes[ch])
             else:
                 # if sum is 0, just make some dummy axes to pass to interpolator
@@ -205,8 +200,8 @@ class Pulse(object):
 
             grid_cdf = np.linspace(0, 1, 2001)
             grid_scale = interp1d(cdf, scaled_bins, 
-                bounds_error=False, 
-                fill_value=(scaled_bins[0], scaled_bins[-1]))(grid_cdf)
+                                  bounds_error=False,
+                                  fill_value=(scaled_bins[0], scaled_bins[-1]))(grid_cdf)
 
             uniform_to_pe_arr.append(grid_scale)
 
@@ -214,12 +209,11 @@ class Pulse(object):
             self.__uniform_to_pe_arr = np.stack(uniform_to_pe_arr)
             _cached_uniform_to_pe_arr[h] = self.__uniform_to_pe_arr
 
-        log.debug('Spe scaling factors created, cached with key %s' %h)
+        log.debug('Spe scaling factors created, cached with key %s' % h)
 
     def uniform_to_pe_arr(self, p, channel=0):
         indices = (p * 2000).astype(np.int64) + 1
         return self.__uniform_to_pe_arr[channel, indices]
-
 
     def clear_pulse_cache(self):
         self._pulses = []
@@ -271,9 +265,9 @@ class Pulse(object):
     @staticmethod
     def singlet_triplet_delays(size, singlet_ratio, config, phase):
         """
-        Given the amount of the eximer, return time between excimer decay
+        Given the amount of the excimer, return time between excimer decay
         and their time of generation.
-        size           - amount of eximer
+        size           - amount of excimer
         self.phase     - 'liquid' or 'gas'
         singlet_ratio  - fraction of excimers that become singlets
                          (NOT the ratio of singlets/triplets!)
@@ -284,6 +278,8 @@ class Pulse(object):
         elif phase == 'gas':
             t1, t3 = (config['singlet_lifetime_gas'],
                       config['triplet_lifetime_gas'])
+        else:
+            t1, t3 = 0, 0
 
         delay = np.random.choice([t1, t3], size, replace=True,
                                  p=[singlet_ratio, 1 - singlet_ratio])
@@ -326,7 +322,7 @@ class S1(Pulse):
                                                    config=self.config,
                                                    phase=self.phase)
 
-        # The new way iterpolation is written always require a list
+        # The new way interpolation is written always require a list
         self._photon_channels = self.photon_channels(positions=positions,
                                                      n_photons=n_photons,
                                                      config=self.config, 
@@ -335,18 +331,18 @@ class S1(Pulse):
         super().__call__()
 
     @staticmethod
-    def get_n_photons(n_photons,positions, s1_light_yield_map, config):
-        """Calculates number of detected photons based on number of photons in total and the postions
+    def get_n_photons(n_photons, positions, s1_light_yield_map, config):
+        """Calculates number of detected photons based on number of photons in total and the positions
         :param n_photons: 1d array of ints with number of photons:
-        :param postions: 2d array with xyz positions of interactions 
-        :param s1_light_yield map: interpolator instance of s1 light yield map 
+        :param positions: 2d array with xyz positions of interactions
+        :param s1_light_yield_map: interpolator instance of s1 light yield map
         :param config: dict wfsim config 
         
         return array with number photons"""
-        if config['detector']=='XENONnT':
+        if config['detector'] == 'XENONnT':
             ly = np.squeeze(s1_light_yield_map(positions),
                             axis=-1)/(1+config['p_double_pe_emision'])
-        elif config['detector']=='XENON1T':
+        elif config['detector'] == 'XENON1T':
             ly = s1_light_yield_map(positions)
             ly *= config['s1_detection_efficiency']
         n_photons = np.random.binomial(n=n_photons, p=ly)
@@ -369,11 +365,11 @@ class S1(Pulse):
         _photon_channels = np.array([]).astype(np.int64)
         for ppc, n in zip(p_per_channel, n_photons):
             _photon_channels = np.append(_photon_channels,
-                    np.random.choice(
-                        channels,
-                        size=n,
-                        p=ppc / np.sum(ppc),
-                        replace=True))
+                                         np.random.choice(
+                                             channels,
+                                             size=n,
+                                             p=ppc / np.sum(ppc),
+                                             replace=True))
         return _photon_channels
 
     @staticmethod
@@ -390,8 +386,8 @@ class S1(Pulse):
         if len(_photon_timings) == 0:
             return _photon_timings.astype(np.int64)
         
-        if (config['s1_model_type'] == 'simple' and 
-            np.isin(recoil_type, NestId._ALL).all()):
+        if (config['s1_model_type'] == 'simple' and
+                np.isin(recoil_type, NestId._ALL).all()):
             # Simple S1 model enabled: use it for ER and NR.
             _photon_timings += np.random.exponential(config['s1_decay_time'], len(_photon_timings)).astype(np.int64)
             _photon_timings += np.random.normal(0, config['s1_decay_spread'], len(_photon_timings)).astype(np.int64)
@@ -400,7 +396,8 @@ class S1(Pulse):
         counts_start = 0
         for i, counts in enumerate(n_photons):
             for k in vars(NestId):
-                if k.startswith('_'): continue
+                if k.startswith('_'):
+                    continue
                 if recoil_type[i] in getattr(NestId, k):
                     str_recoil_type = k
             try:
@@ -419,7 +416,7 @@ class S1(Pulse):
         """  Calculate S1 photon timings for an alpha decay. Neglible recombination time, not validated
         :param size: 1d array of ints, number of photons
         :param config: dict wfsim config
-        :parma phase: str "liquid"
+        :param phase: str "liquid"
         
         return 1d array of photon timings"""
         return Pulse.singlet_triplet_delays(size, config['s1_ER_alpha_singlet_fraction'], config, phase)
@@ -429,8 +426,7 @@ class S1(Pulse):
         """  distribute photons uniformly within the LED pulse length, not validated
         :param size: 1d array of ints, number of photons
         :param config: dict wfsim config
-        :parma phase: str "liquid
-        
+
         return 1d array of photon timings"""
         return np.random.uniform(0, config['led_pulse_length'], size)
 
@@ -439,7 +435,7 @@ class S1(Pulse):
         """Complex ER model, not validated
         :param size: 1d array of ints, number of photons
         :param config: dict wfsim config
-        :parma phase: str "liquid"
+        :param phase: str "liquid"
         return 1d array of photon timings
         """
 
@@ -487,7 +483,7 @@ class S1(Pulse):
         """NR model model, not validated
         :param size: 1d array of ints, number of photons
         :param config: dict wfsim config
-        :parma phase: str "liquid"
+        :param phase: str "liquid"
         return 1d array of photon timings
         """
         return Pulse.singlet_triplet_delays(size, config['s1_NR_singlet_fraction'], config, phase)
@@ -530,10 +526,10 @@ class S2(Pulse):
 
         # Second generate photon timing and channel
         self._electron_timings, self._photon_timings, self._instruction = self.photon_timings(t, n_electron, z_obs,
-                                                                      positions, sc_gain,
-                                                                      config=self.config,
-                                                                      resource=self.resource,
-                                                                      phase=self.phase)
+                                                                                              positions, sc_gain,
+                                                                                              config=self.config,
+                                                                                              resource=self.resource,
+                                                                                              phase=self.phase)
 
         self._photon_channels, self._photon_timings = self.photon_channels(n_electron=n_electron,
                                                                            z_obs=z_obs,
@@ -545,7 +541,7 @@ class S2(Pulse):
         super().__call__()
 
     @staticmethod
-    def get_s2_light_yield(positions,config,resource):
+    def get_s2_light_yield(positions, config, resource):
         """Calculate s2 light yield...
         
         :param positions: 2d array of positions (floats)
@@ -554,16 +550,16 @@ class S2(Pulse):
         
         returns array of floats (mean expectation) 
         """
-        if config['detector']=='XENONnT':
+        if config['detector'] == 'XENONnT':
             sc_gain = np.squeeze(resource.s2_light_yield_map(positions), axis=-1) \
                 * config['s2_secondary_sc_gain']
-        elif config['detector']=='XENON1T':
+        elif config['detector'] == 'XENON1T':
             sc_gain = resource.s2_light_yield_map(positions) \
                 * config['s2_secondary_sc_gain']
         return sc_gain
 
     @staticmethod
-    def get_electron_yield(n_electron,z_obs,config):
+    def get_electron_yield(n_electron, z_obs, config):
         """Drift electrons up to the gas interface and absorb them
 
         :param n_electron: 1d array with ints as number of electrons
@@ -578,17 +574,18 @@ class S2(Pulse):
 
         # Absorb electrons during the drift
         electron_lifetime_correction = np.exp(- 1 * drift_time_mean /
-            config['electron_lifetime_liquid'])
+                                              config['electron_lifetime_liquid'])
         cy = config['electron_extraction_yield'] * electron_lifetime_correction
 
-        #why are there cy greater than 1? We should check this
-        cy = np.clip(cy, a_min = 0, a_max = 1)
+        # why are there cy greater than 1? We should check this
+        cy = np.clip(cy, a_min=0, a_max=1)
         n_electron = np.random.binomial(n=n_electron, p=cy)
         return n_electron
 
     @staticmethod
     def inverse_field_distortion(x, y, z, resource):
-        """For 1T the pattern map is a data driven one so we need to reverse engineer field distortion into the simulated positions
+        """For 1T the pattern map is a data driven one so we need to reverse engineer field distortion
+        into the simulated positions
         :param x: 1d array of float
         :param y: 1d array of float
         :param z: 1d array of float
@@ -598,7 +595,8 @@ class S2(Pulse):
         positions = np.array([x, y, z]).T
         for i_iter in range(6):  # 6 iterations seems to work
             dr = resource.fdc_3d(positions)
-            if i_iter > 0: dr = 0.5 * dr + 0.5 * dr_pre  # Average between iter
+            if i_iter > 0:
+                dr = 0.5 * dr + 0.5 * dr_pre  # Average between iter
             dr_pre = dr
 
             r_obs = np.sqrt(x**2 + y**2) - dr
@@ -650,7 +648,7 @@ class S2(Pulse):
         assert np.sum(n_electron) == shape[0], 'Total number of electron does not agree with shape[0]'
 
         number_density_gas = config['pressure'] / \
-                             (units.boltzmannConstant * config['temperature'])
+            (units.boltzmannConstant * config['temperature'])
         alpha = config['gas_drift_velocity_slope'] / number_density_gas
         uE = units.kV / units.cm
         pressure = config['pressure'] / units.bar
@@ -671,7 +669,8 @@ class S2(Pulse):
         rr = np.clip(1 / r, 1 / rA, 1 / rW)
 
         return S2._luminescence_timings_simple(len(xy), dG, E0, 
-            r, dr, rr, alpha, uE, pressure, n_electron, shape)
+                                               r, dr, rr, alpha, uE,
+                                               pressure, n_electron, shape)
 
     @staticmethod
     def luminescence_timings_garfield(xy, n_electron, shape, config, resource):
@@ -706,10 +705,10 @@ class S2(Pulse):
     @staticmethod
     @njit
     def electron_timings(t, n_electron, z, sc_gain, timings, gains,
-            drift_velocity_liquid,
-            drift_time_gate,
-            diffusion_constant_longitudinal,
-            electron_trapping_time):
+                         drift_velocity_liquid,
+                         drift_time_gate,
+                         diffusion_constant_longitudinal,
+                         electron_trapping_time):
         """Calculate arrival times of the electrons. Data is written to the timings and gains arrays
         :param t: 1d array of ints
         :param n_electron:1 d array of ints
@@ -717,7 +716,10 @@ class S2(Pulse):
         :param sc_gain: secondairy scintallation gain       
         :param timings: empty array with length sum(n_electron)
         :param gains: empty array with length sum(n_electron)
-        :param drift_velocity_liquid, drift_time_gate, diffusion_constant_longitudinal, electron_trapping_time: configuration values
+        :param drift_velocity_liquid: configuration values
+        :param drift_time_gate: configuration values
+        :param diffusion_constant_longitudinal: configuration values
+        :param electron_trapping_time: configuration values
         """
         assert len(timings) == np.sum(n_electron)
         assert len(gains) == np.sum(n_electron)
@@ -744,18 +746,19 @@ class S2(Pulse):
                 i_electron += 1
 
     @staticmethod
-    def photon_timings( t, n_electron, z, xy, sc_gain, config, resource, phase):
-        """Generates photon timings for S2s. Returns a list of photon timings and instructions repeated for original electron
+    def photon_timings(t, n_electron, z, xy, sc_gain, config, resource, phase):
+        """Generates photon timings for S2s. Returns a list of photon timings and instructions
+        repeated for original electron
         
         :param t: 1d float array arrival time of the electrons
         :param n_electron: 1d float array number of electrons to simulate
         :param z: float array. Z positions of s2
         :param xy: 1d float array, xy positions of s2
-        :param sc_gain: float, secondairy s2 gain
+        :param sc_gain: float, secondary s2 gain
         :param config: dict of the wfsim config
         :param resource: instance of the resource class
         :param phase: string, "gas" """
-        # First generate electron timinga
+        # First generate electron timings
         _electron_timings = np.zeros(np.sum(n_electron), np.int64)
         _electron_gains = np.zeros(np.sum(n_electron), np.float64)
         _config = [config[k] for k in
@@ -764,7 +767,7 @@ class S2(Pulse):
                     'diffusion_constant_longitudinal',
                     'electron_trapping_time']]
         S2.electron_timings(t, n_electron, z, sc_gain, 
-            _electron_timings, _electron_gains, *_config)
+                            _electron_timings, _electron_gains, *_config)
 
         if len(_electron_timings) < 1:
             return np.zeros(0, np.int64), np.zeros(0, np.int64), np.zeros(0)
@@ -823,6 +826,8 @@ class S2(Pulse):
         :param n_electron: a 1d int array
         :param z: a 1d float array
         :param xy: a 2d float array of shape [n interaction, 2]
+        :param config: dict of the wfsim config
+        :param resource: instance of the resource class
         """
         drift_time_gate = config['drift_time_gate']
         drift_velocity_liquid = config['drift_velocity_liquid']
@@ -833,7 +838,8 @@ class S2(Pulse):
         drift_time_mean = - z / drift_velocity_liquid + drift_time_gate  # Add gate time for consistancy?
         hdiff_stdev = np.sqrt(2 * diffusion_constant_transverse * drift_time_mean)
 
-        hdiff = np.random.normal(0, 1, (np.sum(n_electron), 2)) * np.repeat(hdiff_stdev, n_electron, axis=0).reshape((-1, 1))
+        hdiff = np.random.normal(0, 1, (np.sum(n_electron), 2)) * \
+            np.repeat(hdiff_stdev, n_electron, axis=0).reshape((-1, 1))
         # Should we also output this xy position in truth?
         xy_multi = np.repeat(xy, n_electron, axis=0) + hdiff  # One entry xy per electron
         # Remove points outside tpc, and the pattern will be the average inside tpc
@@ -862,7 +868,7 @@ class S2(Pulse):
         :param z_obs: a 1d float array
         :param positions: a 2d float array of shape [n interaction, 2] for the xy coordinate
         :param _photon_timings: 1d int array of photon timings,
-        :param _instructions: array of instructions with dtype wfsim.instructions_dtype
+        :param _instruction: array of instructions with dtype wfsim.instructions_dtype
         :param config: dict wfsim config
         :param resource: instance of resource class
         """
@@ -882,9 +888,9 @@ class S2(Pulse):
             pattern = resource.s2_pattern_map(positions)  # [position, pmt]
         if pattern.shape[1] - 1 not in bottom_index:
             pattern = np.pad(pattern, [[0, 0], [0, len(bottom_index)]], 
-                'constant', constant_values=1)
+                             'constant', constant_values=1)
         sum_pat = np.sum(pattern, axis=1).reshape(-1, 1)
-        pattern = np.divide(pattern, sum_pat, out=np.zeros_like(pattern), where=sum_pat!=0)
+        pattern = np.divide(pattern, sum_pat, out=np.zeros_like(pattern), where=sum_pat != 0)
 
         assert pattern.shape[0] == len(positions)
         assert pattern.shape[1] == len(channels)
@@ -898,7 +904,7 @@ class S2(Pulse):
                 _aft = aft * (1 + np.random.normal(0, aft_random))
                 _aft = np.clip(_aft, 0, 1)
                 pat[top_index] = pat[top_index] / pat[top_index].sum() * _aft
-                pat[bottom_index] = pat[bottom_index] / pat[bottom_index].sum() *  (1 - _aft)
+                pat[bottom_index] = pat[bottom_index] / pat[bottom_index].sum() * (1 - _aft)
 
             if np.isnan(pat).sum() > 0:  # Pattern map return zeros
                 _photon_channels = np.array([-1] * count)
@@ -934,7 +940,8 @@ class PhotoIonization_Electron(S2):
         self._photon_timings = []
 
     def generate_instruction(self, signal_pulse, signal_pulse_instruction):
-        if len(signal_pulse._photon_timings) == 0: return []
+        if len(signal_pulse._photon_timings) == 0:
+            return []
         return self.electron_afterpulse(signal_pulse, signal_pulse_instruction)
 
     def electron_afterpulse(self, signal_pulse, signal_pulse_instruction):
@@ -958,7 +965,7 @@ class PhotoIonization_Electron(S2):
 
         instruction = np.repeat(signal_pulse_instruction[0], n_electron)
 
-        instruction['type'] = 4 # pi_el
+        instruction['type'] = 4  # pi_el
         instruction['time'] = t_zeros + self.config['drift_time_gate']
         instruction['x'], instruction['y'] = self._rand_position(n_electron)
         instruction['z'] = - ap_delay * self.config['drift_velocity_liquid']
@@ -986,7 +993,8 @@ class PhotoElectric_Electron(S2):
         self._photon_timings = []
 
     def generate_instruction(self, signal_pulse, signal_pulse_instruction):
-        if len(signal_pulse._photon_timings) == 0: return []
+        if len(signal_pulse._photon_timings) == 0:
+            return []
         return self.electron_afterpulse(signal_pulse, signal_pulse_instruction)
 
     def electron_afterpulse(self, signal_pulse, signal_pulse_instruction):
@@ -1002,12 +1010,13 @@ class PhotoElectric_Electron(S2):
 
         # Randomly select original photon as time zeros
         t_zeros = signal_pulse._photon_timings[np.random.randint(
-            low=0, high=len(signal_pulse._photon_timings),
+            low=0,
+            high=len(signal_pulse._photon_timings),
             size=n_electron)]
 
         instruction = np.repeat(signal_pulse_instruction[0], n_electron)
 
-        instruction['type'] = 6 # pe_el
+        instruction['type'] = 6  # pe_el
         instruction['time'] = t_zeros + self.config['drift_time_gate']
         instruction['x'], instruction['y'] = self._rand_position(n_electron)
         instruction['z'] = - ap_delay * self.config['drift_velocity_liquid']
@@ -1016,7 +1025,7 @@ class PhotoElectric_Electron(S2):
         return instruction
 
     def _rand_position(self, n):
-        Rupper = 46
+        Rupper = self.config['tpc_radius']
 
         r = np.sqrt(np.random.uniform(0, Rupper*Rupper, n))
         angle = np.random.uniform(-np.pi, np.pi, n)
@@ -1073,7 +1082,8 @@ class PMT_Afterpulse(Pulse):
             # Select those photons with U <= max of cdf of specific channel
             cdf_max = delaytime_cdf[signal_pulse._photon_channels, -1]
             sel_photon_id = np.where(rU0 <= cdf_max * config['pmt_ap_modifier'])[0]
-            if len(sel_photon_id) == 0: continue
+            if len(sel_photon_id) == 0:
+                continue
             sel_photon_channel = signal_pulse._photon_channels[sel_photon_id]
 
             # Assign selected photon SECOND random uniform number rU1 from (0, 1] for amplitude
@@ -1082,7 +1092,7 @@ class PMT_Afterpulse(Pulse):
             # The map is made so that the indices are delay time in unit of ns
             if 'Uniform' in element:
                 ap_delay = np.random.uniform(delaytime_cdf[sel_photon_channel, 0], 
-                    delaytime_cdf[sel_photon_channel, 1])                
+                                             delaytime_cdf[sel_photon_channel, 1])
                 ap_amplitude = np.ones_like(ap_delay)
             else:
                 ap_delay = (np.argmin(
@@ -1115,6 +1125,7 @@ class PMT_Afterpulse(Pulse):
 
         else:
             return np.zeros(0, np.int64), np.zeros(0, np.int64), np.zeros(0)
+
 
 @export
 class RawData(object):
@@ -1150,30 +1161,31 @@ class RawData(object):
         # int(type) by design S1-esque being odd, S2-esque being even
         # thus type%2-1 is 0:S1-esque;  -1:S2-esque
         # Make a list of clusters of instructions, with gap smaller then rext
-        inst_time = instructions['time'] + instructions['z']  / v * (instructions['type'] % 2 - 1)
+        inst_time = instructions['time'] + instructions['z'] / v * (instructions['type'] % 2 - 1)
         inst_queue = np.argsort(inst_time)
         inst_queue = np.split(inst_queue, np.where(np.diff(inst_time[inst_queue]) > rext)[0]+1)
 
         # Instruction buffer
-        instb = np.zeros(10000, dtype=instructions.dtype) # size ~ 1% of size of primary
-        instb_filled = np.zeros_like(instb, dtype=bool) # Mask of where buffer is filled
+        instb = np.zeros(10000, dtype=instructions.dtype)  # size ~ 1% of size of primary
+        instb_filled = np.zeros_like(instb, dtype=bool)  # Mask of where buffer is filled
 
         # ik those are illegible, messy logic. lmk if you have a better way
         if progress_bar:
             pbar = tqdm(total=len(inst_queue), desc='Simulating Raw Records')
         while not self.source_finished:
-
+            log.info('Source not finished with %d')
             # A) Add a new instruction into buffer
             try:
-                ixs = inst_queue.pop(0) # The index from original instruction list
+                ixs = inst_queue.pop(0)  # The index from original instruction list
                 self.source_finished = len(inst_queue) == 0
                 assert len(np.where(~instb_filled)[0]) > len(ixs), "Run out of instruction buffer"
-                ib = np.where(~instb_filled)[0][:len(ixs)] # The index of first empty slot in buffer
+                ib = np.where(~instb_filled)[0][:len(ixs)]  # The index of first empty slot in buffer
                 instb[ib] = instructions[ixs]
                 instb_filled[ib] = True
                 if progress_bar:
                     pbar.update(1)
-            except: pass
+            except IndexError:
+                pass
 
             # B) Cluster instructions again with gap size <= rext
             instb_indx = np.where(instb_filled)[0]
@@ -1182,7 +1194,7 @@ class RawData(object):
                 / v * (instb_type % 2 - 1)
             instb_queue = np.argsort(instb_time,  kind='stable')
             instb_queue = np.split(instb_queue, 
-                np.where(np.diff(instb_time[instb_queue]) > rext)[0]+1)
+                                   np.where(np.diff(instb_time[instb_queue]) > rext)[0]+1)
             
             # C) Push pulse cache out first if nothing comes right after them
             if np.min(instb_time) - self.last_pulse_end_time > rext and not np.isinf(self.last_pulse_end_time):
@@ -1192,15 +1204,17 @@ class RawData(object):
             # D) Run all clusters before the current source
             stop_at_this_group = False
             for ibqs in instb_queue:
-                for ptype in [1, 2, 4, 6]: # S1 S2 PI Gate
+                for ptype in [1, 2, 4, 6]:  # S1 S2 PI Gate
                     mask = instb_type[ibqs] == ptype
-                    if np.sum(mask) == 0: continue # No such instruction type
-                    instb_run = instb_indx[ibqs[mask]] # Take hold of todo list
+                    if np.sum(mask) == 0:
+                        continue  # No such instruction type
+                    instb_run = instb_indx[ibqs[mask]]  # Take hold of todo list
 
                     if self.symtype(ptype) in ['s1', 's2']:
-                        stop_at_this_group = True # Stop group iteration
+                        stop_at_this_group = True  # Stop group iteration
                         _instb_run = np.array_split(instb_run, len(instb_run))
-                    else: _instb_run = [instb_run] # Small trick to make truth small
+                    else:
+                        _instb_run = [instb_run]  # Small trick to make truth small
 
                     # Run pulse simulation for real
                     for instb_run in _instb_run:
@@ -1209,14 +1223,14 @@ class RawData(object):
                             instb[ib] = instb_secondary
                             instb_filled[ib] = True
 
-                        if len(truth_buffer): # Extract truth info
+                        if len(truth_buffer):  # Extract truth info
                             self.get_truth(instb[instb_run], truth_buffer)
 
-                        instb_filled[instb_run] = False # Free buffer AFTER copyting into truth buffer
+                        instb_filled[instb_run] = False  # Free buffer AFTER copyting into truth buffer
 
                 if stop_at_this_group: 
                     break
-                self.digitize_pulse_cache() # from pulse cache to raw data
+                self.digitize_pulse_cache()  # from pulse cache to raw data
                 yield from self.ZLE()
                 
             self.source_finished = len(inst_queue) == 0 and np.sum(instb_filled) == 0
@@ -1260,7 +1274,7 @@ class RawData(object):
             if self.config.get('enable_electron_afterpulses', True):
                 yield self.pulses['pi_el'].generate_instruction(
                     self.pulses[primary_pulse], instruction)
-                if primary_pulse in ['s2']: # Only add gate ap to s2
+                if primary_pulse in ['s2']:  # Only add gate ap to s2
                     yield self.pulses['pe_el'].generate_instruction(
                         self.pulses[primary_pulse], instruction)
             self.instruction_event_number = instruction['event_number'][0]
@@ -1278,16 +1292,15 @@ class RawData(object):
 
             self.left = np.min([p['left'] for p in self._pulses_cache]) - self.config['trigger_window']
             self.right = np.max([p['right'] for p in self._pulses_cache]) + self.config['trigger_window']
-            l = self.right - self.left
-            log.info(f'Digitizing pulse from {self.left} - {self.right} of {l} samples')
+            pulse_length = self.right - self.left
+            log.info(f'Digitizing pulse from {self.left} - {self.right} of {pulse_length} samples')
             assert self.right - self.left < 1000000, "Pulse cache too long"
 
-            if self.left % 2 != 0: self.left -= 1 # Seems like a digizier effect
+            if self.left % 2 != 0:
+                self.left -= 1  # Seems like a digizier effect
 
+            self._raw_data = np.zeros((801, self.right - self.left + 1), dtype='<i8')
 
-            self._raw_data = np.zeros((801,
-                self.right - self.left + 1), dtype=('<i8'))
-                                                 
             # Use this mask to by pass non-activated channels
             # Set to true when working with real noise
             self._channel_mask = np.zeros(801, dtype=[('mask', '?'), ('left', 'i8'), ('right', 'i8')])
@@ -1300,40 +1313,39 @@ class RawData(object):
                 self._channel_mask['right'][ch] = max(_pulse['right'], self._channel_mask['right'][ch])
                 adc_wave = - np.trunc(_pulse['current'] * self.current_2_adc).astype(np.int64)
                 _slice = slice(_pulse['left'] - self.left, _pulse['right'] - self.left + 1)
-                
+
                 self._raw_data[ch, _slice] += adc_wave
 
                 if self.config['detector'] == 'XENONnT':
                     adc_wave_he = adc_wave * int(self.config['high_energy_deamplification_factor'])
                     if ch < self.config['n_top_pmts']:
-                        ch_he = np.arange(self.config['channel_map']['he'][0],self.config['channel_map']['he'][1]+1)[ch]
+                        ch_he = np.arange(self.config['channel_map']['he'][0],
+                                          self.config['channel_map']['he'][1] + 1)[ch]
                         self._raw_data[ch_he, _slice] += adc_wave_he
                         self._channel_mask[ch_he] = True
                         self._channel_mask['left'][ch_he] = self._channel_mask['left'][ch]
                         self._channel_mask['right'][ch_he] = self._channel_mask['right'][ch]
                     elif ch <= self.config['channels_bottom'][-1]:
                         self.sum_signal(adc_wave_he,
-                            _pulse['left'] - self.left,
-                            _pulse['right'] - self.left + 1,
-                            self._raw_data[self.config['channel_map']['sum_signal']])
+                                        _pulse['left'] - self.left,
+                                        _pulse['right'] - self.left + 1,
+                                        self._raw_data[self.config['channel_map']['sum_signal']])
 
             self._pulses_cache = []
 
             self._channel_mask['left'] -= self.left + self.config['trigger_window']
             self._channel_mask['right'] -= self.left - self.config['trigger_window']
-            
-            
+
             # Adding noise, baseline and digitizer saturation
             
             if self.config.get('enable_noise', True):
                 self.add_noise(data=self._raw_data,
-                            channel_mask=self._channel_mask,
-                            noise_data=self.resource.noise_data,
-                            noise_data_length=len(self.resource.noise_data))
+                               channel_mask=self._channel_mask,
+                               noise_data=self.resource.noise_data,
+                               noise_data_length=len(self.resource.noise_data))
             self.add_baseline(self._raw_data, self._channel_mask, 
-                    self.config['digitizer_reference_baseline'],)
+                              self.config['digitizer_reference_baseline'],)
             self.digitizer_saturation(self._raw_data, self._channel_mask)
-
 
     def ZLE(self):
         """
@@ -1405,9 +1417,10 @@ class RawData(object):
                 tb[f't_last_{quantum}'] = np.nan
                 tb[f't_sigma_{quantum}'] = np.nan
         
-        #Endtime is the end of the last pulse
+        # Endtime is the end of the last pulse
         tb['endtime'] = np.mean(instruction['time']) if np.isnan(tb['t_last_photon']) else tb['t_last_photon'] + \
-            (self.config['samples_before_pulse_center']+self.config['samples_after_pulse_center']+1)*self.config['sample_duration']
+            (self.config['samples_before_pulse_center'] + self.config['samples_after_pulse_center'] + 1) \
+            * self.config['sample_duration']
         channels = getattr(pulse, '_photon_channels', [])
         if self.config.get('exclude_dpe_in_truth', False):
             n_dpe = n_dpe_bot = 0

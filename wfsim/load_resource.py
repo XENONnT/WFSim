@@ -13,12 +13,13 @@ log.setLevel('DEBUG')
 
 _cached_configs = dict()
 
+
 def load_config(config):
     """Create a Resource instance from the configuration
 
     Uses a cache to avoid re-creating instances from the same config
     """
-    h = strax.deterministic_hash(Resource._files(config))
+    h = strax.deterministic_hash(Resource.file_config(config))
     if h in _cached_configs:
         return _cached_configs[h]
     result = Resource(config)
@@ -40,7 +41,7 @@ class Resource:
             are properly setup
     """
     @staticmethod
-    def _files(config):
+    def file_config(config):
         """
         Find and complete all file paths
 
@@ -98,7 +99,7 @@ class Resource:
         return files
 
     def __init__(self, config=None):
-        files = self._files(config)
+        files = self.file_config(config)
         log.debug(f'Getting {files}')
 
         for k, v in files.items():
@@ -151,7 +152,7 @@ class Resource:
 
             # Gas gap warping map
             if config.get('enable_gas_gap_warping', False):
-                self.gas_gap_length = make_map(["constant dummy", 0.25, [254,]])
+                self.gas_gap_length = make_map(["constant dummy", 0.25, [254, ]])
 
             # Photon After Pulses
             if config.get('enable_pmt_afterpulses', False):
@@ -182,8 +183,8 @@ class Resource:
                 # Get directly the map for the simulated level
                 liquid_level_available = np.unique(s2_luminescence_map['ll'])  # available levels (cm)
                 liquid_level = config['gate_to_anode_distance'] - config['elr_gas_gap_length']  # cm
-                liquid_level = min(liquid_level_available , key=lambda x:abs(x - liquid_level))
-                self.s2_luminescence = s2_luminescence_map[s2_luminescence_map['ll']==liquid_level]
+                liquid_level = min(liquid_level_available, key=lambda x: abs(x - liquid_level))
+                self.s2_luminescence = s2_luminescence_map[s2_luminescence_map['ll'] == liquid_level]
 
             if config.get('field_distortion_on', False):
                 self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
@@ -195,7 +196,7 @@ class Resource:
 
             # Photon After Pulses
             if config.get('enable_pmt_afterpulses', False):
-                 self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='json.gz')
+                self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='json.gz')
 
         elif config.get('detector') == 'XENONnT_neutron_veto':
 
@@ -216,25 +217,27 @@ class Resource:
 
         log.debug(f'{self.__class__.__name__} fully initialized')
 
+
 def make_map(map_file, fmt='text'):
-    '''Fetch and make an instance of InterpolatingMap based on map_file
-    Alternativly map_file can be a list of ["constant dummy", constant: int, shape: list]
-    return an instance of  DummyMap'''
-        
+    """Fetch and make an instance of InterpolatingMap based on map_file
+    Alternatively map_file can be a list of ["constant dummy", constant: int, shape: list]
+    return an instance of  DummyMap"""
+
     if isinstance(map_file, list):
         assert map_file[0] == 'constant dummy', ('Alternative file input can only be '
-            '("constant dummy", constant: int, shape: list')
+                                                 '("constant dummy", constant: int, shape: list')
         return DummyMap(map_file[1], map_file[2])
 
     elif isinstance(map_file, str):
         log.debug(f'Initialize map interpolator for file {map_file}')
         map_data = straxen.get_resource(map_file, fmt=fmt)
         return straxen.InterpolatingMap(map_data)
-    
+
     else:
         raise TypeError("Can't handle map_file except a string or a list")
 
-class DummyMap():
+
+class DummyMap(object):
     """Return constant results
         the length match the length of input
         but from the second dimensions the shape is user defined input
@@ -242,9 +245,11 @@ class DummyMap():
     def __init__(self, const, shape=()):
         self.const = const
         self.shape = shape
+
     def __call__(self, x):
         shape = [len(x)] + list(self.shape)
         return np.ones(shape) * self.const
+
     def reduce_last_dim(self):
         assert len(self.shape) >= 1, 'Need at least 1 dim to reduce further'
         const = self.const * self.shape[-1]

@@ -4,7 +4,8 @@ import numpy as np
 import pandas as pd
 import uproot
 
-import strax, straxen
+import strax
+import straxen
 from .core import RawData, RawDataOptical
 from .load_resource import load_config
 from immutabledict import immutabledict
@@ -16,29 +17,28 @@ _cached_wavelength_to_qe_arr = {}
 
 
 instruction_dtype = [(('Waveform simulator event number.', 'event_number'), np.int32),
-             (('Quanta type (S1 photons or S2 electrons)', 'type'), np.int8),
-             (('Time of the interaction [ns]', 'time'), np.int64),
-             (('X position of the cluster[cm]', 'x'), np.float32),
-             (('Y position of the cluster[cm]', 'y'), np.float32),
-             (('Z position of the cluster[cm]', 'z'), np.float32),
-             (('Number of quanta', 'amp'), np.int32),
-             (('Recoil type of interaction.', 'recoil'), np.int8),
-             (('Energy deposit of interaction', 'e_dep'), np.float32),
-             (('Eventid like in geant4 output rootfile', 'g4id'), np.int32),
-             (('Volume id giving the detector subvolume', 'vol_id'), np.int32)
-             ]
+                     (('Quanta type (S1 photons or S2 electrons)', 'type'), np.int8),
+                     (('Time of the interaction [ns]', 'time'), np.int64),
+                     (('X position of the cluster[cm]', 'x'), np.float32),
+                     (('Y position of the cluster[cm]', 'y'), np.float32),
+                     (('Z position of the cluster[cm]', 'z'), np.float32),
+                     (('Number of quanta', 'amp'), np.int32),
+                     (('Recoil type of interaction.', 'recoil'), np.int8),
+                     (('Energy deposit of interaction', 'e_dep'), np.float32),
+                     (('Eventid like in geant4 output rootfile', 'g4id'), np.int32),
+                     (('Volume id giving the detector subvolume', 'vol_id'), np.int32)
+                     ]
 
 optical_extra_dtype = [(('first optical input index', '_first'), np.int32),
-    (('last optical input index +1', '_last'), np.int32),]
+                       (('last optical input index +1', '_last'), np.int32)]
 
-truth_extra_dtype = [
-    (('End time of the interaction [ns]', 'endtime'), np.int64),
-    ('n_electron', np.float),
-    ('n_photon', np.float), ('n_photon_bottom', np.float),
-    ('t_first_photon', np.float), ('t_last_photon', np.float),
-    ('t_mean_photon', np.float), ('t_sigma_photon', np.float),
-    ('t_first_electron', np.float), ('t_last_electron', np.float),
-    ('t_mean_electron', np.float), ('t_sigma_electron', np.float)]
+truth_extra_dtype = [(('End time of the interaction [ns]', 'endtime'), np.int64),
+                     ('n_electron', np.float),
+                     ('n_photon', np.float), ('n_photon_bottom', np.float),
+                     ('t_first_photon', np.float), ('t_last_photon', np.float),
+                     ('t_mean_photon', np.float), ('t_sigma_photon', np.float),
+                     ('t_first_electron', np.float), ('t_last_electron', np.float),
+                     ('t_mean_electron', np.float), ('t_sigma_electron', np.float)]
 
 logging.basicConfig(handlers=[
     # logging.handlers.WatchedFileHandler('wfsim.log'),
@@ -86,7 +86,7 @@ def _read_optical_nveto(config, events, mask):
     channels = np.hstack(events["pmthitID"].array(library="np")[mask])
     timings = np.hstack(events["pmthitTime"].array(library="np")[mask] * 1e9)
 
-    constant_hc = 1239.841984 # (eV*nm) to calculate (wavelength lambda) = h * c / energy
+    constant_hc = 1239.841984  # (eV*nm) to calculate (wavelength lambda) = h * c / energy
     wavelengths = np.hstack(constant_hc / events["pmthitEnergy"].array(library="np")[mask])
 
     # Caching a 2d array of interpolated value of (channel, wavelength [every nm]) 
@@ -102,10 +102,10 @@ def _read_optical_nveto(config, events, mask):
             wavelength_to_qe_arr = np.zeros([len(nveto_channels), 1000])
             for ich, channel in enumerate(nveto_channels):
                 wavelength_to_qe_arr[ich] = interp1d(qe_data['nv_pmt_qe_wavelength'],
-                   qe_data['nv_pmt_qe'][str(channel)],
-                   bounds_error=False,
-                   kind='linear',
-                   fill_value=(0, 0))(np.arange(1000))
+                                                     qe_data['nv_pmt_qe'][str(channel)],
+                                                     bounds_error=False,
+                                                     kind='linear',
+                                                     fill_value=(0, 0))(np.arange(1000))
             _cached_wavelength_to_qe_arr[h] = wavelength_to_qe_arr
 
     # retrieving qe by index
@@ -113,7 +113,7 @@ def _read_optical_nveto(config, events, mask):
     channels[~hit_mask] = nveto_channels[0]
 
     qes = _cached_wavelength_to_qe_arr[h][channels - nveto_channels[0],
-        np.around(wavelengths).astype(np.int64)]
+                                          np.around(wavelengths).astype(np.int64)]
     hit_mask &= np.random.rand(len(qes)) <= qes * config.get('nv_pmt_ce_factor', 1.0) / 100
 
     amplitudes, og_offset = [], 0
@@ -140,8 +140,8 @@ def read_optical(config):
     if config.get('entry_stop', -1) == -1:
         config['entry_stop'] = np.max(g4id) + 1
 
-    mask = ((g4id < config.get('entry_stop', int(2**63-1))) 
-        & (g4id >= config.get('entry_start', 0)))
+    mask = ((g4id < config.get('entry_stop', int(2**63-1)))
+            & (g4id >= config.get('entry_start', 0)))
     n_events = len(g4id[mask])
 
     if config['neutron_veto']:
@@ -159,7 +159,7 @@ def read_optical(config):
     ins['x'] = events["xp_pri"].array(library="np").flatten()[mask] / 10.
     ins['y'] = events["yp_pri"].array(library="np").flatten()[mask] / 10.
     ins['z'] = events["zp_pri"].array(library="np").flatten()[mask] / 10.
-    ins['time']= int(1e7) * np.arange(1, n_events + 1).flatten()[mask]  # Separate the events by a constant dt
+    ins['time'] = int(1e7) * np.arange(1, n_events + 1).flatten()[mask]  # Separate the events by a constant dt
     ins['event_number'] = np.arange(n_events)
     ins['g4id'] = events['eventid'].array(library="np")[mask]
     ins['type'] = np.repeat(1, n_events)
@@ -179,7 +179,7 @@ def instruction_from_csv(filename):
 
     recs = np.zeros(len(df), dtype=instruction_dtype)
     for column in df.columns:
-        recs[column]=df[column]
+        recs[column] = df[column]
 
     expected_dtype = np.dtype(instruction_dtype)
     assert recs.dtype == expected_dtype, \
@@ -195,10 +195,10 @@ class ChunkRawRecords(object):
         log.debug(f'Setting raw data with {rawdata_generator.__name__}')
         self.rawdata = rawdata_generator(self.config, **kwargs)
         self.record_buffer = np.zeros(5000000,
-            dtype=strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH))  # 2*250 ms buffer
+                                      dtype=strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH))
         self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)])
 
-        self.blevel = buffer_filled_level = 0
+        self.blevel = 0  # buffer_filled_level
 
     def __call__(self, instructions, time_zero=None, **kwargs):
         """
@@ -212,10 +212,10 @@ class ChunkRawRecords(object):
         cksz = int(self.config['chunk_size'] * 1e9)
 
         # Save the constants as privates
-        self.blevel = buffer_filled_level = 0
+        self.blevel = 0  # buffer_filled_level
         self.chunk_time_pre = time_zero - rext if time_zero else np.min(instructions['time']) - rext
         self.chunk_time_pre = (self.chunk_time_pre // cksz) * cksz
-        self.chunk_time = self.chunk_time_pre + cksz # Starting chunk
+        self.chunk_time = self.chunk_time_pre + cksz  # Starting chunk
         self.current_digitized_right = self.last_digitized_right = 0
         for channel, left, right, data in self.rawdata(instructions=instructions,
                                                        truth_buffer=self.truth_buffer,
@@ -228,10 +228,11 @@ class ChunkRawRecords(object):
                 self.current_digitized_right = self.rawdata.right
 
             if self.rawdata.left * dt > self.chunk_time + rext:
+                log.debug(f'Chunk data at chunk time {self.chunk_time}, next pulse start at {self.rawdata.left}')
                 if (self.last_digitized_right + 1) * dt > self.chunk_time:
                     extend = (self.last_digitized_right + 1) * dt - self.chunk_time
                     self.chunk_time += extend 
-                    log.debug(f'Chunk during event, extending {extend} ns')
+                    log.debug(f'Chunk happenned during event, extending {extend} ns')
                 yield from self.final_results()
                 self.chunk_time_pre = self.chunk_time
                 self.chunk_time += cksz
@@ -250,11 +251,12 @@ class ChunkRawRecords(object):
             self.record_buffer[s]['dt'] = dt
             self.record_buffer[s]['time'] = dt * (left + samples_per_record * np.arange(records_needed))
             self.record_buffer[s]['length'] = [min(pulse_length, samples_per_record * (i+1))
-                - samples_per_record * i for i in range(records_needed)]
+                                               - samples_per_record * i for i in range(records_needed)]
             self.record_buffer[s]['pulse_length'] = pulse_length
             self.record_buffer[s]['record_i'] = np.arange(records_needed)
             self.record_buffer[s]['data'] = np.pad(data,
-                (0, records_needed * samples_per_record - pulse_length), 'constant').reshape((-1, samples_per_record))
+                                                   (0, records_needed * samples_per_record - pulse_length),
+                                                   'constant').reshape((-1, samples_per_record))
             self.blevel += records_needed
 
         self.last_digitized_right = self.current_digitized_right
@@ -262,13 +264,17 @@ class ChunkRawRecords(object):
         yield from self.final_results()
 
     def final_results(self):
-        records = self.record_buffer[:self.blevel] # No copying the records from buffer
-        log.debug(f'Yielding chunk from {self.rawdata.__class__.__name__} between {self.chunk_time_pre} - {self.chunk_time}')
+        records = self.record_buffer[:self.blevel]  # No copying the records from buffer
+        log.debug(f'Yielding chunk from {self.rawdata.__class__.__name__} '
+                  f'between {self.chunk_time_pre} - {self.chunk_time}')
         maska = records['time'] <= self.last_digitized_right * self.config['sample_duration']
-        maxrtime = records['time'].max()
-        log.debug(f'Truncating data at sample {self.last_digitized_right} while last records start at {maxrtime}')
+        if self.blevel >= 1:
+            maxrtime = records['time'].max()
+            log.debug(f'Truncating data at sample {self.last_digitized_right} while last records start at {maxrtime}')
+        else:
+            log.debug(f'Truncating data at sample {self.last_digitized_right} while no records is produced')
         records = records[maska]
-        records = strax.sort_by_time(records) # Do NOT remove this line
+        records = strax.sort_by_time(records)  # Do NOT remove this line
 
         # Yield an appropriate amount of stuff from the truth buffer
         # and mark it as available for writing again
@@ -302,11 +308,11 @@ class ChunkRawRecords(object):
             _truth['t_first_photon'][~np.isnan(_truth['t_first_photon'])].astype(int)
         _truth.sort(order='time')
 
-        #Oke this will be a bit ugly but it's easy
-        if self.config['detector']=='XENON1T':
+        # Oke this will be a bit ugly but it's easy
+        if self.config['detector'] == 'XENON1T':
             yield dict(raw_records=records,
                        truth=_truth)
-        elif self.config['detector']=='XENONnT':
+        elif self.config['detector'] == 'XENONnT':
             yield dict(raw_records=records[records['channel'] < self.config['channel_map']['he'][0]],
                        raw_records_he=records[(records['channel'] >= self.config['channel_map']['he'][0]) &
                                               (records['channel'] <= self.config['channel_map']['he'][-1])],
@@ -369,28 +375,10 @@ class SimulatorPlugin(strax.Plugin):
     last_chunk_time = -999999999999999
 
     # A very very long input timeout, our simulator takes time
-    input_timeout = 3600 # as an hour
+    input_timeout = 3600  # as an hour
 
     def setup(self):
         self.set_config()
-
-        # Update gains to the nT defaults
-        self.to_pe = straxen.get_to_pe(self.run_id, self.config['gain_model'],
-            self.config['channel_map']['tpc'][1]+1)
-
-        self.config['gains'] = np.divide((1e-8 * 2.25 / 2**14) / (1.6e-19 * 10 * 50),
-                               self.to_pe,
-                               out=np.zeros_like(self.to_pe, ), 
-                               where=self.to_pe!=0)
-
-        if self.config['seed'] != False:
-            np.random.seed(self.config['seed'])
-
-        # We hash the config to load resources. Channel map is immutable and cannot be hashed
-        self.config['channel_map'] = dict(self.config['channel_map'])
-        self.config['channel_map']['sum_signal'] = 800
-        self.config['channels_bottom'] = np.arange(self.config['n_top_pmts'],self.config['n_tpc_pmts'])
-
         self.get_instructions()
         self.check_instructions()
         self._setup()
@@ -400,6 +388,23 @@ class SimulatorPlugin(strax.Plugin):
         overrides = self.config['fax_config_override']
         if overrides is not None:
             self.config.update(overrides)
+
+        # Update gains to the nT defaults
+        self.to_pe = straxen.get_to_pe(self.run_id, self.config['gain_model'],
+                                       self.config['channel_map']['tpc'][1]+1)
+
+        self.config['gains'] = np.divide((1e-8 * 2.25 / 2**14) / (1.6e-19 * 10 * 50),
+                                         self.to_pe,
+                                         out=np.zeros_like(self.to_pe, ),
+                                         where=self.to_pe != 0)
+
+        if self.config['seed']:
+            np.random.seed(self.config['seed'])
+
+        # We hash the config to load resources. Channel map is immutable and cannot be hashed
+        self.config['channel_map'] = dict(self.config['channel_map'])
+        self.config['channel_map']['sum_signal'] = 800
+        self.config['channels_bottom'] = np.arange(self.config['n_top_pmts'], self.config['n_tpc_pmts'])
 
     def _setup(self):
         # Set in inheriting class
@@ -418,26 +423,29 @@ class SimulatorPlugin(strax.Plugin):
             results = [results]
         last_chunk_time = self.last_chunk_time
         for result in results:
-            if len(result) == 0: continue
+            if len(result) == 0:
+                continue
             if result['time'][0] < self.last_chunk_time + 1000:
                 raise RuntimeError(
                     "Simulator returned chunks with insufficient spacing. "
                     f"Last chunk's max time was {self.last_chunk_time}, "
                     f"this chunk's first time is {result['time'][0]}.")
-            if len(result) == 1: continue
+            if len(result) == 1:
+                continue
             if np.diff(result['time']).min() < 0:
                 raise RuntimeError("Simulator returned non-sorted records!")
             
             last_chunk_time = max(result['time'].max(), self.last_chunk_time)
         self.last_chunk_time = last_chunk_time
 
-    def is_ready(self,chunk_i):
+    def is_ready(self, chunk_i):
         """Overwritten to mimic online input plugin.
         Returns False to check source finished;
         Returns True to get next chunk.
         """
-        if 'ready' not in self.__dict__: self.ready = False
-        self.ready ^= True # Flip
+        if 'ready' not in self.__dict__:
+            self.ready = False
+        self.ready ^= True  # Flip
         return self.ready
 
     def source_finished(self):
@@ -468,15 +476,15 @@ class RawRecordsFromFaxNT(SimulatorPlugin):
         self.instructions = self.instructions[~m]
 
         assert np.all(self.instructions['x']**2 + self.instructions['y']**2 < self.config['tpc_radius']**2), \
-                "Interation is outside the TPC"
+            "Interation is outside the TPC"
         assert np.all(self.instructions['z'] < 0.25), \
-                "Interation is outside the TPC"
+            "Interation is outside the TPC"
         assert np.all(self.instructions['amp'] > 0), \
-                "Interaction has zero size"
+            "Interaction has zero size"
 
     def infer_dtype(self):
-        dtype = {data_type:strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH)
-                for data_type in self.provides if data_type != 'truth'}
+        dtype = {data_type: strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH)
+                 for data_type in self.provides if data_type != 'truth'}
         dtype['truth'] = instruction_dtype + truth_extra_dtype
         return dtype
 
@@ -488,7 +496,7 @@ class RawRecordsFromFaxNT(SimulatorPlugin):
         self._sort_check(result[self.provides[0]])
         # To accomodate nveto raw records, should be the first in provide.
 
-        return {data_type:self.chunk(
+        return {data_type: self.chunk(
             start=self.sim.chunk_time_pre,
             end=self.sim.chunk_time,
             data=result[data_type],
@@ -503,26 +511,35 @@ class RawRecordsFromFax1T(RawRecordsFromFaxNT):
 @export
 @strax.takes_config(
     strax.Option('epix_config', track=False, default={},
-                help='Path to epix configuration'),
+                 help='Path to epix configuration'),
     strax.Option('entry_start', default=0, track=False,),
     strax.Option('entry_stop', default=-1, track=False,
-                help='G4 id event number to stop at. If -1 process the entire file'),
+                 help='G4 id event number to stop at. If -1 process the entire file'),
     strax.Option('fax_config_nveto', default=None, track=True,),
+    strax.Option('gain_model_nv', default=('to_pe_constant', 0.01), track=False),
     )
 class RawRecordsFromMcChain(SimulatorPlugin):
     provides = ('raw_records', 'raw_records_he', 'raw_records_aqmon', 'raw_records_nv', 'truth', 'truth_nv')
     data_kind = immutabledict(zip(provides, provides))
 
     def set_config(self,):
-        self.config.update(straxen.get_resource(self.config['fax_config'], fmt='json'))
-        overrides = self.config['fax_config_override']
-        if overrides is not None:
-            self.config.update(overrides)
+        super().set_config()
 
         if 'raw_records_nv' in self.provides:
             self.config_nveto = deepcopy(self.config)
             self.config_nveto.update(straxen.get_resource(self.config_nveto['fax_config_nveto'], fmt='json'))
             self.config_nveto['detector'] = 'XENONnT_neutron_veto'
+            self.config_nveto['channel_map'] = dict(self.config_nveto['channel_map'])
+            self.config_nveto['enable_electron_afterpulses'] = False
+
+            self.to_pe_nveto = straxen.get_to_pe(self.run_id, self.config_nveto['gain_model_nv'],
+                self.config['channel_map']['nveto'][1] - self.config['channel_map']['nveto'][0] + 1)
+
+            self.config_nveto['gains'] = np.divide((2e-9 * 2 / 2**14) / (1.6e-19 * 1 * 50),
+                               self.to_pe_nveto,
+                               out=np.zeros_like(self.to_pe_nveto), 
+                               where=self.to_pe_nveto != 0)
+            self.config_nveto['channels_bottom'] = np.array([], np.int64)
 
     def set_timing(self,):
         """Set timing information in such a way to synchronize instructions for the TPC and nVeto"""
@@ -555,12 +572,13 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             m = (self.instructions_epix['z'] < - self.config['tpc_length']) & (self.instructions_epix['type'] == 2)
             self.instructions_epix = self.instructions_epix[~m]
 
-            assert np.all(self.instructions_epix['x']**2 + self.instructions_epix['y']**2 < self.config['tpc_radius']**2), \
-                    "Interation is outside the TPC"
+            assert np.all(self.instructions_epix['x']**2 + self.instructions_epix['y']**2 <
+                          self.config['tpc_radius']**2), \
+                "Interation is outside the TPC"
             assert np.all(self.instructions_epix['z'] < 0.25), \
-                    "Interation is outside the TPC"
+                "Interation is outside the TPC"
             assert np.all(self.instructions_epix['amp'] > 0), \
-                    "Interaction has zero size"
+                "Interaction has zero size"
             assert all(self.instructions_epix['g4id'] >= self.config['entry_start'])
             assert all(self.instructions_epix['g4id'] < self.config['entry_stop'])
 
@@ -585,12 +603,12 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                 'detector': self.config['detector'],
                 'entry_start': self.config['entry_start'],
                 'entry_stop': self.config['entry_stop'],
-                'input_file': self.config['fax_file'],})
+                'input_file': self.config['fax_file']})
             self.instructions_epix = epix.run_epix.main(
                 epix.run_epix.setup(epix_config),
                 return_wfsim_instructions=True)
             self.g4id.append(self.instructions_epix['g4id'])
-            log.debug("Epix produced %d instructions in tpc" %(len(self.instructions_epix)))
+            log.debug("Epix produced %d instructions in tpc" % (len(self.instructions_epix)))
 
         if 'raw_records_nv' in self.provides:
             self.config_nveto['nv_pmt_ce_factor'] = 1.0
@@ -602,7 +620,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             nv_inst_to_keep &= (self.instructions_nveto['_last'] - self.instructions_nveto['_first']) > 0
             self.instructions_nveto = self.instructions_nveto[nv_inst_to_keep]
             self.g4id.append(self.instructions_nveto['g4id'])
-            log.debug("Epix produced %d instructions in nv" %(len(self.instructions_nveto)))
+            log.debug("Epix produced %d instructions in nv" % (len(self.instructions_nveto)))
 
         self.g4id = np.unique(np.concatenate(self.g4id))
         self.set_timing()
@@ -619,8 +637,10 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             self.sim_nv.truth_buffer = np.zeros(10000, dtype=instruction_dtype + optical_extra_dtype
                                                 + truth_extra_dtype + [('fill', bool)])
 
-            assert '_first' in self.instructions_nveto.dtype.names, 'Require indexing info in optical instruction see optical extra dtype'
-            assert all(self.instructions_nveto['type'] == 1), 'Only s1 type is supported for generating rawdata from optical input'
+            assert '_first' in self.instructions_nveto.dtype.names, 'Require indexing info in optical ' \
+                                                                    'instruction see optical extra dtype'
+            assert all(self.instructions_nveto['type'] == 1), 'Only s1 type ' \
+                                                              'is supported for generating rawdata from optical input'
             time_zero = np.min(self.instructions_epix['time']) if 'raw_records' in self.provides else None
             time_zero_nv = np.min(self.instructions_nveto['time'])
             log.debug(f'Forcing first nveto chunk start at {time_zero} while nveto instruction start at {time_zero_nv}')
@@ -630,8 +650,8 @@ class RawRecordsFromMcChain(SimulatorPlugin):
 
     def infer_dtype(self):
         dtype = dict([(data_type, instruction_dtype + truth_extra_dtype) if 'truth' in data_type
-            else (data_type, strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH))
-            for data_type in self.provides])
+                      else (data_type, strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH))
+                      for data_type in self.provides])
         return dtype
 
     def compute(self):
@@ -677,6 +697,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
         return source_finished
 
 
+@export
 class RawRecordsFromFaxnVeto(RawRecordsFromMcChain):
     provides = ('raw_records_nv', 'truth_nv')
     data_kind = immutabledict(zip(provides, provides))
