@@ -49,10 +49,7 @@ class Resource:
         if config is None:
             config = dict()
 
-        files = {
-            'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
-            'noise_file': 'x1t_noise_170203_0850_00_small.npz',}
-
+        files = {}
         if config['detector'] == 'XENON1T':
             files.update({
                 'photon_area_distribution': 'XENON1T_spe_distributions.csv',
@@ -62,6 +59,8 @@ class Resource:
                 's2_pattern_map': 'XENON1T_s2_xy_patterns_top_corrected_MCv2.1.0.json.gz',
                 'photon_ap_cdfs': 'x1t_pmt_afterpulse_config.pkl.gz',
                 'fdc_3d': 'XENON1T_FDC_SR1_data_driven_time_dependent_3d_correction_tf_nn_part1_v1.json.gz',
+                'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
+                'noise_file': 'x1t_noise_170203_0850_00_small.npz'
             })
 
         elif config['detector'] == 'XENONnT':
@@ -72,9 +71,15 @@ class Resource:
                 'photon_ap_cdfs': 'XENONnT_pmt_afterpulse_config_012605.json.gz',
                 's2_luminescence': 'XENONnT_GARFIELD_B1d5n_C30n_G1n_A6d5p_T1d5n_PMTs1d5n_FSR0d95n.npz',
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
-                'nv_pmt_qe': 'nveto_pmt_qe.json'
+                'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
+                'noise_file': 'x1t_noise_170203_0850_00_small.npz'
             })
-
+        elif config['detector'] == 'XENONnT_neutron_veto':
+            files.update({
+                'photon_area_distribution': 'XENONnT_spe_distributions_nveto_013071.csv',
+                'nv_pmt_qe': 'nveto_pmt_qe.json',
+                'noise_file': 'xnt_noise_nveto_014901.npz'
+            })
         else:
             raise ValueError(f"Unsupported detector {config['detector']}")
 
@@ -87,11 +92,11 @@ class Resource:
             files['url_base'] = config['url_base']
         elif config['detector'] == "XENON1T":
             files['url_base'] = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/sim_files'
-        elif config['detector'] == "XENONnT":
+        else:
             files['url_base'] = f'https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/{commit}/sim_files'
 
         return files
-        
+
     def __init__(self, config=None):
         files = self._files(config)
         log.debug(f'Getting {files}')
@@ -152,7 +157,7 @@ class Resource:
             if config.get('enable_pmt_afterpulses', False):
                 self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
 
-        if config.get('detector', 'XENONnT') == 'XENONnT':
+        elif config.get('detector', 'XENONnT') == 'XENONnT':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
             if isinstance(self.s1_pattern_map, DummyMap):
                 self.s1_light_yield_map = self.s1_pattern_map.reduce_last_dim()
@@ -192,6 +197,8 @@ class Resource:
             if config.get('enable_pmt_afterpulses', False):
                  self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='json.gz')
 
+        elif config.get('detector') == 'XENONnT_neutron_veto':
+
             # Neutron veto PMT QE as function of wavelength
             if config.get('neutron_veto', False):
                 self.nv_pmt_qe = straxen.get_resource(files['nv_pmt_qe'], fmt='json')
@@ -200,11 +207,11 @@ class Resource:
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
 
         # Electron After Pulses compressed, haven't figure out how pkl.gz works
-        if config.get('enable_electron_afterpulses',False):
+        if config.get('enable_electron_afterpulses', False):
             self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
 
         # Noise sample
-        if config.get('enable_noise',False):
+        if config.get('enable_noise', False):
             self.noise_data = straxen.get_resource(files['noise_file'], fmt='npy')['arr_0'].flatten()
 
         log.debug(f'{self.__class__.__name__} fully initialized')

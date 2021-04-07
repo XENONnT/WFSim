@@ -374,19 +374,17 @@ class SimulatorPlugin(strax.Plugin):
     def setup(self):
         self.set_config()
 
-        c=self.config
-        
         # Update gains to the nT defaults
-        self.to_pe = straxen.get_to_pe(self.run_id, c['gain_model'],
-                              c['channel_map']['tpc'][1]+1)
+        self.to_pe = straxen.get_to_pe(self.run_id, self.config['gain_model'],
+            self.config['channel_map']['tpc'][1]+1)
 
-        c['gains'] = np.divide((1e-8 * 2.25 / 2**14) / (1.6e-19 * 10 * 50),
+        self.config['gains'] = np.divide((1e-8 * 2.25 / 2**14) / (1.6e-19 * 10 * 50),
                                self.to_pe,
                                out=np.zeros_like(self.to_pe, ), 
                                where=self.to_pe!=0)
 
-        if c['seed'] != False:
-            np.random.seed(c['seed'])
+        if self.config['seed'] != False:
+            np.random.seed(self.config['seed'])
 
         # We hash the config to load resources. Channel map is immutable and cannot be hashed
         self.config['channel_map'] = dict(self.config['channel_map'])
@@ -398,11 +396,10 @@ class SimulatorPlugin(strax.Plugin):
         self._setup()
 
     def set_config(self,):
-        c = self.config
-        c.update(straxen.get_resource(c['fax_config'], fmt='json'))
+        self.config.update(straxen.get_resource(self.config['fax_config'], fmt='json'))
         overrides = self.config['fax_config_override']
         if overrides is not None:
-            c.update(overrides)
+            self.config.update(overrides)
 
     def _setup(self):
         # Set in inheriting class
@@ -516,6 +513,17 @@ class RawRecordsFromMcChain(SimulatorPlugin):
     provides = ('raw_records', 'raw_records_he', 'raw_records_aqmon', 'raw_records_nv', 'truth', 'truth_nv')
     data_kind = immutabledict(zip(provides, provides))
 
+    def set_config(self,):
+        self.config.update(straxen.get_resource(self.config['fax_config'], fmt='json'))
+        overrides = self.config['fax_config_override']
+        if overrides is not None:
+            self.config.update(overrides)
+
+        if 'raw_records_nv' in self.provides:
+            self.config_nveto = deepcopy(self.config)
+            self.config_nveto.update(straxen.get_resource(self.config_nveto['fax_config_nveto'], fmt='json'))
+            self.config_nveto['detector'] = 'XENONnT_neutron_veto'
+
     def set_timing(self,):
         """Set timing information in such a way to synchronize instructions for the TPC and nVeto"""
 
@@ -585,9 +593,9 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             log.debug("Epix produced %d instructions in tpc" %(len(self.instructions_epix)))
 
         if 'raw_records_nv' in self.provides:
-            self.config['nv_pmt_ce_factor'] = 1.0
+            self.config_nveto['nv_pmt_ce_factor'] = 1.0
             self.instructions_nveto, self.nveto_channels, self.nveto_timings =\
-                read_optical(self.config)
+                read_optical(self.config_nveto)
             # Why epix removes many of the g4ids?
             min_g4id = np.min(self.g4id[0]) if len(self.g4id) > 0 else 0
             nv_inst_to_keep = self.instructions_nveto['g4id'] >= min_g4id
@@ -604,8 +612,6 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             self.sim = ChunkRawRecords(self.config)
             self.sim_iter = self.sim(self.instructions_epix, progress_bar=False)
         if 'raw_records_nv' in self.provides:
-            self.config_nveto = deepcopy(self.config)
-            self.config_nveto.update(straxen.get_resource(self.config_nveto['fax_config_nveto'], fmt='json'))
             self.sim_nv = ChunkRawRecords(self.config_nveto,
                                           rawdata_generator=RawDataOptical,
                                           channels=self.nveto_channels,
