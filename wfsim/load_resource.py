@@ -97,6 +97,8 @@ class Resource:
         log.debug(f'Getting {files}')
 
         for k, v in files.items():
+            if isinstance(v, list):
+                continue
             if k == 'url_base':
                 continue
             log.debug(f'Obtaining {k} from {v}')
