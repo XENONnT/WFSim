@@ -132,7 +132,9 @@ class Resource:
             if config.get('enable_pmt_afterpulses',False):
                 self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
 
-        if config.get('detector','XENONnT') == 'XENONnT' and not config.get('neutron_veto', False):
+        #if config.get('detector','XENONnT') == 'XENONnT' and not config.get('neutron_veto', False):
+        if config.get('detector','XENONnT') == 'XENONnT':
+            print('Chao!')
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
             if isinstance(self.s1_pattern_map, DummyMap):
                 self.s1_light_yield_map = self.s1_pattern_map.reduce_last_dim()

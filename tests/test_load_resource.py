@@ -34,3 +34,15 @@ def test_load_nt():
     }
     result = load_config(config)
     return result, config
+
+
+def test_load_nt_nveto():
+    config = {
+        "detector": "XENONnT",
+        "neutron_veto": True,
+        "enable_noise": True,
+        "url_base": "https://raw.githubusercontent.com/XENONnT/WFSim/1a83938b43098d446f518cbbc82514ed12d607d1/files",
+        "photon_area_distribution": "XENONnT_spe_distributions_single_channel.csv",
+    }
+    result = load_config(config)
+    return result, config

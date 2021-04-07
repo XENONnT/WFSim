@@ -5,6 +5,7 @@ import wfsim
 import logging
 import os.path as osp
 from .test_load_resource import test_load_nt
+from .test_load_resource import test_load_nt_nveto
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -82,6 +83,43 @@ def test_sim_nT():
         _sanity_check(rr, p)
         log.info(f'All done')
 
+
+
+def test_sim_nT_nveto():
+    """Test the nT nVeto simulator. Works only if one has access to the XENONnT databases"""
+
+    with tempfile.TemporaryDirectory() as tempdir:
+        log.debug(f'Working in {tempdir}')
+        conf = straxen.contexts.xnt_common_config
+        conf['gain_model'] = ('to_pe_constant', 1)# Very naive gain as tentative
+        resource, conf_override = test_load_nt_nveto()
+
+        # The SPE table in this package is for a single channel
+        # We generate the full SPE file for testing here
+        for i in range(1, 120):
+            resource.photon_area_distribution[str(i)] = \
+                resource.photon_area_distribution['0']
+        spe_file = osp.join(tempdir, 'XENONnT_spe_distributions.csv')
+        resource.photon_area_distribution.to_csv(spe_file, index=False)
+        conf_override['photon_area_distribution'] = spe_file
+
+        st = strax.Context(
+            storage=tempdir,
+            config=dict(
+                nchunk=1, event_rate=1, chunk_size=2,
+                detector='XENONnT',
+                fax_config_nveto=('https://raw.githubusercontent.com/XENONnT/WFSim'
+                            '/a412375ad1fc85f30596b2b73cd8ffe5401de42e/files/fax_config_nt_nveto.json'),
+                **conf,
+                fax_config_override=conf_override),
+            **straxen.contexts.common_opts)
+        st.register(wfsim.RawRecordsFromFaxnVeto)
+
+        log.debug(f'Getting raw-records')
+        rr = st.get_array(run_id, 'raw_records_nv')
+        assert len(rr) > 0
+        assert rr['data'].sum() > 0
+        log.info(f'All done')
 
 def _sanity_check(raw_records, peaks):
     assert len(raw_records) > 0
