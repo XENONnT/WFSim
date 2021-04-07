@@ -1267,7 +1267,7 @@ class RawData(object):
                 self._pulses_cache += _pulses
                 self.last_pulse_end_time = max(
                     self.last_pulse_end_time,
-                    np.max([p['right'] for p in _pulses]) * 10)
+                    np.max([p['right'] for p in _pulses]) * self.config['sample_duration'])
 
         # Make new instructions for electron afterpulses, if requested
         if primary_pulse in ['s1', 's2']:

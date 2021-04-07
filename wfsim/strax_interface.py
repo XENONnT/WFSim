@@ -516,7 +516,7 @@ class RawRecordsFromFax1T(RawRecordsFromFaxNT):
     strax.Option('entry_stop', default=-1, track=False,
                  help='G4 id event number to stop at. If -1 process the entire file'),
     strax.Option('fax_config_nveto', default=None, track=True,),
-    strax.Option('gain_model_nv', default=('to_pe_constant', 0.01), track=False),
+    strax.Option('gain_model_nv', default=('to_pe_constant', 0.004), track=False),
     )
 class RawRecordsFromMcChain(SimulatorPlugin):
     provides = ('raw_records', 'raw_records_he', 'raw_records_aqmon', 'raw_records_nv', 'truth', 'truth_nv')
