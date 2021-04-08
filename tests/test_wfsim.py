@@ -31,7 +31,7 @@ def test_sim_1T():
                 nchunk=2, event_rate=1, chunk_size=1,
                 detector='XENON1T',
                 fax_config=('https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files'
-                    '/0813736b133fccf658170207282668177898b47a/sim_files/fax_config_1t.json'),  # noqa
+                    '/f4ea367122f45d1ae0e90e57005a77fef7df8a2c/sim_files/fax_config_1t.json'),  # noqa
                 **straxen.contexts.x1t_common_config),
             **straxen.contexts.common_opts)
         st.register(wfsim.RawRecordsFromFax1T)
@@ -69,7 +69,7 @@ def test_sim_nT():
                 nchunk=1, event_rate=1, chunk_size=2,
                 detector='XENONnT',
                 fax_config=('https://raw.githubusercontent.com/XENONnT/WFSim'
-                '/a412375ad1fc85f30596b2b73cd8ffe5401de42e/files/XENONnT_wfsim_config.json'),
+                '/e890b18f3caab9889a166273580b06f56da5ac58/files/XENONnT_wfsim_config.json'),
                 **conf,
                 fax_config_override=conf_override),
             **straxen.contexts.common_opts)

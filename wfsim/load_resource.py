@@ -61,7 +61,8 @@ class Resource:
                 'photon_ap_cdfs': 'xnt_pmt_afterpulse_config.pkl.gz',
                 's2_luminescence': 'XENONnT_GARFIELD_B1d5n_C30n_G1n_A6d5p_T1d5n_PMTs1d5n_FSR0d95n.npz',
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
-                'nv_pmt_qe_file': 'nveto_pmt_qe.json'
+                'nv_pmt_qe_file': 'nveto_pmt_qe.json',
+                'field_dependencies_map': '',
             })
         else:
             raise ValueError(f"Unsupported detector {config['detector']}")
@@ -166,6 +167,15 @@ class Resource:
                 gas_gap_map = straxen.get_resource(files['gas_gap_map'], fmt='pkl')
                 self.gas_gap_length = lambda positions: gas_gap_map.lookup(*positions.T)
 
+            # Field dependencies 
+            # This config entry a dictionary of 5 items
+            if any(config['enable_field_dependencies'].values()):
+                field_dependencies_map = make_map(files['field_dependencies_map'], fmt='json.gz')
+                def rz_map(z, xy, **kwargs):
+                    r = np.sqrt(xy[:, 0]**2 + xy[:, 1]**2)
+                    return field_dependencies_map(np.array([r, z]).T, **kwargs)
+                self.field_dependencies_map = rz_map
+
             # Photon After Pulses
             if config['enable_pmt_afterpulses']:
                 self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='json.gz')
@@ -216,7 +226,7 @@ class DummyMap():
     def __init__(self, const, shape=()):
         self.const = const
         self.shape = shape
-    def __call__(self, x):
+    def __call__(self, x, **kwargs):
         shape = [len(x)] + list(self.shape)
         return np.ones(shape) * self.const
     def reduce_last_dim(self):
