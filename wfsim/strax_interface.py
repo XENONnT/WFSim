@@ -115,7 +115,7 @@ def _read_optical_nveto(config, events, mask):
     hit_mask &= np.random.rand(len(qes)) <= qes * config.get('nv_pmt_ce_factor', 1.0) / 100
 
     amplitudes, og_offset = [], 0
-    for tmp in events["pmthitID"].array(library="np"):
+    for tmp in events["pmthitID"].array(library="np")[mask]:
         og_length = len(tmp)
         amplitudes.append(hit_mask[og_offset:og_offset + og_length].sum())
         og_offset += og_length
@@ -157,7 +157,7 @@ def read_optical(config):
     ins['x'] = events["xp_pri"].array(library="np").flatten()[mask] / 10.
     ins['y'] = events["yp_pri"].array(library="np").flatten()[mask] / 10.
     ins['z'] = events["zp_pri"].array(library="np").flatten()[mask] / 10.
-    ins['time'] = int(1e7) * np.arange(1, n_events + 1).flatten()[mask]  # Separate the events by a constant dt
+    ins['time'] = int(1e7) * np.arange(1, n_events + 1)  # Separate the events by a constant dt
     ins['event_number'] = np.arange(n_events)
     ins['g4id'] = events['eventid'].array(library="np")[mask]
     ins['type'] = np.repeat(1, n_events)
@@ -268,13 +268,12 @@ class ChunkRawRecords(object):
         records = self.record_buffer[:self.blevel]  # No copying the records from buffer
         log.debug(f'Yielding chunk from {self.rawdata.__class__.__name__} '
                   f'between {self.chunk_time_pre} - {self.chunk_time}')
-        maska = records['time'] <= self.last_digitized_right * self.config['sample_duration']
+        maska = records['time'] <= self.chunk_time
         if self.blevel >= 1:
-            last_digi_time = self.last_digitized_right * self.config['sample_duration']
             max_r_time = records['time'].max()
-            log.debug(f'Truncating data at sample time {last_digi_time}, last record time {max_r_time}')
+            log.debug(f'Truncating data at sample time {self.chunk_time}, last record time {max_r_time}')
         else:
-            log.debug(f'Truncating data at sample time {last_digi_time}, no record is produced')
+            log.debug(f'Truncating data at sample time {self.chunk_time}, no record is produced')
         records = records[maska]
         records = strax.sort_by_time(records)  # Do NOT remove this line
 
@@ -284,13 +283,11 @@ class ChunkRawRecords(object):
         maskb = (
             self.truth_buffer['fill'] &
             # This condition will always be false if self.truth_buffer['t_first_photon'] == np.nan
-            ((self.truth_buffer['t_first_photon']
-             <= self.last_digitized_right * self.config['sample_duration']) |
+            ((self.truth_buffer['t_first_photon'] <= self.chunk_time) |
              # Hence, we need to use this trick to also save these cases (this
              # is what we set the end time to for np.nans)
             (np.isnan(self.truth_buffer['t_first_photon']) &
-             (self.truth_buffer['time']
-              <= self.last_digitized_right * self.config['sample_duration'])
+             (self.truth_buffer['time'] <= self.chunk_time)
             )))
         truth = self.truth_buffer[maskb]   # This is a copy, not a view!
 
@@ -562,7 +559,8 @@ class RawRecordsFromMcChain(SimulatorPlugin):
 
         # For tpc we have multiple instructions per g4id.
         if 'raw_records' in self.provides:
-            i_timings = np.searchsorted(np.unique(self.g4id), self.instructions_epix['g4id'])
+            i_timings = np.searchsorted(np.arange(self.config['entry_start'], self.config['entry_stop']),
+                                        self.instructions_epix['g4id'])
             self.instructions_epix['time'] += timings[i_timings]
 
             extra_long = self.instructions_epix['time'] > (self.config['entry_stop'] + 0.5) / rate
@@ -572,12 +570,9 @@ class RawRecordsFromMcChain(SimulatorPlugin):
 
         # nveto instruction doesn't carry physical time delay, so the time is overwritten
         if 'raw_records_nv' in self.provides:
-            i_timings = np.searchsorted(np.unique(self.g4id), self.instructions_nveto['g4id'])
+            i_timings = np.searchsorted(np.arange(self.config['entry_start'], self.config['entry_stop']),
+                                        self.instructions_nveto['g4id'])
             self.instructions_nveto['time'] = timings[i_timings]
-            extra_long = self.instructions_nveto['time'] > (self.config['entry_stop'] + 0.5) / rate
-            self.instructions_nveto = self.instructions_nveto[~extra_long]
-            log.warning('Found and removing %d nveto instructions later than maximum time %d'
-                        % (extra_long.sum(), max_time))
 
     def check_instructions(self):
         if 'raw_records' in self.provides:
