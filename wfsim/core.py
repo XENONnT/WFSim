@@ -17,7 +17,7 @@ logging.basicConfig(handlers=[
     # logging.handlers.WatchedFileHandler('wfsim.log'),
     logging.StreamHandler()])
 log = logging.getLogger('wfsim.core')
-log.setLevel('INFO')
+log.setLevel('WARNING')
 
 PULSE_TYPE_NAMES = ('RESERVED', 's1', 's2', 'unknown', 'pi_el', 'pmt_ap', 'pe_el')
 _cached_pmt_current_templates = {}
@@ -1161,7 +1161,7 @@ class RawData(object):
         # int(type) by design S1-esque being odd, S2-esque being even
         # thus type%2-1 is 0:S1-esque;  -1:S2-esque
         # Make a list of clusters of instructions, with gap smaller then rext
-        inst_time = instructions['time'] + instructions['z'] / v * (instructions['type'] % 2 - 1)
+        inst_time = instructions['time'] + (instructions['z'] / v * (instructions['type'] % 2 - 1)).astype(np.int64)
         inst_queue = np.argsort(inst_time)
         inst_queue = np.split(inst_queue, np.where(np.diff(inst_time[inst_queue]) > rext)[0]+1)
 
@@ -1173,7 +1173,6 @@ class RawData(object):
         if progress_bar:
             pbar = tqdm(total=len(inst_queue), desc='Simulating Raw Records')
         while not self.source_finished:
-            log.info('Source not finished with %d')
             # A) Add a new instruction into buffer
             try:
                 ixs = inst_queue.pop(0)  # The index from original instruction list
@@ -1190,8 +1189,8 @@ class RawData(object):
             # B) Cluster instructions again with gap size <= rext
             instb_indx = np.where(instb_filled)[0]
             instb_type = instb[instb_indx]['type']
-            instb_time = instb[instb_indx]['time'] + instb[instb_indx]['z']  \
-                / v * (instb_type % 2 - 1)
+            instb_time = instb[instb_indx]['time'] + \
+                         (instb[instb_indx]['z']  / v * (instb_type % 2 - 1)).astype(np.int64)
             instb_queue = np.argsort(instb_time,  kind='stable')
             instb_queue = np.split(instb_queue, 
                                    np.where(np.diff(instb_time[instb_queue]) > rext)[0]+1)
@@ -1293,7 +1292,7 @@ class RawData(object):
             self.left = np.min([p['left'] for p in self._pulses_cache]) - self.config['trigger_window']
             self.right = np.max([p['right'] for p in self._pulses_cache]) + self.config['trigger_window']
             pulse_length = self.right - self.left
-            log.info(f'Digitizing pulse from {self.left} - {self.right} of {pulse_length} samples')
+            log.debug(f'Digitizing pulse from {self.left} - {self.right} of {pulse_length} samples')
             assert self.right - self.left < 1000000, "Pulse cache too long"
 
             if self.left % 2 != 0:

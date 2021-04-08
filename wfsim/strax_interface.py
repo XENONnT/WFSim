@@ -40,9 +40,7 @@ truth_extra_dtype = [(('End time of the interaction [ns]', 'endtime'), np.int64)
                      ('t_first_electron', np.float), ('t_last_electron', np.float),
                      ('t_mean_electron', np.float), ('t_sigma_electron', np.float)]
 
-logging.basicConfig(handlers=[
-    # logging.handlers.WatchedFileHandler('wfsim.log'),
-    logging.StreamHandler()])
+logging.basicConfig(handlers=[logging.StreamHandler()])
 log = logging.getLogger('wfsim.interface')
 log.setLevel('DEBUG')
 
@@ -84,7 +82,7 @@ def _read_optical_nveto(config, events, mask):
     returns two flatterned nested arrays of channels and timings, 
     """
     channels = np.hstack(events["pmthitID"].array(library="np")[mask])
-    timings = np.hstack(events["pmthitTime"].array(library="np")[mask] * 1e9)
+    timings = np.hstack(events["pmthitTime"].array(library="np")[mask] * 1e9).astype(np.int64)
 
     constant_hc = 1239.841984  # (eV*nm) to calculate (wavelength lambda) = h * c / energy
     wavelengths = np.hstack(constant_hc / events["pmthitEnergy"].array(library="np")[mask])
@@ -94,11 +92,11 @@ def _read_optical_nveto(config, events, mask):
     nveto_channels = np.arange(config['channel_map']['nveto'][0], config['channel_map']['nveto'][1] + 1)
     if h not in _cached_wavelength_to_qe_arr:
         resource = load_config(config)
-        if getattr(resource, 'nv_pmt_qe_data', None) is None:
+        if getattr(resource, 'nv_pmt_qe', None) is None:
             log.warning('nv pmt qe data not specified all qe default to 100 %')
             _cached_wavelength_to_qe_arr[h] = np.ones([len(nveto_channels), 1000]) * 100
         else:
-            qe_data = resource.nv_pmt_qe_data
+            qe_data = resource.nv_pmt_qe
             wavelength_to_qe_arr = np.zeros([len(nveto_channels), 1000])
             for ich, channel in enumerate(nveto_channels):
                 wavelength_to_qe_arr[ich] = interp1d(qe_data['nv_pmt_qe_wavelength'],
@@ -144,14 +142,14 @@ def read_optical(config):
             & (g4id >= config.get('entry_start', 0)))
     n_events = len(g4id[mask])
 
-    if config['neutron_veto']:
+    if config['detector'] == 'XENONnT_neutron_veto':
         channels, timings, amplitudes = _read_optical_nveto(config, events, mask)
         # Still need to shift nveto channel for simulation code to work
         channels -= config['channel_map']['nveto'][0]
     else:
         # TPC
         channels = np.hstack(events["pmthitID"].array(library="np")[mask])
-        timings = np.hstack(events["pmthitTime"].array(library="np")[mask]) * 1e9
+        timings = np.hstack(events["pmthitTime"].array(library="np")[mask] * 1e9).astype(np.int64)
         amplitudes = np.array([len(tmp) for tmp in events["pmthitID"].array(library="np")[mask]])
 
     # Events should be in the TPC
@@ -167,6 +165,9 @@ def read_optical(config):
     ins['_first'] = np.cumsum(amplitudes) - amplitudes
     ins['_last'] = np.cumsum(amplitudes)
 
+    # Subtract the majority of the time delay
+    ins['time'] += timings[ins['_first']]
+    timings -= np.repeat(timings[ins['_first']], amplitudes)
     return ins, channels, timings
 
 
@@ -214,7 +215,6 @@ class ChunkRawRecords(object):
         # Save the constants as privates
         self.blevel = 0  # buffer_filled_level
         self.chunk_time_pre = time_zero - rext if time_zero else np.min(instructions['time']) - rext
-        self.chunk_time_pre = (self.chunk_time_pre // cksz) * cksz
         self.chunk_time = self.chunk_time_pre + cksz  # Starting chunk
         self.current_digitized_right = self.last_digitized_right = 0
         for channel, left, right, data in self.rawdata(instructions=instructions,
@@ -228,7 +228,8 @@ class ChunkRawRecords(object):
                 self.current_digitized_right = self.rawdata.right
 
             if self.rawdata.left * dt > self.chunk_time + rext:
-                log.debug(f'Chunk data at chunk time {self.chunk_time}, next pulse start at {self.rawdata.left}')
+                next_left_time = self.rawdata.left * dt
+                log.debug(f'Pause sim loop at {self.chunk_time}, next pulse start at {next_left_time}')
                 if (self.last_digitized_right + 1) * dt > self.chunk_time:
                     extend = (self.last_digitized_right + 1) * dt - self.chunk_time
                     self.chunk_time += extend 
@@ -269,10 +270,11 @@ class ChunkRawRecords(object):
                   f'between {self.chunk_time_pre} - {self.chunk_time}')
         maska = records['time'] <= self.last_digitized_right * self.config['sample_duration']
         if self.blevel >= 1:
-            maxrtime = records['time'].max()
-            log.debug(f'Truncating data at sample {self.last_digitized_right} while last records start at {maxrtime}')
+            last_digi_time = self.last_digitized_right * self.config['sample_duration']
+            max_r_time = records['time'].max()
+            log.debug(f'Truncating data at sample time {last_digi_time}, last record time {max_r_time}')
         else:
-            log.debug(f'Truncating data at sample {self.last_digitized_right} while no records is produced')
+            log.debug(f'Truncating data at sample time {last_digi_time}, no record is produced')
         records = records[maska]
         records = strax.sort_by_time(records)  # Do NOT remove this line
 
@@ -309,7 +311,7 @@ class ChunkRawRecords(object):
         _truth.sort(order='time')
 
         # Oke this will be a bit ugly but it's easy
-        if self.config['detector'] == 'XENON1T':
+        if self.config['detector'] == 'XENON1T' or self.config['detector'] == 'XENONnT_neutron_veto':
             yield dict(raw_records=records,
                        truth=_truth)
         elif self.config['detector'] == 'XENONnT':
@@ -516,7 +518,7 @@ class RawRecordsFromFax1T(RawRecordsFromFaxNT):
     strax.Option('entry_stop', default=-1, track=False,
                  help='G4 id event number to stop at. If -1 process the entire file'),
     strax.Option('fax_config_nveto', default=None, track=True,),
-    strax.Option('gain_model_nv', default=('to_pe_constant', 0.004), track=False),
+    strax.Option('gain_model_nv', default=('to_pe_constant', 0.01), track=False),
     )
 class RawRecordsFromMcChain(SimulatorPlugin):
     provides = ('raw_records', 'raw_records_he', 'raw_records_aqmon', 'raw_records_nv', 'truth', 'truth_nv')
@@ -550,21 +552,32 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             self.config['entry_stop'] = np.max(self.g4id) + 1
 
         # Convert rate from Hz to ns^-1
-        rate = self.config['event_rate'] / 1000000000
+        rate = self.config['event_rate'] / 1e9
         # Add half interval to avoid time 0
         timings = np.random.uniform((self.config['entry_start'] + 0.5) / rate, 
                                     (self.config['entry_stop'] + 0.5) / rate, 
                                     self.config['entry_stop'] - self.config['entry_start'])
         timings = np.sort(timings).astype(np.int64)
+        max_time = int((self.config['entry_stop'] + 0.5) / rate)
 
         # For tpc we have multiple instructions per g4id.
         if 'raw_records' in self.provides:
             i_timings = np.searchsorted(np.unique(self.g4id), self.instructions_epix['g4id'])
             self.instructions_epix['time'] += timings[i_timings]
+
+            extra_long = self.instructions_epix['time'] > (self.config['entry_stop'] + 0.5) / rate
+            self.instructions_epix = self.instructions_epix[~extra_long]
+            log.warning('Found and removing %d epix instructions later than maximum time %d'
+                        % (extra_long.sum(), max_time))
+
         # nveto instruction doesn't carry physical time delay, so the time is overwritten
         if 'raw_records_nv' in self.provides:
             i_timings = np.searchsorted(np.unique(self.g4id), self.instructions_nveto['g4id'])
             self.instructions_nveto['time'] = timings[i_timings]
+            extra_long = self.instructions_nveto['time'] > (self.config['entry_stop'] + 0.5) / rate
+            self.instructions_nveto = self.instructions_nveto[~extra_long]
+            log.warning('Found and removing %d nveto instructions later than maximum time %d'
+                        % (extra_long.sum(), max_time))
 
     def check_instructions(self):
         if 'raw_records' in self.provides:
@@ -615,9 +628,10 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             self.instructions_nveto, self.nveto_channels, self.nveto_timings =\
                 read_optical(self.config_nveto)
             # Why epix removes many of the g4ids?
-            min_g4id = np.min(self.g4id[0]) if len(self.g4id) > 0 else 0
-            nv_inst_to_keep = self.instructions_nveto['g4id'] >= min_g4id
-            nv_inst_to_keep &= (self.instructions_nveto['_last'] - self.instructions_nveto['_first']) > 0
+            # Remove nveto event if no tpc event of the same g4id is found
+            if len(self.g4id) > 0:
+                nv_inst_to_keep = np.isin(self.instructions_nveto['g4id'], self.g4id[0])
+                nv_inst_to_keep &= (self.instructions_nveto['_last'] - self.instructions_nveto['_first']) > 0
             self.instructions_nveto = self.instructions_nveto[nv_inst_to_keep]
             self.g4id.append(self.instructions_nveto['g4id'])
             log.debug("Epix produced %d instructions in nv" % (len(self.instructions_nveto)))
@@ -628,7 +642,10 @@ class RawRecordsFromMcChain(SimulatorPlugin):
     def _setup(self):
         if 'raw_records' in self.provides:
             self.sim = ChunkRawRecords(self.config)
-            self.sim_iter = self.sim(self.instructions_epix, progress_bar=False)
+            self.sim_iter = self.sim(self.instructions_epix,
+                                     time_zero=int((self.config['entry_start'] + 0.5) / self.config['event_rate'] * 1e9),
+                                     progress_bar=False)
+
         if 'raw_records_nv' in self.provides:
             self.sim_nv = ChunkRawRecords(self.config_nveto,
                                           rawdata_generator=RawDataOptical,
@@ -641,11 +658,8 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                                                                     'instruction see optical extra dtype'
             assert all(self.instructions_nveto['type'] == 1), 'Only s1 type ' \
                                                               'is supported for generating rawdata from optical input'
-            time_zero = np.min(self.instructions_epix['time']) if 'raw_records' in self.provides else None
-            time_zero_nv = np.min(self.instructions_nveto['time'])
-            log.debug(f'Forcing first nveto chunk start at {time_zero} while nveto instruction start at {time_zero_nv}')
             self.sim_nv_iter = self.sim_nv(self.instructions_nveto,
-                                           time_zero=time_zero,
+                                           time_zero=int((self.config['entry_start'] + 0.5) / self.config['event_rate'] * 1e9),
                                            progress_bar=False)
 
     def infer_dtype(self):
@@ -655,18 +669,33 @@ class RawRecordsFromMcChain(SimulatorPlugin):
         return dtype
 
     def compute(self):
+        log.debug('Full chain plugin calling compute')
         if 'raw_records' in self.provides:
             try:
                 result = next(self.sim_iter)
             except StopIteration:
-                raise RuntimeError("Bug in chunk count computation")
+                if self.sim.source_finished():
+                    log.debug('TPC instructions are already depleted')
+                    result = dict([(data_type, np.zeros(0, self.dtype_for(data_type)))
+                                    for data_type in self.provides if 'nv' not in data_type])
+                    self.sim.chunk_time = self.sim_nv.chunk_time
+                    self.sim.chunk_time_pre = self.sim_nv.chunk_time_pre
+                else:
+                    raise RuntimeError("Bug in getting source finished")
 
         if 'raw_records_nv' in self.provides:
             try:
                 result_nv = next(self.sim_nv_iter)
                 result_nv['raw_records']['channel'] += self.config['channel_map']['nveto'][0]
             except StopIteration:
-                raise RuntimeError("Bug in chunk count computation")            
+                if self.sim_nv.source_finished():
+                    log.debug('nVeto instructions are already depleted')
+                    result_nv = dict([(data_type.strip('_nv'), np.zeros(0, self.dtype_for(data_type)))
+                                       for data_type in self.provides if 'nv' in data_type])
+                    self.sim_nv.chunk_time = self.sim.chunk_time
+                    self.sim_nv.chunk_time_pre = self.sim.chunk_time_pre
+                else:
+                    raise RuntimeError("Bug in getting source finished")
 
         chunk = {}
         for data_type in self.provides:

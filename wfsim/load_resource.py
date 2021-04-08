@@ -100,7 +100,7 @@ class Resource:
 
     def __init__(self, config=None):
         files = self.file_config(config)
-        log.debug(f'Getting {files}')
+        log.debug('Getting\n' + '\n'.join([f'{k}: {v}' for k, v in files.items()]))
 
         for k, v in files.items():
             if isinstance(v, list):
