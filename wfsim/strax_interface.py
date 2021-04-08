@@ -510,12 +510,14 @@ class RawRecordsFromFax1T(RawRecordsFromFaxNT):
 @export
 @strax.takes_config(
     strax.Option('epix_config', track=False, default={},
-                 help='Path to epix configuration'),
+                 help='Dict with epix configuration'),
     strax.Option('entry_start', default=0, track=False,),
     strax.Option('entry_stop', default=-1, track=False,
                  help='G4 id event number to stop at. If -1 process the entire file'),
     strax.Option('fax_config_nveto', default=None, track=True,),
+    strax.Option('fax_config_override_nveto', default=None, track=True,help='Dictionary with configuration option overrides'),
     strax.Option('gain_model_nv', default=('to_pe_constant', 0.01), track=False),
+    strax.Option('targets',default=('tpc',),help='tuple with what data to simulate (tpc, nveto or both)',track=False),
     )
 class RawRecordsFromMcChain(SimulatorPlugin):
     provides = ('raw_records', 'raw_records_he', 'raw_records_aqmon', 'raw_records_nv', 'truth', 'truth_nv')
@@ -524,12 +526,14 @@ class RawRecordsFromMcChain(SimulatorPlugin):
     def set_config(self,):
         super().set_config()
 
-        if 'raw_records_nv' in self.provides:
+        if 'nveto' in self.config['targets']:
             self.config_nveto = deepcopy(self.config)
             self.config_nveto.update(straxen.get_resource(self.config_nveto['fax_config_nveto'], fmt='json'))
             self.config_nveto['detector'] = 'XENONnT_neutron_veto'
             self.config_nveto['channel_map'] = dict(self.config_nveto['channel_map'])
-            self.config_nveto['enable_electron_afterpulses'] = False
+            overrides = self.config['fax_config_override_nveto']
+            if overrides is not None:
+                self.config_nveto.update(overrides)
 
             self.to_pe_nveto = straxen.get_to_pe(self.run_id, self.config_nveto['gain_model_nv'],
                 self.config['channel_map']['nveto'][1] - self.config['channel_map']['nveto'][0] + 1)
@@ -558,7 +562,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
         max_time = int((self.config['entry_stop'] + 0.5) / rate)
 
         # For tpc we have multiple instructions per g4id.
-        if 'raw_records' in self.provides:
+        if 'tpc' in self.config['targets']:
             i_timings = np.searchsorted(np.arange(self.config['entry_start'], self.config['entry_stop']),
                                         self.instructions_epix['g4id'])
             self.instructions_epix['time'] += timings[i_timings]
@@ -569,13 +573,13 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                         % (extra_long.sum(), max_time))
 
         # nveto instruction doesn't carry physical time delay, so the time is overwritten
-        if 'raw_records_nv' in self.provides:
+        if 'nveto' in self.config['targets']:
             i_timings = np.searchsorted(np.arange(self.config['entry_start'], self.config['entry_stop']),
                                         self.instructions_nveto['g4id'])
             self.instructions_nveto['time'] = timings[i_timings]
 
     def check_instructions(self):
-        if 'raw_records' in self.provides:
+        if 'tpc' in self.config['targets']:
             # Let below cathode S1 instructions pass but remove S2 instructions
             m = (self.instructions_epix['z'] < - self.config['tpc_length']) & (self.instructions_epix['type'] == 2)
             self.instructions_epix = self.instructions_epix[~m]
@@ -590,7 +594,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             assert all(self.instructions_epix['g4id'] >= self.config['entry_start'])
             assert all(self.instructions_epix['g4id'] < self.config['entry_stop'])
 
-        if 'raw_records_nv' in self.provides:
+        if 'nveto' in self.config['targets']:
             assert all(self.instructions_nveto['g4id'] >= self.config['entry_start'])
             assert all(self.instructions_nveto['g4id'] < self.config['entry_stop'])
 
@@ -604,7 +608,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
         """
 
         self.g4id = []
-        if 'raw_records' in self.provides:
+        if 'tpc' in self.config['targets']:
             import epix
             epix_config = deepcopy(self.config['epix_config'])  # dictionary directly fed to context
             epix_config.update({
@@ -618,7 +622,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             self.g4id.append(self.instructions_epix['g4id'])
             log.debug("Epix produced %d instructions in tpc" % (len(self.instructions_epix)))
 
-        if 'raw_records_nv' in self.provides:
+        if 'nveto' in self.config['targets']:
             self.config_nveto['nv_pmt_ce_factor'] = 1.0
             self.instructions_nveto, self.nveto_channels, self.nveto_timings =\
                 read_optical(self.config_nveto)
@@ -635,13 +639,13 @@ class RawRecordsFromMcChain(SimulatorPlugin):
         self.set_timing()
 
     def _setup(self):
-        if 'raw_records' in self.provides:
+        if 'tpc' in self.config['targets']:
             self.sim = ChunkRawRecords(self.config)
             self.sim_iter = self.sim(self.instructions_epix,
                                      time_zero=int((self.config['entry_start'] + 0.5) / self.config['event_rate'] * 1e9),
-                                     progress_bar=False)
+                                     progress_bar=True)
 
-        if 'raw_records_nv' in self.provides:
+        if 'nveto' in self.config['targets']:
             self.sim_nv = ChunkRawRecords(self.config_nveto,
                                           rawdata_generator=RawDataOptical,
                                           channels=self.nveto_channels,
@@ -655,7 +659,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                                                               'is supported for generating rawdata from optical input'
             self.sim_nv_iter = self.sim_nv(self.instructions_nveto,
                                            time_zero=int((self.config['entry_start'] + 0.5) / self.config['event_rate'] * 1e9),
-                                           progress_bar=False)
+                                           progress_bar=True)
 
     def infer_dtype(self):
         dtype = dict([(data_type, instruction_dtype + truth_extra_dtype) if 'truth' in data_type
@@ -665,7 +669,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
 
     def compute(self):
         log.debug('Full chain plugin calling compute')
-        if 'raw_records' in self.provides:
+        if 'tpc' in self.config['targets']:
             try:
                 result = next(self.sim_iter)
             except StopIteration:
@@ -678,7 +682,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                 else:
                     raise RuntimeError("Bug in getting source finished")
 
-        if 'raw_records_nv' in self.provides:
+        if 'nveto' in self.config['targets']:
             try:
                 result_nv = next(self.sim_nv_iter)
                 result_nv['raw_records']['channel'] += self.config['channel_map']['nveto'][0]
@@ -714,9 +718,9 @@ class RawRecordsFromMcChain(SimulatorPlugin):
     def source_finished(self):
         """Return whether all instructions has been used."""
         source_finished = True
-        if 'raw_records' in self.provides:
+        if 'tpc' in self.config['targets']:
             source_finished &= self.sim.source_finished()
-        if 'raw_records_nv' in self.provides:
+        if 'nveto' in self.config['targets']:
             source_finished &= self.sim_nv.source_finished()
         return source_finished
 
