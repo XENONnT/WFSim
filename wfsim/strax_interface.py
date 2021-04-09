@@ -136,7 +136,7 @@ def read_optical(config):
 
     # Slightly weird here. Entry_stop is not in the regular config, so if it's not skip this part
     g4id = events['eventid'].array(library="np")
-    if config.get('entry_stop', -1) == -1:
+    if config.get('entry_stop', None) is None:
         config['entry_stop'] = np.max(g4id) + 1
 
     mask = ((g4id < config.get('entry_stop', int(2**63-1)))
@@ -513,7 +513,7 @@ class RawRecordsFromFax1T(RawRecordsFromFaxNT):
     strax.Option('epix_config', track=False, default={},
                  help='Dict with epix configuration'),
     strax.Option('entry_start', default=0, track=False,),
-    strax.Option('entry_stop', default=-1, track=False,
+    strax.Option('entry_stop', default=None, track=False,
                  help='G4 id event number to stop at. If -1 process the entire file'),
     strax.Option('fax_config_nveto', default=None, track=True,),
     strax.Option('fax_config_override_nveto', default=None, track=True,
@@ -551,11 +551,11 @@ class RawRecordsFromMcChain(SimulatorPlugin):
         """Set timing information in such a way to synchronize instructions for the TPC and nVeto"""
 
         # If no event_stop is specified set it to the maximum (-1=do all events)
-        if self.config['entry_stop'] == -1:
+        if self.config['entry_stop'] is None:
             self.config['entry_start'] = np.min(self.g4id)
             self.config['entry_stop'] = np.max(self.g4id) + 1
-        log.debug('Entry stop set at %d, max g4id at %d'
-                  % (self.config['entry_stop'], np.max(self.g4id)))
+        log.debug('Entry stop set at %d, g4id min %d max %d'
+                  % (self.config['entry_stop'], np.min(self.g4id), np.max(self.g4id)))
 
         # Convert rate from Hz to ns^-1
         rate = self.config['event_rate'] / 1e9
