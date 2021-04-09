@@ -110,6 +110,7 @@ def _read_optical_nveto(config, events, mask):
     hit_mask = (channels >= nveto_channels[0]) & (channels <= nveto_channels[-1])
     channels[~hit_mask] = nveto_channels[0]
 
+    wavelengths[(wavelengths < 0) | (wavelengths >= 999)] = 0
     qes = _cached_wavelength_to_qe_arr[h][channels - nveto_channels[0],
                                           np.around(wavelengths).astype(np.int64)]
     hit_mask &= np.random.rand(len(qes)) <= qes * config.get('nv_pmt_ce_factor', 1.0) / 100
@@ -341,7 +342,7 @@ class ChunkRawRecords(object):
                  help="Duration of each chunk in seconds"),
     strax.Option('nchunk', default=10, track=False,
                  help="Number of chunks to simulate"),
-    strax.Option('right_raw_extension', default=500000),
+    strax.Option('right_raw_extension', default=100000),
     strax.Option('timeout', default=1800,
                  help="Terminate processing if any one mailbox receives "
                       "no result for more than this many seconds"),
@@ -515,10 +516,12 @@ class RawRecordsFromFax1T(RawRecordsFromFaxNT):
     strax.Option('entry_stop', default=-1, track=False,
                  help='G4 id event number to stop at. If -1 process the entire file'),
     strax.Option('fax_config_nveto', default=None, track=True,),
-    strax.Option('fax_config_override_nveto', default=None, track=True,help='Dictionary with configuration option overrides'),
+    strax.Option('fax_config_override_nveto', default=None, track=True,
+                 help='Dictionary with configuration option overrides'),
     strax.Option('gain_model_nv', default=('to_pe_constant', 0.01), track=False),
-    strax.Option('targets',default=('tpc',),help='tuple with what data to simulate (tpc, nveto or both)',track=False),
-    )
+    strax.Option('targets', default=('tpc',), track=False,
+                 help='tuple with what data to simulate (tpc, nveto or both)')
+)
 class RawRecordsFromMcChain(SimulatorPlugin):
     provides = ('raw_records', 'raw_records_he', 'raw_records_aqmon', 'raw_records_nv', 'truth', 'truth_nv')
     data_kind = immutabledict(zip(provides, provides))
@@ -551,6 +554,8 @@ class RawRecordsFromMcChain(SimulatorPlugin):
         if self.config['entry_stop'] == -1:
             self.config['entry_start'] = np.min(self.g4id)
             self.config['entry_stop'] = np.max(self.g4id) + 1
+        log.debug('Entry stop set at %d, max g4id at %d'
+                  % (self.config['entry_stop'], np.max(self.g4id)))
 
         # Convert rate from Hz to ns^-1
         rate = self.config['event_rate'] / 1e9

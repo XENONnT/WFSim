@@ -17,7 +17,7 @@ logging.basicConfig(handlers=[
     # logging.handlers.WatchedFileHandler('wfsim.log'),
     logging.StreamHandler()])
 log = logging.getLogger('wfsim.core')
-log.setLevel('WARNING')
+log.setLevel('DEBUG')
 
 PULSE_TYPE_NAMES = ('RESERVED', 's1', 's2', 'unknown', 'pi_el', 'pmt_ap', 'pe_el')
 _cached_pmt_current_templates = {}
@@ -1205,27 +1205,37 @@ class RawData(object):
             for ibqs in instb_queue:
                 for ptype in [1, 2, 4, 6]:  # S1 S2 PI Gate
                     mask = instb_type[ibqs] == ptype
-                    if np.sum(mask) == 0:
+                    if mask.sum() == 0:
                         continue  # No such instruction type
-                    instb_run = instb_indx[ibqs[mask]]  # Take hold of todo list
 
-                    if self.symtype(ptype) in ['s1', 's2']:
-                        stop_at_this_group = True  # Stop group iteration
-                        _instb_run = np.array_split(instb_run, len(instb_run))
+                    if ptype == 1:
+                        stop_at_this_group = True
+                        # Group S1 within 100 ns apart, truth info would be summarized within the group
+                        instb_run = np.split(instb_indx[ibqs[mask]],
+                                             np.where(np.diff(instb_time[ibqs[mask]]) > 100)[0] + 1)
+                    elif ptype == 2:
+                        stop_at_this_group = True
+                        # Group S2 within 2 mm apart, truth info would be summarized within the group
+                        instb_run = np.split(instb_indx[ibqs[mask]], 
+                                             np.where(np.diff(instb_time[ibqs[mask]]) > int(0.2 / v))[0] + 1)
                     else:
-                        _instb_run = [instb_run]  # Small trick to make truth small
+                        instb_run = [instb_indx[ibqs[mask]]]
 
                     # Run pulse simulation for real
-                    for instb_run in _instb_run:
-                        for instb_secondary in self.sim_data(instb[instb_run]):
+                    n_set = len(instb_run)
+                    for i_set, instb_run_i in enumerate(instb_run):
+                        if 'g4id' in instructions.dtype.names:
+                            g4id = instb[instb_run_i]['g4id'][0]
+                            log.debug(f'Making S{ptype} pulse set ({i_set+1}/{n_set}) for g4 event {g4id}')
+                        for instb_secondary in self.sim_data(instb[instb_run_i]):
                             ib = np.where(~instb_filled)[0][:len(instb_secondary)]
                             instb[ib] = instb_secondary
                             instb_filled[ib] = True
 
                         if len(truth_buffer):  # Extract truth info
-                            self.get_truth(instb[instb_run], truth_buffer)
+                            self.get_truth(instb[instb_run_i], truth_buffer)
 
-                        instb_filled[instb_run] = False  # Free buffer AFTER copyting into truth buffer
+                        instb_filled[instb_run_i] = False  # Free buffer AFTER copyting into truth buffer
 
                 if stop_at_this_group: 
                     break
@@ -1249,6 +1259,7 @@ class RawData(object):
         """
         # Simulate the primary pulse
         primary_pulse = self.symtype(instruction['type'][0])
+
         self.sim_primary(primary_pulse, instruction, **kwargs)
 
         # Add PMT afterpulses, if requested
