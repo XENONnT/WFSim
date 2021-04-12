@@ -103,17 +103,16 @@ def find_optical_t_range(firsts, lasts, timings, tmins, tmaxs, start=0):
 
 
 @numba.njit
-def split_long_optical_pulse(firsts, lasts, timings, channels, tmins):
+def split_long_optical_pulse(firsts, lasts, timings, channels):
     """
     Helper function to split photon timings of a single optical entry into
     two entries if the is a gap longer than PULSE_MAX_DURATION ns.
     """
     for ix in range(len(firsts)):
-        tmin = tmins[ix]
 
         extra_long_time_index = []
         for iy in range(firsts[ix], lasts[ix]):
-            if timings[iy] > tmin + PULSE_MAX_DURATION:
+            if timings[iy] > PULSE_MAX_DURATION:
                 extra_long_time_index.append(iy)
 
         if len(extra_long_time_index) == 0:
@@ -154,16 +153,15 @@ def optical_adjustment(instructions, timings, channels):
                              start=start)
 
         instructions['time'][start:] += tmins[start:]
-        long_pulse = (tmaxs - tmins) > PULSE_MAX_DURATION
-        n_long_pulse = long_pulse[start:].sum()
+        long_pulse = ((tmaxs - tmins) > PULSE_MAX_DURATION) & (np.arange(len(instructions)) >= start)
+        n_long_pulse = long_pulse.sum()
         if n_long_pulse < 1: break
-        start = len(instructions)
 
         extra_inst = []
         for ix, first, last in split_long_optical_pulse(
             instructions['_first'][long_pulse],
             instructions['_last'][long_pulse],
-            timings, channels, tmins[long_pulse]):
+            timings, channels):
 
             tmp = deepcopy(instructions[ix])
             tmp['_first'] = first
@@ -174,9 +172,8 @@ def optical_adjustment(instructions, timings, channels):
         instructions = np.append(instructions, extra_inst)
         tmins = np.hstack([tmins, np.zeros(len(extra_inst), np.int64)])
         tmaxs = np.hstack([tmaxs, np.zeros(len(extra_inst), np.int64)])
-
-    # Reduce the majority of the time delay
-    instructions['time'] += tmins
+        
+        start = len(instructions)
 
     # Instructions is now a copy so return is needed
     return instructions
