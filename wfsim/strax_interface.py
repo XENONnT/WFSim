@@ -1,7 +1,6 @@
 import logging
 
 import numpy as np
-import numba
 import pandas as pd
 import uproot
 
@@ -72,22 +71,7 @@ def rand_instructions(c):
     nelectrons = 10 ** (np.random.uniform(3, 4, n))
     instructions['amp'] = np.vstack([nphotons, nelectrons]).T.flatten().astype(int)
 
-    return instructions
-
-
-@numba.njit
-def _min_timing_per_instruction(firsts, lasts, timings):
-    tmins = np.zeros(len(firsts), dtype=np.int64)
-    for ix in range(len(firsts)):
-        tmin = timings[firsts[ix]]
-        for t in timings[firsts[ix]: lasts[ix]]:
-            # Adding a safty check to avoid including photon happening too early
-            if tmin < - int(1e7):
-                continue
-            if t < tmin:
-                tmin = t
-        tmins[ix] = tmin
-    return tmins
+    return instructionss
 
 
 def _read_optical_nveto(config, events, mask):
