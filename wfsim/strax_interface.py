@@ -759,6 +759,6 @@ class RawRecordsFromFaxnVeto(RawRecordsFromMcChain):
 
 
 @export
-class RawRecordsFromFax1T(RawRecordsFromMcChain):
+class RawRecordsFromMcChain1T(RawRecordsFromMcChain):
     provides = ('raw_records', 'truth')
     data_kind = immutabledict(zip(provides, provides))

@@ -1188,7 +1188,7 @@ class RawData(object):
         inst_queue = np.split(inst_queue, np.where(np.diff(inst_time[inst_queue]) > rext)[0]+1)
 
         # Instruction buffer
-        instb = np.zeros(10000, dtype=instructions.dtype)  # size ~ 1% of size of primary
+        instb = np.zeros(20000, dtype=instructions.dtype)  # size ~ 1% of size of primary
         instb_filled = np.zeros_like(instb, dtype=bool)  # Mask of where buffer is filled
 
         # ik those are illegible, messy logic. lmk if you have a better way
@@ -1250,7 +1250,11 @@ class RawData(object):
                             g4id = instb[instb_run_i]['g4id'][0]
                             log.debug(f'Making S{ptype} pulse set ({i_set+1}/{n_set}) for g4 event {g4id}')
                         for instb_secondary in self.sim_data(instb[instb_run_i]):
-                            ib = np.where(~instb_filled)[0][:len(instb_secondary)]
+                            n_too_much = 0
+                            if len(np.where(~instb_filled)[0]) < len(instb_secondary):
+                                n_too_much = len(instb_secondary) - len(np.where(~instb_filled)[0])
+                                log.warning(f'Running out of instruction buffer removing {n_too_much} secondaries')
+                            ib = np.where(~instb_filled)[0][:len(instb_secondary) - n_too_much]
                             instb[ib] = instb_secondary
                             instb_filled[ib] = True
 
