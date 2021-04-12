@@ -72,8 +72,15 @@ class Resource:
                 'photon_ap_cdfs': 'XENONnT_pmt_afterpulse_config_012605.json.gz',
                 's2_luminescence': 'XENONnT_GARFIELD_B1d5n_C30n_G1n_A6d5p_T1d5n_PMTs1d5n_FSR0d95n.npz',
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
-                'nv_pmt_qe_file': 'nveto_pmt_qe.json',
+                'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
+                'noise_file': 'x1t_noise_170203_0850_00_small.npz',
                 'field_dependencies_map': '',
+             })
+         elif config['detector'] == 'XENONnT_neutron_veto':
+             files.update({
+                 'photon_area_distribution': 'XENONnT_spe_distributions_nveto_013071.csv',
+                 'nv_pmt_qe': 'nveto_pmt_qe.json',
+                 'noise_file': 'xnt_noise_nveto_014901.npz'
             })
         else:
             raise ValueError(f"Unsupported detector {config['detector']}")
