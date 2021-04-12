@@ -343,29 +343,20 @@ class ChunkRawRecords(object):
 
 
 @strax.takes_config(
-    strax.Option('optical', default=False, track=True,
-                 help="Flag for using optical mc for instructions"),
-    strax.Option('seed', default=False, track=True,
-                 help="Option for setting the seed of the random number generator used for"
-                      "generation of the instructions"),
-    strax.Option('fax_file', default=None, track=False,
-                 help="Directory with fax instructions"),
-    strax.Option('fax_config_override', default=None,
-                 help="Dictionary with configuration option overrides"),
+    strax.Option('detector', default='XENONnT', track=True),
     strax.Option('event_rate', default=1000, track=False,
                  help="Average number of events per second"),
     strax.Option('chunk_size', default=100, track=False,
                  help="Duration of each chunk in seconds"),
     strax.Option('nchunk', default=10, track=False,
                  help="Number of chunks to simulate"),
-    strax.Option('right_raw_extension', default=100000),
-    strax.Option('timeout', default=1800,
-                 help="Terminate processing if any one mailbox receives "
-                      "no result for more than this many seconds"),
+    strax.Option('fax_file', default=None, track=False,
+                 help="Directory with fax instructions"), 
     strax.Option('fax_config', default='fax_config_nt_design.json'),
+    strax.Option('fax_config_override', default=None,
+                 help="Dictionary with configuration option overrides"),
     strax.Option('gain_model', default=('to_pe_per_run', 'to_pe_nt.npy'),
                  help='PMT gain model. Specify as (model_type, model_config).'),
-    strax.Option('detector', default='XENONnT', track=True),
     strax.Option('channel_map', track=False, type=immutabledict,
                  help="immutabledict mapping subdetector to (min, max) "
                       "channel number. Provided by context"),
@@ -373,6 +364,13 @@ class ChunkRawRecords(object):
                  help="Number of pmts in tpc. Provided by context"),
     strax.Option('n_top_pmts', track=False,
                  help="Number of pmts in top array. Provided by context"),
+    strax.Option('right_raw_extension', default=100000),
+    strax.Option('timeout', default=1800,
+                 help="Terminate processing if any one mailbox receives "
+                      "no result for more than this many seconds"),
+    strax.Option('seed', default=False, track=False,
+                 help="Option for setting the seed of the random number generator used for"
+                      "generation of the instructions"),
     strax.Option('neutron_veto', default=False, track=False,
                  help="Flag for nVeto optical simulation instead of TPC"),
 )
@@ -588,7 +586,6 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             log.debug("Epix produced %d instructions in tpc" % (len(self.instructions_epix)))
 
         if 'nveto' in self.config['targets']:
-            self.config_nveto['nv_pmt_ce_factor'] = 1.0
             self.instructions_nveto, self.nveto_channels, self.nveto_timings =\
                 read_optical(self.config_nveto)
             # Why epix removes many of the g4ids?
