@@ -632,6 +632,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             self.instructions_epix = self.instructions_epix[~extra_long]
             log.warning('Found and removing %d epix instructions later than maximum time %d'
                         % (extra_long.sum(), max_time))
+            self.instrutions_epix = np.sort(self.instructions_epix, order='time')
 
         # nveto instruction doesn't carry physical time delay, so the time is overwritten
         if 'nveto' in self.config['targets']:
