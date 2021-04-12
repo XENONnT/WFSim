@@ -76,7 +76,7 @@ class Resource:
                 'noise_file': 'x1t_noise_170203_0850_00_small.npz',
                 'field_dependencies_map': '',
              })
-         elif config['detector'] == 'XENONnT_neutron_veto':
+        elif config['detector'] == 'XENONnT_neutron_veto':
              files.update({
                  'photon_area_distribution': 'XENONnT_spe_distributions_nveto_013071.csv',
                  'nv_pmt_qe': 'nveto_pmt_qe.json',
