@@ -1,6 +1,7 @@
 import logging
 
 import numpy as np
+import numba
 import pandas as pd
 import uproot
 
@@ -8,6 +9,7 @@ import strax
 import straxen
 from .core import RawData, RawDataOptical
 from .load_resource import load_config
+from .utils import optical_adjustment
 from immutabledict import immutabledict
 from scipy.interpolate import interp1d
 from copy import deepcopy
@@ -71,6 +73,21 @@ def rand_instructions(c):
     instructions['amp'] = np.vstack([nphotons, nelectrons]).T.flatten().astype(int)
 
     return instructions
+
+
+@numba.njit
+def _min_timing_per_instruction(firsts, lasts, timings):
+    tmins = np.zeros(len(firsts), dtype=np.int64)
+    for ix in range(len(firsts)):
+        tmin = timings[firsts[ix]]
+        for t in timings[firsts[ix]: lasts[ix]]:
+            # Adding a safty check to avoid including photon happening too early
+            if tmin < - int(1e7):
+                continue
+            if t < tmin:
+                tmin = t
+        tmins[ix] = tmin
+    return tmins
 
 
 def _read_optical_nveto(config, events, mask):
@@ -158,7 +175,7 @@ def read_optical(config):
     ins['x'] = events["xp_pri"].array(library="np").flatten()[mask] / 10.
     ins['y'] = events["yp_pri"].array(library="np").flatten()[mask] / 10.
     ins['z'] = events["zp_pri"].array(library="np").flatten()[mask] / 10.
-    ins['time'] = int(1e7) * np.arange(1, n_events + 1)  # Separate the events by a constant dt
+    ins['time'] = np.zeros(n_events, np.int64)
     ins['event_number'] = np.arange(n_events)
     ins['g4id'] = events['eventid'].array(library="np")[mask]
     ins['type'] = np.repeat(1, n_events)
@@ -166,9 +183,8 @@ def read_optical(config):
     ins['_first'] = np.cumsum(amplitudes) - amplitudes
     ins['_last'] = np.cumsum(amplitudes)
 
-    # Subtract the majority of the time delay
-    ins['time'] += timings[ins['_first']]
-    timings -= np.repeat(timings[ins['_first']], amplitudes)
+    # Need to shift the timing and split long pulses
+    ins = optical_adjustment(ins, timings, channels)
     return ins, channels, timings
 
 
@@ -547,62 +563,6 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                                where=self.to_pe_nveto != 0)
             self.config_nveto['channels_bottom'] = np.array([], np.int64)
 
-    def set_timing(self,):
-        """Set timing information in such a way to synchronize instructions for the TPC and nVeto"""
-
-        # If no event_stop is specified set it to the maximum (-1=do all events)
-        if self.config['entry_stop'] is None:
-            self.config['entry_start'] = np.min(self.g4id)
-            self.config['entry_stop'] = np.max(self.g4id) + 1
-        log.debug('Entry stop set at %d, g4id min %d max %d'
-                  % (self.config['entry_stop'], np.min(self.g4id), np.max(self.g4id)))
-
-        # Convert rate from Hz to ns^-1
-        rate = self.config['event_rate'] / 1e9
-        # Add half interval to avoid time 0
-        timings = np.random.uniform((self.config['entry_start'] + 0.5) / rate, 
-                                    (self.config['entry_stop'] + 0.5) / rate, 
-                                    self.config['entry_stop'] - self.config['entry_start'])
-        timings = np.sort(timings).astype(np.int64)
-        max_time = int((self.config['entry_stop'] + 0.5) / rate)
-
-        # For tpc we have multiple instructions per g4id.
-        if 'tpc' in self.config['targets']:
-            i_timings = np.searchsorted(np.arange(self.config['entry_start'], self.config['entry_stop']),
-                                        self.instructions_epix['g4id'])
-            self.instructions_epix['time'] += timings[i_timings]
-
-            extra_long = self.instructions_epix['time'] > (self.config['entry_stop'] + 0.5) / rate
-            self.instructions_epix = self.instructions_epix[~extra_long]
-            log.warning('Found and removing %d epix instructions later than maximum time %d'
-                        % (extra_long.sum(), max_time))
-
-        # nveto instruction doesn't carry physical time delay, so the time is overwritten
-        if 'nveto' in self.config['targets']:
-            i_timings = np.searchsorted(np.arange(self.config['entry_start'], self.config['entry_stop']),
-                                        self.instructions_nveto['g4id'])
-            self.instructions_nveto['time'] = timings[i_timings]
-
-    def check_instructions(self):
-        if 'tpc' in self.config['targets']:
-            # Let below cathode S1 instructions pass but remove S2 instructions
-            m = (self.instructions_epix['z'] < - self.config['tpc_length']) & (self.instructions_epix['type'] == 2)
-            self.instructions_epix = self.instructions_epix[~m]
-
-            assert np.all(self.instructions_epix['x']**2 + self.instructions_epix['y']**2 <
-                          self.config['tpc_radius']**2), \
-                "Interation is outside the TPC"
-            assert np.all(self.instructions_epix['z'] < 0.25), \
-                "Interation is outside the TPC"
-            assert np.all(self.instructions_epix['amp'] > 0), \
-                "Interaction has zero size"
-            assert all(self.instructions_epix['g4id'] >= self.config['entry_start'])
-            assert all(self.instructions_epix['g4id'] < self.config['entry_stop'])
-
-        if 'nveto' in self.config['targets']:
-            assert all(self.instructions_nveto['g4id'] >= self.config['entry_start'])
-            assert all(self.instructions_nveto['g4id'] < self.config['entry_stop'])
-
     def get_instructions(self):
         """
         Run epix and save instructions as self.instructions_epix
@@ -642,6 +602,67 @@ class RawRecordsFromMcChain(SimulatorPlugin):
 
         self.g4id = np.unique(np.concatenate(self.g4id))
         self.set_timing()
+
+    def set_timing(self,):
+        """Set timing information in such a way to synchronize instructions for the TPC and nVeto"""
+
+        # If no event_stop is specified set it to the maximum (-1=do all events)
+        if self.config['entry_stop'] is None:
+            self.config['entry_start'] = np.min(self.g4id)
+            self.config['entry_stop'] = np.max(self.g4id) + 1
+        log.debug('Entry stop set at %d, g4id min %d max %d'
+                  % (self.config['entry_stop'], np.min(self.g4id), np.max(self.g4id)))
+
+        # Convert rate from Hz to ns^-1
+        rate = self.config['event_rate'] / 1e9
+        # Add half interval to avoid time 0
+        timings = np.random.uniform((self.config['entry_start'] + 0.5) / rate, 
+                                    (self.config['entry_stop'] + 0.5) / rate, 
+                                    self.config['entry_stop'] - self.config['entry_start'])
+        timings = np.sort(timings).astype(np.int64)
+        max_time = int((self.config['entry_stop'] + 0.5) / rate)
+
+        # For tpc we have multiple instructions per g4id.
+        if 'tpc' in self.config['targets']:
+            i_timings = np.searchsorted(np.arange(self.config['entry_start'], self.config['entry_stop']),
+                                        self.instructions_epix['g4id'])
+            self.instructions_epix['time'] += timings[i_timings]
+
+            extra_long = self.instructions_epix['time'] > max_time
+            self.instructions_epix = self.instructions_epix[~extra_long]
+            log.warning('Found and removing %d epix instructions later than maximum time %d'
+                        % (extra_long.sum(), max_time))
+
+        # nveto instruction doesn't carry physical time delay, so the time is overwritten
+        if 'nveto' in self.config['targets']:
+            i_timings = np.searchsorted(np.arange(self.config['entry_start'], self.config['entry_stop']),
+                                        self.instructions_nveto['g4id'])
+            self.instructions_nveto['time'] += timings[i_timings]
+
+            extra_long = self.instructions_nveto['time'] > max_time
+            self.instructions_nveto = self.instructions_nveto[~extra_long]
+            log.warning('Found and removing %d nveto instructions later than maximum time %d'
+                        % (extra_long.sum(), max_time))
+
+    def check_instructions(self):
+        if 'tpc' in self.config['targets']:
+            # Let below cathode S1 instructions pass but remove S2 instructions
+            m = (self.instructions_epix['z'] < - self.config['tpc_length']) & (self.instructions_epix['type'] == 2)
+            self.instructions_epix = self.instructions_epix[~m]
+
+            assert np.all(self.instructions_epix['x']**2 + self.instructions_epix['y']**2 <
+                          self.config['tpc_radius']**2), \
+                "Interation is outside the TPC"
+            assert np.all(self.instructions_epix['z'] < 0.25), \
+                "Interation is outside the TPC"
+            assert np.all(self.instructions_epix['amp'] > 0), \
+                "Interaction has zero size"
+            assert all(self.instructions_epix['g4id'] >= self.config['entry_start'])
+            assert all(self.instructions_epix['g4id'] < self.config['entry_stop'])
+
+        if 'nveto' in self.config['targets']:
+            assert all(self.instructions_nveto['g4id'] >= self.config['entry_start'])
+            assert all(self.instructions_nveto['g4id'] < self.config['entry_stop'])
 
     def _setup(self):
         if 'tpc' in self.config['targets']:
@@ -733,4 +754,10 @@ class RawRecordsFromMcChain(SimulatorPlugin):
 @export
 class RawRecordsFromFaxnVeto(RawRecordsFromMcChain):
     provides = ('raw_records_nv', 'truth_nv')
+    data_kind = immutabledict(zip(provides, provides))
+
+
+@export
+class RawRecordsFromFax1T(RawRecordsFromMcChain):
+    provides = ('raw_records', 'truth')
     data_kind = immutabledict(zip(provides, provides))

@@ -57,7 +57,7 @@ class Pulse(object):
         if ('_photon_timings' not in self.__dict__) or \
                 ('_photon_channels' not in self.__dict__):
             raise NotImplementedError
-        
+
         # The pulse cache should be immediately transferred after call this function
         self.clear_pulse_cache()
 
@@ -1528,10 +1528,15 @@ class RawDataOptical(RawData):
                 self.pulses[primary_pulse].clear_pulse_cache()
             else:
                 ixs = np.hstack(ixs).astype(int)
+                # Some photons come too early or late, exceeding memory allocation
+                nveto_cutoff = self.config.get('nveto_time_max_cutoff', int(1e6))
+                mask = (self.timings[ixs] >= 0) & (self.timings[ixs] < nveto_cutoff)
+                if (~mask).sum() > 0:
+                    log.debug('Removing %d photons from optical input' % ((~mask).sum()))
                 # By channel sorting is needed due to a speed boosting trick in pulse generation
-                sorted_index = np.argsort(self.channels[ixs])
-                self.pulses[primary_pulse]._photon_channels = self.channels[ixs][sorted_index]
-                self.pulses[primary_pulse]._photon_timings = (self.timings[ixs] + event_time)[sorted_index]
+                sorted_index = np.argsort(self.channels[ixs][mask])
+                self.pulses[primary_pulse]._photon_channels = self.channels[ixs][mask][sorted_index]
+                self.pulses[primary_pulse]._photon_timings = (self.timings[ixs][mask] + event_time[mask])[sorted_index]
                 self.pulses[primary_pulse]()
         elif primary_pulse in ['pi_el', 'pe_el']:
             self.pulses[primary_pulse](instruction)

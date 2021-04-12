@@ -1,10 +1,13 @@
 import numba
 import numpy as np
 import pandas as pd
+from copy import deepcopy
 from scipy.interpolate import interp1d
 
 import strax
 export, __all__ = strax.exporter(export_self=True)
+PULSE_MAX_DURATION = int(1e3)
+N_SPLIT_LOOP = 5
 
 
 def init_spe_scaling_factor_distributions(file):
@@ -75,3 +78,105 @@ def find_intervals_below_threshold(w, threshold, holdoff, result_buffer):
 
     n_intervals = current_interval  # No +1, as current_interval was incremented also when the last interval closed
     return n_intervals
+
+
+@numba.njit
+def find_optical_t_range(firsts, lasts, timings, tmins, tmaxs, start=0):
+    """
+    Helper function find the min and max of each optical entry
+    also substract tmin from the timings within each entry
+    """
+    
+    for ix in range(start, len(firsts)):
+        tmin = timings[firsts[ix]]
+        tmax = timings[firsts[ix]]
+        for iy in range(firsts[ix], lasts[ix]):
+            if timings[iy] < tmin:
+                tmin = timings[iy]
+            if timings[iy] > tmax:
+                tmax = timings[iy]
+
+        tmins[ix] = tmin
+        tmaxs[ix] = tmax
+
+        timings[firsts[ix]: lasts[ix]] -= tmin
+
+
+@numba.njit
+def split_long_optical_pulse(firsts, lasts, timings, channels, tmins):
+    """
+    Helper function to split photon timings of a single optical entry into
+    two entries if the is a gap longer than PULSE_MAX_DURATION ns.
+    """
+    for ix in range(len(firsts)):
+        tmin = tmins[ix]
+
+        extra_long_time_index = []
+        for iy in range(firsts[ix], lasts[ix]):
+            if timings[iy] > tmin + PULSE_MAX_DURATION:
+                extra_long_time_index.append(iy)
+
+        if len(extra_long_time_index) == 0:
+            continue
+
+        tmin = timings[extra_long_time_index[0]]
+        for cnt, iy in enumerate(extra_long_time_index):
+            cnt += firsts[ix]
+
+            if iy > cnt:
+                tmp = timings[cnt]                
+                timings[cnt] = timings[iy]
+                timings[iy] = tmp
+
+                tmp = channels[cnt]                
+                channels[cnt] = channels[iy]
+                channels[iy] = tmp
+
+        yield ix, firsts[ix], cnt + 1
+        firsts[ix] = cnt + 1
+
+
+def optical_adjustment(instructions, timings, channels):
+    """
+    Helper function to process optical instructions so that for each entry
+    1) Move the instruction timing to the first photon in the entry and move photon timings
+    2) Split photon timing into maximum interval of PULSE_MAX_DURATION default 1us
+       The split photon are put into new instruction append at the end of the instructions
+    """
+    tmins = np.zeros(len(instructions), np.int64)
+    tmaxs = np.zeros(len(instructions), np.int64)
+
+    start = 0
+    for i in range(N_SPLIT_LOOP):
+        find_optical_t_range(instructions['_first'], 
+                             instructions['_last'],
+                             timings, tmins, tmaxs,
+                             start=start)
+
+        instructions['time'][start:] += tmins[start:]
+        long_pulse = (tmaxs - tmins) > PULSE_MAX_DURATION
+        n_long_pulse = long_pulse[start:].sum()
+        if n_long_pulse < 1: break
+        start = len(instructions)
+
+        extra_inst = []
+        for ix, first, last in split_long_optical_pulse(
+            instructions['_first'][long_pulse],
+            instructions['_last'][long_pulse],
+            timings, channels, tmins[long_pulse]):
+
+            tmp = deepcopy(instructions[ix])
+            tmp['_first'] = first
+            tmp['_last'] = last
+
+            extra_inst.append(tmp)
+
+        instructions = np.append(instructions, extra_inst)
+        tmins = np.hstack([tmins, np.zeros(len(extra_inst), np.int64)])
+        tmaxs = np.hstack([tmaxs, np.zeros(len(extra_inst), np.int64)])
+
+    # Reduce the majority of the time delay
+    instructions['time'] += tmins
+
+    # Instructions is now a copy so return is needed
+    return instructions
