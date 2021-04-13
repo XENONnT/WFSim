@@ -43,7 +43,7 @@ truth_extra_dtype = [(('End time of the interaction [ns]', 'endtime'), np.int64)
 
 logging.basicConfig(handlers=[logging.StreamHandler()])
 log = logging.getLogger('wfsim.interface')
-log.setLevel('DEBUG')
+log.setLevel('WARNING')
 
 
 def rand_instructions(c):
