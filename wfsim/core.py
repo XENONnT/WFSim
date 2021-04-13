@@ -1252,10 +1252,10 @@ class RawData(object):
                         for instb_secondary in self.sim_data(instb[instb_run_i]):
                             n_too_much = 0
                             if len(np.where(~instb_filled)[0]) < len(instb_secondary):
-                                n_too_much = len(instb_secondary) - len(np.where(~instb_filled)[0])
+                                n_too_much = len(instb_secondary) - len(np.where(~instb_filled)[0]) + 10
                                 log.warning(f'Running out of instruction buffer removing {n_too_much} secondaries')
                             ib = np.where(~instb_filled)[0][:len(instb_secondary) - n_too_much]
-                            instb[ib] = instb_secondary
+                            instb[ib] = instb_secondary[:-n_too_much]
                             instb_filled[ib] = True
 
                         if len(truth_buffer):  # Extract truth info
