@@ -27,19 +27,27 @@ instruction_dtype = [(('Waveform simulator event number.', 'event_number'), np.i
                      (('Recoil type of interaction.', 'recoil'), np.int8),
                      (('Energy deposit of interaction', 'e_dep'), np.float32),
                      (('Eventid like in geant4 output rootfile', 'g4id'), np.int32),
-                     (('Volume id giving the detector subvolume', 'vol_id'), np.int32)
-                     ]
+                     (('Volume id giving the detector subvolume', 'vol_id'), np.int32)]
+
 
 optical_extra_dtype = [(('first optical input index', '_first'), np.int32),
                        (('last optical input index +1', '_last'), np.int32)]
 
-truth_extra_dtype = [(('End time of the interaction [ns]', 'endtime'), np.int64),
-                     ('n_electron', np.float),
-                     ('n_photon', np.float), ('n_photon_bottom', np.float),
-                     ('t_first_photon', np.float), ('t_last_photon', np.float),
-                     ('t_mean_photon', np.float), ('t_sigma_photon', np.float),
-                     ('t_first_electron', np.float), ('t_last_electron', np.float),
-                     ('t_mean_electron', np.float), ('t_sigma_electron', np.float)]
+
+truth_extra_dtype = [
+    (('End time of the interaction [ns]', 'endtime'), np.int64),
+    (('Number of simulated electrons', 'n_electron'), np.float),
+    (('Number of detected photons', 'n_photon'), np.float),
+    (('number of photons detected in bottom array', 'n_photon_bottom'), np.float),
+    (('Arrival time of the first photon [ns]', 't_first_photon'), np.float),
+    (('Arrival time of the last photon [ns]', 't_last_photon'), np.float),
+    (('Mean time of the photons [ns]', 't_mean_photon'), np.float),
+    (('Standard deviation of photon arrival times [ns]', 't_sigma_photon'), np.float),
+    (('Arrival time of the first electron [ns]', 't_first_electron'), np.float),
+    (('Arrival time of the last electron [ns]', 't_last_electron'), np.float),
+    (('Mean time of the electrons [ns]', 't_mean_electron'), np.float),
+    (('Standard deviation of electron arrival times [ns]', 't_sigma_electron'), np.float)]
+
 
 logging.basicConfig(handlers=[logging.StreamHandler()])
 log = logging.getLogger('wfsim.interface')
@@ -349,9 +357,6 @@ class ChunkRawRecords(object):
     strax.Option('n_top_pmts', track=False,
                  help="Number of pmts in top array. Provided by context"),
     strax.Option('right_raw_extension', default=100000),
-    strax.Option('timeout', default=1800,
-                 help="Terminate processing if any one mailbox receives "
-                      "no result for more than this many seconds"),
     strax.Option('seed', default=False, track=False,
                  help="Option for setting the seed of the random number generator used for"
                       "generation of the instructions"),
