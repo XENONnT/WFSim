@@ -34,13 +34,30 @@ instruction_dtype = [(('Waveform simulator event number.', 'event_number'), np.i
              ]
 
 truth_extra_dtype = [
-    (('End time of the interaction [ns]', 'endtime'), np.int64),
-    ('n_electron', np.float),
-    ('n_photon', np.float), ('n_photon_bottom', np.float),
-    ('t_first_photon', np.float), ('t_last_photon', np.float),
-    ('t_mean_photon', np.float), ('t_sigma_photon', np.float),
-    ('t_first_electron', np.float), ('t_last_electron', np.float),
-    ('t_mean_electron', np.float), ('t_sigma_electron', np.float)]
+    (('End time of the interaction [ns]', 'endtime'),
+     np.int64),
+    (('Number of simulated electrons', 'n_electron'),
+     np.float),
+    (('Number of detected photons', 'n_photon'),
+     np.float),
+    (('number of photons detected in bottom array', 'n_photon_bottom'),
+     np.float),
+    (('Arrival time of the first photon [ns]', 't_first_photon'),
+     np.float),
+    (('Arrival time of the last photon [ns]', 't_last_photon'),
+     np.float),
+    (('Mean time of the photons [ns]', 't_mean_photon'),
+     np.float),
+    (('Standard deviation of photon arrival times [ns]', 't_sigma_photon'),
+     np.float),
+    (('Arrival time of the first electron [ns]', 't_first_electron'),
+     np.float),
+    (('Arrival time of the last electron [ns]', 't_last_electron'),
+     np.float),
+    (('Mean time of the electrons [ns]', 't_mean_electron'),
+     np.float),
+    (('Standard deviation of electron arrival times [ns]', 't_sigma_electron'),
+     np.float)]
 
 log = logging.getLogger('SimulationCore')
 
