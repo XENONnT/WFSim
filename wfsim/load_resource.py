@@ -77,10 +77,10 @@ class Resource:
                 'field_dependencies_map': '',
              })
         elif config['detector'] == 'XENONnT_neutron_veto':
-             files.update({
-                 'photon_area_distribution': 'XENONnT_spe_distributions_nveto_013071.csv',
-                 'nv_pmt_qe': 'nveto_pmt_qe.json',
-                 'noise_file': 'xnt_noise_nveto_014901.npz'
+            files.update({
+                'photon_area_distribution': 'XENONnT_spe_distributions_nveto_013071.csv',
+                'nv_pmt_qe': 'nveto_pmt_qe.json',
+                'noise_file': 'xnt_noise_nveto_014901.npz'
             })
         else:
             raise ValueError(f"Unsupported detector {config['detector']}")
@@ -199,6 +199,7 @@ class Resource:
             # This config entry a dictionary of 5 items
             if any(config['enable_field_dependencies'].values()):
                 field_dependencies_map = make_map(files['field_dependencies_map'], fmt='json.gz')
+
                 def rz_map(z, xy, **kwargs):
                     r = np.sqrt(xy[:, 0]**2 + xy[:, 1]**2)
                     return field_dependencies_map(np.array([r, z]).T, **kwargs)

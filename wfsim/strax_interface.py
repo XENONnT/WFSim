@@ -36,17 +36,17 @@ optical_extra_dtype = [(('first optical input index', '_first'), np.int32),
 
 truth_extra_dtype = [
     (('End time of the interaction [ns]', 'endtime'), np.int64),
-    (('Number of simulated electrons', 'n_electron'), np.float),
-    (('Number of detected photons', 'n_photon'), np.float),
-    (('number of photons detected in bottom array', 'n_photon_bottom'), np.float),
-    (('Arrival time of the first photon [ns]', 't_first_photon'), np.float),
-    (('Arrival time of the last photon [ns]', 't_last_photon'), np.float),
-    (('Mean time of the photons [ns]', 't_mean_photon'), np.float),
-    (('Standard deviation of photon arrival times [ns]', 't_sigma_photon'), np.float),
-    (('Arrival time of the first electron [ns]', 't_first_electron'), np.float),
-    (('Arrival time of the last electron [ns]', 't_last_electron'), np.float),
-    (('Mean time of the electrons [ns]', 't_mean_electron'), np.float),
-    (('Standard deviation of electron arrival times [ns]', 't_sigma_electron'), np.float)]
+    (('Number of simulated electrons', 'n_electron'), np.float64),
+    (('Number of detected photons', 'n_photon'), np.float64),
+    (('number of photons detected in bottom array', 'n_photon_bottom'), np.float64),
+    (('Arrival time of the first photon [ns]', 't_first_photon'), np.float64),
+    (('Arrival time of the last photon [ns]', 't_last_photon'), np.float64),
+    (('Mean time of the photons [ns]', 't_mean_photon'), np.float64),
+    (('Standard deviation of photon arrival times [ns]', 't_sigma_photon'), np.float64),
+    (('Arrival time of the first electron [ns]', 't_first_electron'), np.float64),
+    (('Arrival time of the last electron [ns]', 't_last_electron'), np.float64),
+    (('Mean time of the electrons [ns]', 't_mean_electron'), np.float64),
+    (('Standard deviation of electron arrival times [ns]', 't_sigma_electron'), np.float64),]
 
 
 logging.basicConfig(handlers=[logging.StreamHandler()])
@@ -65,9 +65,9 @@ def rand_instructions(c):
     uniform_times = c['total_time'] * (np.arange(n) + 1.) / n
     instructions['time'] = np.repeat(uniform_times, 2) * int(1e9)
     instructions['event_number'] = np.digitize(instructions['time'],
-         1e9 * np.arange(c['nchunk']) * c['chunk_size']) - 1
+                                               1e9 * np.arange(c['nchunk']) * c['chunk_size']) - 1
     instructions['type'] = np.tile([1, 2], n)
-    instructions['recoil'] = [7 for i in range(n * 2)]  # Use nest ids for  ER
+    instructions['recoil'] = np.repeat(7, n * 2)  # Use nest ids for  ER
 
     r = np.sqrt(np.random.uniform(0, c['tpc_radius']**2, n))
     t = np.random.uniform(-np.pi, np.pi, n)
@@ -79,7 +79,7 @@ def rand_instructions(c):
     nelectrons = 10 ** (np.random.uniform(3, 4, n))
     instructions['amp'] = np.vstack([nphotons, nelectrons]).T.flatten().astype(int)
 
-    return instructionss
+    return instructions
 
 
 def _read_optical_nveto(config, events, mask):
@@ -140,7 +140,7 @@ def read_optical(config):
     data = uproot.open(config['fax_file'])
     try:
         events = data.get('events')
-    except:
+    except AttributeError:
         raise Exception("Are you using mc version >4?")
 
     # Slightly weird here. Entry_stop is not in the regular config, so if it's not skip this part
@@ -295,9 +295,9 @@ class ChunkRawRecords(object):
             ((self.truth_buffer['t_first_photon'] <= self.chunk_time) |
              # Hence, we need to use this trick to also save these cases (this
              # is what we set the end time to for np.nans)
-            (np.isnan(self.truth_buffer['t_first_photon']) &
-             (self.truth_buffer['time'] <= self.chunk_time)
-            )))
+             (np.isnan(self.truth_buffer['t_first_photon']) &
+              (self.truth_buffer['time'] <= self.chunk_time)))
+        )
         truth = self.truth_buffer[maskb]   # This is a copy, not a view!
 
         # Careful here: [maskb]['fill'] = ... does not work
@@ -541,13 +541,14 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             if overrides is not None:
                 self.config_nveto.update(overrides)
 
-            self.to_pe_nveto = straxen.get_to_pe(self.run_id, self.config_nveto['gain_model_nv'],
+            self.to_pe_nveto = straxen.get_to_pe(
+                self.run_id, self.config_nveto['gain_model_nv'],
                 self.config['channel_map']['nveto'][1] - self.config['channel_map']['nveto'][0] + 1)
 
             self.config_nveto['gains'] = np.divide((2e-9 * 2 / 2**14) / (1.6e-19 * 1 * 50),
-                               self.to_pe_nveto,
-                               out=np.zeros_like(self.to_pe_nveto), 
-                               where=self.to_pe_nveto != 0)
+                                                   self.to_pe_nveto,
+                                                   out=np.zeros_like(self.to_pe_nveto),
+                                                   where=self.to_pe_nveto != 0)
             self.config_nveto['channels_bottom'] = np.array([], np.int64)
 
     def get_instructions(self):
@@ -653,9 +654,10 @@ class RawRecordsFromMcChain(SimulatorPlugin):
     def _setup(self):
         if 'tpc' in self.config['targets']:
             self.sim = ChunkRawRecords(self.config)
-            self.sim_iter = self.sim(self.instructions_epix,
-                                     time_zero=int((self.config['entry_start'] + 0.5) / self.config['event_rate'] * 1e9),
-                                     progress_bar=True)
+            self.sim_iter = self.sim(
+                self.instructions_epix,
+                time_zero=int((self.config['entry_start'] + 0.5) / self.config['event_rate'] * 1e9),
+                progress_bar=True)
 
         if 'nveto' in self.config['targets']:
             self.sim_nv = ChunkRawRecords(self.config_nveto,
@@ -669,9 +671,10 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                                                                     'instruction see optical extra dtype'
             assert all(self.instructions_nveto['type'] == 1), 'Only s1 type ' \
                                                               'is supported for generating rawdata from optical input'
-            self.sim_nv_iter = self.sim_nv(self.instructions_nveto,
-                                           time_zero=int((self.config['entry_start'] + 0.5) / self.config['event_rate'] * 1e9),
-                                           progress_bar=True)
+            self.sim_nv_iter = self.sim_nv(
+                self.instructions_nveto,
+                time_zero=int((self.config['entry_start'] + 0.5) / self.config['event_rate'] * 1e9),
+                progress_bar=True)
 
     def infer_dtype(self):
         dtype = dict([(data_type, instruction_dtype + truth_extra_dtype) if 'truth' in data_type
@@ -688,7 +691,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                 if self.sim.source_finished():
                     log.debug('TPC instructions are already depleted')
                     result = dict([(data_type, np.zeros(0, self.dtype_for(data_type)))
-                                    for data_type in self.provides if 'nv' not in data_type])
+                                   for data_type in self.provides if 'nv' not in data_type])
                     self.sim.chunk_time = self.sim_nv.chunk_time
                     self.sim.chunk_time_pre = self.sim_nv.chunk_time_pre
                 else:
@@ -702,7 +705,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                 if self.sim_nv.source_finished():
                     log.debug('nVeto instructions are already depleted')
                     result_nv = dict([(data_type.strip('_nv'), np.zeros(0, self.dtype_for(data_type)))
-                                       for data_type in self.provides if 'nv' in data_type])
+                                      for data_type in self.provides if 'nv' in data_type])
                     self.sim_nv.chunk_time = self.sim.chunk_time
                     self.sim_nv.chunk_time_pre = self.sim.chunk_time_pre
                 else:

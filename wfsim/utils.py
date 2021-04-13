@@ -40,6 +40,7 @@ def find_intervals_below_threshold(w, threshold, holdoff, result_buffer):
     """Fills result_buffer with l, r bounds of intervals in w < threshold.
     :param w: Waveform to do hitfinding in
     :param threshold: Threshold for including an interval
+    :param holdoff: Holdoff number of samples after the pulse return back down to threshold
     :param result_buffer: numpy N*2 array of ints, will be filled by function.
                           if more than N intervals are found, none past the first N will be processed.
     :returns : number of intervals processed
@@ -118,7 +119,6 @@ def split_long_optical_pulse(firsts, lasts, timings, channels):
         if len(extra_long_time_index) == 0:
             continue
 
-        tmin = timings[extra_long_time_index[0]]
         for cnt, iy in enumerate(extra_long_time_index):
             cnt += firsts[ix]
 
@@ -155,13 +155,14 @@ def optical_adjustment(instructions, timings, channels):
         instructions['time'][start:] += tmins[start:]
         long_pulse = ((tmaxs - tmins) > PULSE_MAX_DURATION) & (np.arange(len(instructions)) >= start)
         n_long_pulse = long_pulse.sum()
-        if n_long_pulse < 1: break
+        if n_long_pulse < 1:
+            break
 
         extra_inst = []
-        for ix, first, last in split_long_optical_pulse(
-            instructions['_first'][long_pulse],
-            instructions['_last'][long_pulse],
-            timings, channels):
+        for ix, first, last in split_long_optical_pulse(instructions['_first'][long_pulse],
+                                                        instructions['_last'][long_pulse],
+                                                        timings,
+                                                        channels):
 
             tmp = deepcopy(instructions[ix])
             tmp['_first'] = first

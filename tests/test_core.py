@@ -30,7 +30,7 @@ def test_noise(data_length, n_channels, noise_data_length):
     # Take a copy of the channel mask
     channel_mask = channel_mask[:n_channels]
     # Noise is a string with random floats
-    noise_data = np.random.randint(-10, 10, size=noise_data_length).astype(np.float)
+    noise_data = np.random.randint(-10, 10, size=noise_data_length).astype(np.float64)
 
     RawData = wfsim.RawData
     noise_function = RawData.add_noise
