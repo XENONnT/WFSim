@@ -1251,11 +1251,11 @@ class RawData(object):
                             log.debug(f'Making S{ptype} pulse set ({i_set+1}/{n_set}) for g4 event {g4id}')
                         for instb_secondary in self.sim_data(instb[instb_run_i]):
                             n_too_much = 0
-                            if len(np.where(~instb_filled)[0]) < len(instb_secondary):
+                            if len(np.where(~instb_filled)[0]) - 10 < len(instb_secondary):
                                 n_too_much = len(instb_secondary) - len(np.where(~instb_filled)[0]) + 10
                                 log.warning(f'Running out of instruction buffer removing {n_too_much} secondaries')
                             ib = np.where(~instb_filled)[0][:len(instb_secondary) - n_too_much]
-                            instb[ib] = instb_secondary[:-n_too_much]
+                            instb[ib] = instb_secondary[:len(instb_secondary) - n_too_much]
                             instb_filled[ib] = True
 
                         if len(truth_buffer):  # Extract truth info
