@@ -2,7 +2,7 @@ v0.5.0
 ======
 * McChainSimulator (major) patch (#125)
 * Update utilix version in requirements.txt (ffc6c2f)
-* Don not track the timeout (#131)
+* Do not track the timeout (#131)
 * Change dtype of truth (#138)
 * Load Rz field maps (#130)
 * Conserve total quanta in tutorial (#135)
