@@ -5,20 +5,26 @@ import numpy as np
 import strax
 import straxen
 import logging
-log = logging.getLogger('load_resource')
+logging.basicConfig(handlers=[
+    # logging.handlers.WatchedFileHandler('wfsim.log'),
+    logging.StreamHandler()])
+log = logging.getLogger('wfsim.resource')
+log.setLevel('WARNING')
 
 _cached_configs = dict()
+
 
 def load_config(config):
     """Create a Resource instance from the configuration
 
     Uses a cache to avoid re-creating instances from the same config
     """
-    h = strax.deterministic_hash(config)
+    h = strax.deterministic_hash(Resource.file_config(config))
     if h in _cached_configs:
         return _cached_configs[h]
     result = Resource(config)
     _cached_configs[h] = result
+    log.debug(f'Caching config file set {h}')
     return result
 
 
@@ -34,15 +40,17 @@ class Resource:
             Download from a private repository if credentials 
             are properly setup
     """
-    def __init__(self, config=None):
-        log.debug(f'Getting {config}')
+    @staticmethod
+    def file_config(config):
+        """
+        Find and complete all file paths
+
+        returns dictionary mapping item name to path
+        """
         if config is None:
             config = dict()
 
-        files = {
-            'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
-            'noise_file': 'x1t_noise_170203_0850_00_small.npz',
-        }
+        files = {}
         if config['detector'] == 'XENON1T':
             files.update({
                 'photon_area_distribution': 'XENON1T_spe_distributions.csv',
@@ -52,17 +60,27 @@ class Resource:
                 's2_pattern_map': 'XENON1T_s2_xy_patterns_top_corrected_MCv2.1.0.json.gz',
                 'photon_ap_cdfs': 'x1t_pmt_afterpulse_config.pkl.gz',
                 'fdc_3d': 'XENON1T_FDC_SR1_data_driven_time_dependent_3d_correction_tf_nn_part1_v1.json.gz',
+                'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
+                'noise_file': 'x1t_noise_170203_0850_00_small.npz'
             })
+
         elif config['detector'] == 'XENONnT':
             files.update({
-                'photon_area_distribution': 'XENONnT_spe_distributions.csv',
+                'photon_area_distribution': 'XENONnT_spe_distributions_20210305.csv',
                 's1_pattern_map': 'XENONnT_s1_xyz_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
                 's2_pattern_map': 'XENONnT_s2_xy_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
-                'photon_ap_cdfs': 'xnt_pmt_afterpulse_config.pkl.gz',
+                'photon_ap_cdfs': 'XENONnT_pmt_afterpulse_config_012605.json.gz',
                 's2_luminescence': 'XENONnT_GARFIELD_B1d5n_C30n_G1n_A6d5p_T1d5n_PMTs1d5n_FSR0d95n.npz',
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
-                'nv_pmt_qe_file': 'nveto_pmt_qe.json',
+                'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
+                'noise_file': 'x1t_noise_170203_0850_00_small.npz',
                 'field_dependencies_map': '',
+             })
+        elif config['detector'] == 'XENONnT_neutron_veto':
+            files.update({
+                'photon_area_distribution': 'XENONnT_spe_distributions_nveto_013071.csv',
+                'nv_pmt_qe': 'nveto_pmt_qe.json',
+                'noise_file': 'xnt_noise_nveto_014901.npz'
             })
         else:
             raise ValueError(f"Unsupported detector {config['detector']}")
@@ -73,14 +91,22 @@ class Resource:
 
         commit = 'master'  # Replace this by a commit hash if you feel solid and responsible
         if config.get('url_base', False):
-            url_base = config['url_base']
+            files['url_base'] = config['url_base']
         elif config['detector'] == "XENON1T":
-            url_base = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/sim_files'
-        elif config['detector'] == "XENONnT":
-            url_base = f'https://raw.githubusercontent.com/XENONnT/WFSim/{commit}/files'
+            files['url_base'] = f'https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files/{commit}/sim_files'
+        else:
+            files['url_base'] = f'https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/{commit}/sim_files'
+
+        return files
+
+    def __init__(self, config=None):
+        files = self.file_config(config)
+        log.debug('Getting\n' + '\n'.join([f'{k}: {v}' for k, v in files.items()]))
 
         for k, v in files.items():
             if isinstance(v, list):
+                continue
+            if k == 'url_base':
                 continue
             log.debug(f'Obtaining {k} from {v}')
             if v.startswith('/'):
@@ -111,30 +137,29 @@ class Resource:
                     log.info(f"ntauxfiles is not installed or does not have {v}")
                     # We cannot download the file from the database. We need to
                     # try to get a placeholder file from a URL.
-                    raw_url = osp.join(url_base, v)
+                    raw_url = osp.join(files['url_base'], v)
                     log.warning(f'{k} did not download, trying {raw_url}')
                     files[k] = raw_url
             log.debug(f'Downloaded {k} successfully')
+
+        self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
 
         if config['detector'] == 'XENON1T':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='json.gz')
             self.s1_light_yield_map = make_map(files['s1_light_yield_map'], fmt='json')
             self.s2_light_yield_map = make_map(files['s2_light_yield_map'], fmt='json')
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='json.gz')
-
-            # Garfield luminescence timing samples
-            if config['s2_luminescence_model'] == 'garfield':
-                raise NotImplementedError
+            self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
 
             # Gas gap warping map
-            if config['enable_gas_gap_warping']:
-                self.gas_gap_length = make_map(["constant dummy", 0.25, [254,]])
+            if config.get('enable_gas_gap_warping', False):
+                self.gas_gap_length = make_map(["constant dummy", 0.25, [254, ]])
 
             # Photon After Pulses
-            if config['enable_pmt_afterpulses']:
+            if config.get('enable_pmt_afterpulses', False):
                 self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
 
-        if config['detector'] == 'XENONnT':
+        elif config.get('detector', 'XENONnT') == 'XENONnT':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
             if isinstance(self.s1_pattern_map, DummyMap):
                 self.s1_light_yield_map = self.s1_pattern_map.reduce_last_dim()
@@ -154,16 +179,19 @@ class Resource:
                 self.s2_light_yield_map = lymap
 
             # Garfield luminescence timing samples
-            if config['s2_luminescence_model'] == 'garfield':
-                s2_luminescence_map = straxen.get_resource(files['s2_luminescence'], fmt='npy')['arr_0']
+            if config.get('s2_luminescence_model', False) == 'garfield':
+                s2_luminescence_map = straxen.get_resource(files['s2_luminescence'], fmt='npy_pickle')['arr_0']
                 # Get directly the map for the simulated level
                 liquid_level_available = np.unique(s2_luminescence_map['ll'])  # available levels (cm)
                 liquid_level = config['gate_to_anode_distance'] - config['elr_gas_gap_length']  # cm
-                liquid_level = min(liquid_level_available , key=lambda x:abs(x - liquid_level))
-                self.s2_luminescence = s2_luminescence_map[s2_luminescence_map['ll']==liquid_level]
+                liquid_level = min(liquid_level_available, key=lambda x: abs(x - liquid_level))
+                self.s2_luminescence = s2_luminescence_map[s2_luminescence_map['ll'] == liquid_level]
+
+            if config.get('field_distortion_on', False):
+                self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
 
             # Gas gap warping map
-            if config['enable_gas_gap_warping']:
+            if config.get('enable_gas_gap_warping', False):
                 gas_gap_map = straxen.get_resource(files['gas_gap_map'], fmt='pkl')
                 self.gas_gap_length = lambda positions: gas_gap_map.lookup(*positions.T)
 
@@ -171,54 +199,56 @@ class Resource:
             # This config entry a dictionary of 5 items
             if any(config['enable_field_dependencies'].values()):
                 field_dependencies_map = make_map(files['field_dependencies_map'], fmt='json.gz')
+
                 def rz_map(z, xy, **kwargs):
                     r = np.sqrt(xy[:, 0]**2 + xy[:, 1]**2)
                     return field_dependencies_map(np.array([r, z]).T, **kwargs)
                 self.field_dependencies_map = rz_map
 
             # Photon After Pulses
-            if config['enable_pmt_afterpulses']:
+            if config.get('enable_pmt_afterpulses', False):
                 self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='json.gz')
 
-        # Spe area distributions
+        elif config.get('detector') == 'XENONnT_neutron_veto':
+
+            # Neutron veto PMT QE as function of wavelength
+            if config.get('neutron_veto', False):
+                self.nv_pmt_qe = straxen.get_resource(files['nv_pmt_qe'], fmt='json')
+
+        # SPE area distributions
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
 
-        # 3d field distortion map
-        if config['field_distortion_on']:
-            self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
-
         # Electron After Pulses compressed, haven't figure out how pkl.gz works
-        if config['enable_electron_afterpulses']:
+        if config.get('enable_electron_afterpulses', False):
             self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
 
         # Noise sample
-        if config['enable_noise']:
+        if config.get('enable_noise', False):
             self.noise_data = straxen.get_resource(files['noise_file'], fmt='npy')['arr_0'].flatten()
-
-        # nVeto PMT Q.E.
-        if config['neutron_veto']:
-            self.nv_pmt_qe_data = straxen.get_resource(files['nv_pmt_qe_file'], fmt='json')
 
         log.debug(f'{self.__class__.__name__} fully initialized')
 
+
 def make_map(map_file, fmt='text'):
-    '''Fetch and make an instance of InterpolatingMap based on map_file
-    Alternativly map_file can be a list of ["constant dummy", constant: int, shape: list]
-    return an instance of  DummyMap'''
-        
+    """Fetch and make an instance of InterpolatingMap based on map_file
+    Alternatively map_file can be a list of ["constant dummy", constant: int, shape: list]
+    return an instance of  DummyMap"""
+
     if isinstance(map_file, list):
         assert map_file[0] == 'constant dummy', ('Alternative file input can only be '
-            '("constant dummy", constant: int, shape: list')
+                                                 '("constant dummy", constant: int, shape: list')
         return DummyMap(map_file[1], map_file[2])
 
     elif isinstance(map_file, str):
+        log.debug(f'Initialize map interpolator for file {map_file}')
         map_data = straxen.get_resource(map_file, fmt=fmt)
         return straxen.InterpolatingMap(map_data)
-    
+
     else:
         raise TypeError("Can't handle map_file except a string or a list")
 
-class DummyMap():
+
+class DummyMap(object):
     """Return constant results
         the length match the length of input
         but from the second dimensions the shape is user defined input
@@ -226,9 +256,11 @@ class DummyMap():
     def __init__(self, const, shape=()):
         self.const = const
         self.shape = shape
+        
     def __call__(self, x, **kwargs):
         shape = [len(x)] + list(self.shape)
         return np.ones(shape) * self.const
+
     def reduce_last_dim(self):
         assert len(self.shape) >= 1, 'Need at least 1 dim to reduce further'
         const = self.const * self.shape[-1]
@@ -236,28 +268,3 @@ class DummyMap():
         shape[-1] = 1
 
         return DummyMap(const, shape)
-
-def clear_cached_configs():
-    """Loop over the config cache and release some of the memory
-    DO NOT use this function unless you know what you are doing
-    Mostly because I don't fully understand how this works
-    But also, many objects are still occupying memory due to obscure references
-    """
-
-    def deep_clear(d, depth=5):
-        if depth <= 0:
-            return
-
-        if isinstance(d, straxen.InterpolatingMap):
-            deep_clear(d.__dict__, depth=depth)
-
-        elif isinstance(d, straxen.InterpolateAndExtrapolate):
-            deep_clear(d.__dict__, depth=depth)
-
-        elif isinstance(d, dict):
-            for key, item in d.items():
-                deep_clear(item, depth=depth-1)
-                d[key] = None
-
-    for h, r in _cached_configs.items():
-        deep_clear(r.__dict__)
