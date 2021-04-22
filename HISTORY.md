@@ -1,3 +1,21 @@
+v0.5.0
+======
+* McChainSimulator (major) patch (#125)
+* Update utilix version in requirements.txt (ffc6c2f)
+* Don not track the timeout (#131)
+* Change dtype of truth (#138)
+* Load Rz field maps (#130)
+* Conserve total quanta in tutorial (#135)
+* Load GARFIELD map according to liquid level (#127)
+* Fix PMT Afterpulse (#117)
+* Fixing chunking issue (#118)
+* Update history of releases (#123)
+* Allow errors while building docs (#122)
+* Fix missing epix import (#115)
+* Fix non-literal compare (#121)
+* Reintroduce self._electron_timings for truth (#116)
+* Update tutorial notebook (f59c2c0 + ee6b6ad)
+
 v0.4.1
 ======
 * Miscellaneous fixes (#113)
