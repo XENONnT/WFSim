@@ -37,6 +37,7 @@ def test_load_nt():
         "photon_area_distribution": "XENONnT_spe_distributions_single_channel.csv",
         "s1_pattern_map": ["constant dummy", 14e-5, [494,]],
         "s2_pattern_map": ["constant dummy", 30e-5, [494,]],
+        "s2_correction_map": ["constant dummy", 1, []],
         "field_dependencies_map": ["constant dummy", 1, []],
     }
     result = load_config(config)
