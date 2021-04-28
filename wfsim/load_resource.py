@@ -9,6 +9,7 @@ log = logging.getLogger('load_resource')
 
 _cached_configs = dict()
 
+
 def load_config(config):
     """Create a Resource instance from the configuration
 
@@ -48,7 +49,7 @@ class Resource:
                 'photon_area_distribution': 'XENON1T_spe_distributions.csv',
                 's1_light_yield_map': 'XENON1T_s1_xyz_ly_kr83m_SR1_pax-680_fdc-3d_v0.json',
                 's1_pattern_map': 'XENON1T_s1_xyz_patterns_interp_corrected_MCv2.1.0.json.gz',
-                's2_light_yield_map': 'XENON1T_s2_xy_ly_SR1_v2.2.json',
+                's2_correction_map': 'XENON1T_s2_xy_ly_SR1_v2.2.json',
                 's2_pattern_map': 'XENON1T_s2_xy_patterns_top_corrected_MCv2.1.0.json.gz',
                 'photon_ap_cdfs': 'x1t_pmt_afterpulse_config.pkl.gz',
                 'fdc_3d': 'XENON1T_FDC_SR1_data_driven_time_dependent_3d_correction_tf_nn_part1_v1.json.gz',
@@ -58,6 +59,7 @@ class Resource:
                 'photon_area_distribution': 'XENONnT_spe_distributions.csv',
                 's1_pattern_map': 'XENONnT_s1_xyz_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
                 's2_pattern_map': 'XENONnT_s2_xy_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
+                's2_correction_map': 'XENONnT_s2_xy_correction_corrected_qes_MCva43fa9b_wires.json.gz',
                 'photon_ap_cdfs': 'xnt_pmt_afterpulse_config.pkl.gz',
                 's2_luminescence': 'XENONnT_GARFIELD_B1d5n_C30n_G1n_A6d5p_T1d5n_PMTs1d5n_FSR0d95n.npz',
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
@@ -119,7 +121,7 @@ class Resource:
         if config['detector'] == 'XENON1T':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='json.gz')
             self.s1_light_yield_map = make_map(files['s1_light_yield_map'], fmt='json')
-            self.s2_light_yield_map = make_map(files['s2_light_yield_map'], fmt='json')
+            self.s2_correction_map = make_map(files['s2_correction_map'], fmt='json')
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='json.gz')
 
             # Garfield luminescence timing samples
@@ -128,7 +130,7 @@ class Resource:
 
             # Gas gap warping map
             if config['enable_gas_gap_warping']:
-                self.gas_gap_length = make_map(["constant dummy", 0.25, [254,]])
+                self.gas_gap_length = make_map(["constant dummy", 0.25, [254, ]])
 
             # Photon After Pulses
             if config['enable_pmt_afterpulses']:
@@ -145,13 +147,7 @@ class Resource:
                 self.s1_light_yield_map = lymap
 
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='pkl')
-            if isinstance(self.s2_pattern_map, DummyMap):
-                self.s2_light_yield_map = self.s2_pattern_map.reduce_last_dim()
-            else:
-                lymap = deepcopy(self.s2_pattern_map)
-                lymap.data['map'] = np.sum(lymap.data['map'][:][:], axis=2, keepdims=True)
-                lymap.__init__(lymap.data)
-                self.s2_light_yield_map = lymap
+            self.s2_correction_map = make_map(files['s2_correction_map'], fmt='json.gz')
 
             # Garfield luminescence timing samples
             if config['s2_luminescence_model'] == 'garfield':
@@ -159,8 +155,8 @@ class Resource:
                 # Get directly the map for the simulated level
                 liquid_level_available = np.unique(s2_luminescence_map['ll'])  # available levels (cm)
                 liquid_level = config['gate_to_anode_distance'] - config['elr_gas_gap_length']  # cm
-                liquid_level = min(liquid_level_available , key=lambda x:abs(x - liquid_level))
-                self.s2_luminescence = s2_luminescence_map[s2_luminescence_map['ll']==liquid_level]
+                liquid_level = min(liquid_level_available, key=lambda x: abs(x - liquid_level))
+                self.s2_luminescence = s2_luminescence_map[s2_luminescence_map['ll'] == liquid_level]
 
             # Gas gap warping map
             if config['enable_gas_gap_warping']:
@@ -171,6 +167,7 @@ class Resource:
             # This config entry a dictionary of 5 items
             if any(config['enable_field_dependencies'].values()):
                 field_dependencies_map = make_map(files['field_dependencies_map'], fmt='json.gz')
+
                 def rz_map(z, xy, **kwargs):
                     r = np.sqrt(xy[:, 0]**2 + xy[:, 1]**2)
                     return field_dependencies_map(np.array([r, z]).T, **kwargs)
@@ -201,14 +198,15 @@ class Resource:
 
         log.debug(f'{self.__class__.__name__} fully initialized')
 
+
 def make_map(map_file, fmt='text'):
-    '''Fetch and make an instance of InterpolatingMap based on map_file
+    """Fetch and make an instance of InterpolatingMap based on map_file
     Alternativly map_file can be a list of ["constant dummy", constant: int, shape: list]
-    return an instance of  DummyMap'''
+    return an instance of  DummyMap"""
         
     if isinstance(map_file, list):
         assert map_file[0] == 'constant dummy', ('Alternative file input can only be '
-            '("constant dummy", constant: int, shape: list')
+                                                 '("constant dummy", constant: int, shape: list')
         return DummyMap(map_file[1], map_file[2])
 
     elif isinstance(map_file, str):
@@ -218,7 +216,8 @@ def make_map(map_file, fmt='text'):
     else:
         raise TypeError("Can't handle map_file except a string or a list")
 
-class DummyMap():
+
+class DummyMap:
     """Return constant results
         the length match the length of input
         but from the second dimensions the shape is user defined input
@@ -226,9 +225,11 @@ class DummyMap():
     def __init__(self, const, shape=()):
         self.const = const
         self.shape = shape
+
     def __call__(self, x, **kwargs):
         shape = [len(x)] + list(self.shape)
         return np.ones(shape) * self.const
+
     def reduce_last_dim(self):
         assert len(self.shape) >= 1, 'Need at least 1 dim to reduce further'
         const = self.const * self.shape[-1]
@@ -236,6 +237,7 @@ class DummyMap():
         shape[-1] = 1
 
         return DummyMap(const, shape)
+
 
 def clear_cached_configs():
     """Loop over the config cache and release some of the memory
