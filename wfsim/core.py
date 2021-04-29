@@ -309,25 +309,25 @@ class S1(Pulse):
 
         _, _, t, x, y, z, n_photons, recoil_type, *rest = [
             np.array(v).reshape(-1) for v in zip(*instruction)]
-
         positions = np.array([x, y, z]).T  # For map interpolation
         n_photons = self.get_n_photons(n_photons=n_photons,
                                        positions=positions,
                                        s1_light_yield_map=self.resource.s1_light_yield_map,
                                        config=self.config)
-
-        self._photon_timings = self.photon_timings(t=t,
-                                                   n_photons=n_photons, 
-                                                   recoil_type=recoil_type,
-                                                   config=self.config,
-                                                   phase=self.phase)
-
         # The new way interpolation is written always require a list
         self._photon_channels = self.photon_channels(positions=positions,
                                                      n_photons=n_photons,
                                                      config=self.config, 
                                                      s1_pattern_map=self.resource.s1_pattern_map)
 
+        self._photon_timings = self.photon_timings(t=t,
+                                                   n_photons=n_photons, 
+                                                   recoil_type=recoil_type,
+                                                   config=self.config,
+                                                   phase=self.phase,
+                                                   channels=self._photon_channels,
+                                                   positions = positions,
+                                                   resource=self.resource )
         super().__call__()
 
     @staticmethod
@@ -373,7 +373,7 @@ class S1(Pulse):
         return _photon_channels
 
     @staticmethod
-    def photon_timings(t, n_photons, recoil_type, config, phase):
+    def photon_timings(t, n_photons, recoil_type, config, phase, channels=None,positions=None,resource=None):
         """Calculate distribution of photon arrival timnigs
         :param t: 1d array of ints
         :param n_photons: 1d array of ints
@@ -385,14 +385,45 @@ class S1(Pulse):
         _photon_timings = np.repeat(t, n_photons)
         if len(_photon_timings) == 0:
             return _photon_timings.astype(np.int64)
-        
         if (config['s1_model_type'] == 'simple' and
                 np.isin(recoil_type, NestId._ALL).all()):
             # Simple S1 model enabled: use it for ER and NR.
             _photon_timings += np.random.exponential(config['s1_decay_time'], len(_photon_timings)).astype(np.int64)
             _photon_timings += np.random.normal(0, config['s1_decay_spread'], len(_photon_timings)).astype(np.int64)
             return _photon_timings
-
+        if (config['s1_model_type'] == 'simplespline' and
+                np.isin(recoil_type, NestId._ALL).all()):
+            counts_start = 0
+            for i, counts in enumerate(n_photons):
+                extra_times = np.zeros(counts)
+                
+                ## doing top arrays
+                _top_bool = channels[counts_start:counts_start+counts]<(config['n_top_pmts'])
+                _n_top_hit = np.sum(_top_bool)
+                _top_times = np.zeros(_n_top_hit)
+                _top_rng = np.random.uniform(0,1,size=_n_top_hit)
+                _top_argsort = _top_rng.argsort()
+                _top_times[_top_argsort] = resource.s1_time_splines['top'](positions[i][2],
+                                                                           _top_rng[_top_argsort] )[:,0]
+                ###
+                _bottom_bool = channels[counts_start:counts_start+counts]>=(config['n_top_pmts'])
+                _n_bottom_hit = np.sum(_bottom_bool)     
+                _bottom_times = np.zeros(_n_bottom_hit)  
+                _bottom_rng = np.random.uniform(0,1,size=_n_bottom_hit)
+                _bottom_argsort = _bottom_rng.argsort()
+                _bottom_times[_bottom_argsort] = resource.s1_time_splines['bottom'](positions[i][2],
+                                                                           _bottom_rng[_bottom_argsort] )[:,0]
+                    
+                ###
+                extra_times[_top_bool] = _top_times
+                extra_times[_bottom_bool] = _bottom_times
+                
+                _photon_timings[counts_start: counts_start + counts]+=extra_times.round().astype(np.int64)
+                counts_start += counts
+                pass
+            return _photon_timings
+        
+        _photon_timings = np.repeat(t, n_photons)
         counts_start = 0
         for i, counts in enumerate(n_photons):
             for k in vars(NestId):

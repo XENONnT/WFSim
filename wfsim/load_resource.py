@@ -75,6 +75,7 @@ class Resource:
                 'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
                 'noise_file': 'x1t_noise_170203_0850_00_small.npz',
                 'field_dependencies_map': '',
+                's1_time_spline': '',
              })
         elif config['detector'] == 'XENONnT_neutron_veto':
             files.update({
@@ -208,7 +209,10 @@ class Resource:
             # Photon After Pulses
             if config.get('enable_pmt_afterpulses', False):
                 self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='json.gz')
-
+            if config.get('s1_time_spline', False):
+                import dill
+                self.s1_time_splines = dill.load(open(files['s1_time_spline'], "rb"))
+                print('Loaded S1 timing splines')
         elif config.get('detector') == 'XENONnT_neutron_veto':
 
             # Neutron veto PMT QE as function of wavelength
