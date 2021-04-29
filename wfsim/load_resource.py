@@ -263,29 +263,3 @@ class DummyMap:
         shape[-1] = 1
 
         return DummyMap(const, shape)
-
-
-def clear_cached_configs():
-    """Loop over the config cache and release some of the memory
-    DO NOT use this function unless you know what you are doing
-    Mostly because I don't fully understand how this works
-    But also, many objects are still occupying memory due to obscure references
-    """
-
-    def deep_clear(d, depth=5):
-        if depth <= 0:
-            return
-
-        if isinstance(d, straxen.InterpolatingMap):
-            deep_clear(d.__dict__, depth=depth)
-
-        elif isinstance(d, straxen.InterpolateAndExtrapolate):
-            deep_clear(d.__dict__, depth=depth)
-
-        elif isinstance(d, dict):
-            for key, item in d.items():
-                deep_clear(item, depth=depth-1)
-                d[key] = None
-
-    for h, r in _cached_configs.items():
-        deep_clear(r.__dict__)
