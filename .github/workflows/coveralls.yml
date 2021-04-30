@@ -25,12 +25,12 @@ jobs:
         python-version: 3.8
     - name: Checkout repo
       uses: actions/checkout@v2
-    - name: Install python dependencies
-      uses: py-actions/py-dependency-install@v2
     - name: Install requirements
       run: |
         pip install coveralls
         pip install git+https://github.com/XENONnT/straxen
+    - name: Install python dependencies
+      uses: py-actions/py-dependency-install@v2
     - name: Coveralls
       env:
         NUMBA_DISABLE_JIT: 1
