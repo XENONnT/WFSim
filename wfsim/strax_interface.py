@@ -714,25 +714,23 @@ class RawRecordsFromMcChain(SimulatorPlugin):
 
         chunk = {}
         for data_type in self.provides:
-            if 'nv' in data_type and 'nveto' in self.config['targets']:
-                chunk[data_type] = self.chunk(
-                    start=self.sim_nv.chunk_time_pre,
-                    end=self.sim_nv.chunk_time,
-                    data=result_nv[data_type.strip('_nv')],
-                    data_type=data_type)
-                #If nv is not one of the targets just return an empty chunk
             if 'nv' in data_type:
-                chunk[data_type] = self.chunk(
-                    start=self.sim.chunk_time_pre,
-                    end=self.sim.chunk_time,
-                    data=np.array([]),
-                    data_type=data_type)
-            elif 'nv' not in data_type:
-                chunk[data_type] = self.chunk(
-                    start=self.sim.chunk_time_pre,
-                    end=self.sim.chunk_time,
-                    data=result[data_type],
-                    data_type=data_type)
+                if 'nveto' in self.config['targets']:
+                  chunk[data_type] = self.chunk(start=self.sim_nv.chunk_time_pre,
+                                                end=self.sim_nv.chunk_time,
+                                                data=result_nv[data_type.strip('_nv')],
+                                                data_type=data_type)
+                #If nv is not one of the targets just return an empty chunk
+                else:
+                  chunk[data_type] = self.chunk(start=self.sim.chunk_time_pre,
+                                                end=self.sim.chunk_time,
+                                                data=np.array([]),
+                                                data_type=data_type)
+            else:
+                chunk[data_type] = self.chunk(start=self.sim.chunk_time_pre,
+                                              end=self.sim.chunk_time,
+                                              data=result[data_type],
+                                              data_type=data_type)
 
         self._sort_check([chunk[data_type].data for data_type in self.provides])
 
