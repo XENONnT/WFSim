@@ -583,12 +583,10 @@ class S2(Pulse):
         
         returns array of floats (mean expectation) 
         """
-        if config['detector'] == 'XENONnT':
-            sc_gain = np.squeeze(resource.s2_light_yield_map(positions), axis=-1) \
-                * config['s2_secondary_sc_gain']
-        elif config['detector'] == 'XENON1T':
-            sc_gain = resource.s2_light_yield_map(positions) \
-                * config['s2_secondary_sc_gain']
+        # sc gain should has the unit of pe / electron, here we divide 1 + dpe to get nphoton / electron
+        sc_gain = resource.s2_correction_map(positions) \
+                * config['s2_secondary_sc_gain'] / (1 + config['p_double_pe_emision'])
+
         return sc_gain
 
     @staticmethod
