@@ -56,7 +56,7 @@ class Resource:
                 'photon_area_distribution': 'XENON1T_spe_distributions.csv',
                 's1_light_yield_map': 'XENON1T_s1_xyz_ly_kr83m_SR1_pax-680_fdc-3d_v0.json',
                 's1_pattern_map': 'XENON1T_s1_xyz_patterns_interp_corrected_MCv2.1.0.json.gz',
-                's2_light_yield_map': 'XENON1T_s2_xy_ly_SR1_v2.2.json',
+                's2_correction_map': 'XENON1T_s2_xy_ly_SR1_v2.2.json',
                 's2_pattern_map': 'XENON1T_s2_xy_patterns_top_corrected_MCv2.1.0.json.gz',
                 'photon_ap_cdfs': 'x1t_pmt_afterpulse_config.pkl.gz',
                 'fdc_3d': 'XENON1T_FDC_SR1_data_driven_time_dependent_3d_correction_tf_nn_part1_v1.json.gz',
@@ -69,6 +69,7 @@ class Resource:
                 'photon_area_distribution': 'XENONnT_spe_distributions_20210305.csv',
                 's1_pattern_map': 'XENONnT_s1_xyz_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
                 's2_pattern_map': 'XENONnT_s2_xy_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
+                's2_correction_map': 'XENONnT_s2_xy_correction_corrected_qes_MCva43fa9b_wires.json.gz',
                 'photon_ap_cdfs': 'XENONnT_pmt_afterpulse_config_012605.json.gz',
                 's2_luminescence': 'XENONnT_GARFIELD_B1d5n_C30n_G1n_A6d5p_T1d5n_PMTs1d5n_FSR0d95n.npz',
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
@@ -147,7 +148,7 @@ class Resource:
         if config['detector'] == 'XENON1T':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='json.gz')
             self.s1_light_yield_map = make_map(files['s1_light_yield_map'], fmt='json')
-            self.s2_light_yield_map = make_map(files['s2_light_yield_map'], fmt='json')
+            self.s2_correction_map = make_map(files['s2_correction_map'], fmt='json')
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='json.gz')
             self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
 
@@ -170,13 +171,7 @@ class Resource:
                 self.s1_light_yield_map = lymap
 
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='pkl')
-            if isinstance(self.s2_pattern_map, DummyMap):
-                self.s2_light_yield_map = self.s2_pattern_map.reduce_last_dim()
-            else:
-                lymap = deepcopy(self.s2_pattern_map)
-                lymap.data['map'] = np.sum(lymap.data['map'][:][:], axis=2, keepdims=True)
-                lymap.__init__(lymap.data)
-                self.s2_light_yield_map = lymap
+            self.s2_correction_map = make_map(files['s2_correction_map'], fmt='json.gz')
 
             # Garfield luminescence timing samples
             if config.get('s2_luminescence_model', False) == 'garfield':
@@ -248,7 +243,7 @@ def make_map(map_file, fmt='text'):
         raise TypeError("Can't handle map_file except a string or a list")
 
 
-class DummyMap(object):
+class DummyMap:
     """Return constant results
         the length match the length of input
         but from the second dimensions the shape is user defined input
@@ -256,7 +251,7 @@ class DummyMap(object):
     def __init__(self, const, shape=()):
         self.const = const
         self.shape = shape
-        
+
     def __call__(self, x, **kwargs):
         shape = [len(x)] + list(self.shape)
         return np.ones(shape) * self.const
