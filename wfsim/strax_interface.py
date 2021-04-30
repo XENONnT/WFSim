@@ -721,7 +721,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                     data=result_nv[data_type.strip('_nv')],
                     data_type=data_type)
                 #If nv is not one of the targets jus return an empty chunk
-                if 'nv' in data_type:
+            if 'nv' in data_type:
                     chunk[data_type] = self.chunk(
                     start=self.sim.chunk_time_pre,
                     end=self.sim.chunk_time,
