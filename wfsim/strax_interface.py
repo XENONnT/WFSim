@@ -521,7 +521,8 @@ class RawRecordsFromFax1T(RawRecordsFromFaxNT):
     strax.Option('fax_config_nveto', default=None, track=True,),
     strax.Option('fax_config_override_nveto', default=None, track=True,
                  help='Dictionary with configuration option overrides'),
-    strax.Option('gain_model_nv', default=('to_pe_constant', 0.01), track=False),
+    strax.Option('gain_model_nv', track=True,
+                 help='nveto gain model, provided by context'),
     strax.Option('targets', default=('tpc',), track=False,
                  help='tuple with what data to simulate (tpc, nveto or both)')
 )
