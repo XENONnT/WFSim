@@ -29,6 +29,7 @@ jobs:
       uses: py-actions/py-dependency-install@v2
     - name: Install requirements
       run: |
+        pip install coveralls
         pip install git+https://github.com/XENONnT/straxen
     - name: Coveralls
       env:
