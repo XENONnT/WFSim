@@ -725,7 +725,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                     chunk[data_type] = self.chunk(
                     start=self.sim.chunk_time_pre,
                     end=self.sim.chunk_time,
-                    data=list(),
+                    data=np.array([]),
                     data_type=data_type)
             elif 'nv' not in data_type:
                 chunk[data_type] = self.chunk(
@@ -734,7 +734,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                     data=result[data_type],
                     data_type=data_type)
 
-        self._sort_check([chunk[data_type].data for data_type in [self.targets[target] for target in self.config['targets']][0]])
+        self._sort_check([chunk[data_type].data for data_type in self.provides])
 
         return chunk
 
