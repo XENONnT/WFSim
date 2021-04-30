@@ -380,7 +380,9 @@ class S1(Pulse):
         :param recoil_type: 1d array of ints
         :param config: dict wfsim config
         :param phase: str "liquid"
-
+        :param channels: list of photon hit channels 
+        :params positions: nx3 array of true XYZ positions from instruction
+        :parans resource: pointer to resources class of wfsim that contains s1 timing splines
         returns photon timing array"""
         _photon_timings = np.repeat(t, n_photons)
         if len(_photon_timings) == 0:
@@ -426,6 +428,14 @@ class S1(Pulse):
 
     @staticmethod
     def spline_delay(counts_start, counts, channels, position, config, splines):
+        """Function gettting times from s1 timing splines:
+        
+        :param counts_start: first count corresponding to current instruction
+        :param counts: number of counts corresponding to current instruction
+        :param position: 1x3 array for XYZ position of current instruction
+        :param config: current configuration of wfsim
+        :param splines: pointer to s1 timing splines from resources
+        """
         extra_times = np.zeros(counts)
         
         # interpolation functions inside make resorting and result in sorted times
