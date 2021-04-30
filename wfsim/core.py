@@ -395,8 +395,12 @@ class S1(Pulse):
                 np.isin(recoil_type, NestId._ALL).all()):
             counts_start = 0
             for i, counts in enumerate(n_photons):
+                # Generating time delays that are read from splines
                 extra_times = np.zeros(counts)
                 
+
+                # interpolation functions inside make resorting and result in sorted times
+                # argsort is used to avoid this issue 
                 ## doing top arrays
                 _top_bool = channels[counts_start:counts_start+counts]<(config['n_top_pmts'])
                 _n_top_hit = np.sum(_top_bool)
@@ -405,7 +409,7 @@ class S1(Pulse):
                 _top_argsort = _top_rng.argsort()
                 _top_times[_top_argsort] = resource.s1_time_splines['top'](positions[i][2],
                                                                            _top_rng[_top_argsort] )[:,0]
-                ###
+                ### doing bottom array
                 _bottom_bool = channels[counts_start:counts_start+counts]>=(config['n_top_pmts'])
                 _n_bottom_hit = np.sum(_bottom_bool)     
                 _bottom_times = np.zeros(_n_bottom_hit)  
@@ -414,13 +418,11 @@ class S1(Pulse):
                 _bottom_times[_bottom_argsort] = resource.s1_time_splines['bottom'](positions[i][2],
                                                                            _bottom_rng[_bottom_argsort] )[:,0]
                     
-                ###
+                ### Addting propagation/scintillation delay to final times
                 extra_times[_top_bool] = _top_times
                 extra_times[_bottom_bool] = _bottom_times
-                
                 _photon_timings[counts_start: counts_start + counts]+=extra_times.round().astype(np.int64)
                 counts_start += counts
-                pass
             return _photon_timings
         
         _photon_timings = np.repeat(t, n_photons)
