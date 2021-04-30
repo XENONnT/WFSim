@@ -48,7 +48,7 @@ def deregister_if_not_simulated(context, check_for_endswith=('_nv', '_mv')):
     :param check_for_endswith: Check for these patterns. If no
         raw-records of this kind are created, remove any other plugin
         that ends with these strings from the context
-    :return: The cleaned up context
+    :return: The cleaned-up context
     """
     simulated = context._plugin_class_registry['truth'].provides
     for endswith in check_for_endswith:
