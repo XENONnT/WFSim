@@ -714,7 +714,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
 
         chunk = {}
         for data_type in self.provides:
-            if 'nv' in data_type:
+            if 'nveto' in self.config['targets']:
                 chunk[data_type] = self.chunk(
                     start=self.sim_nv.chunk_time_pre,
                     end=self.sim_nv.chunk_time,
