@@ -21,7 +21,11 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     setup_requires=['pytest-runner'],
     install_requires=requires,
-    tests_require=requires + ['pytest'],
+    tests_require=requires + ['pytest',
+                              'hypothesis',
+                              'flake8',
+                              'pytest-cov',
+                              ],
     python_requires=">=3.6",
     extras_require={
         'docs': [

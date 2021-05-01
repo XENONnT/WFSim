@@ -33,10 +33,11 @@ def test_load_nt():
             "diffusion_radial_map": False,
             "diffusion_azimuthal_map": False},
         "neutron_veto": False,
-        "url_base": "https://raw.githubusercontent.com/XENONnT/WFSim/e890b18f3caab9889a166273580b06f56da5ac58/files",
+        "url_base": "https://raw.githubusercontent.com/XENONnT/WFSim/9e6ecfab13a314a83eec9844ba40811bc4a2dc36/files",
         "photon_area_distribution": "XENONnT_spe_distributions_single_channel.csv",
         "s1_pattern_map": ["constant dummy", 14e-5, [494,]],
         "s2_pattern_map": ["constant dummy", 30e-5, [494,]],
+        "s2_correction_map": ["constant dummy", 1, []],
         "field_dependencies_map": ["constant dummy", 1, []],
     }
     result = load_config(config)

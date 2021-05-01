@@ -31,15 +31,14 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Checkout repo
         uses: actions/checkout@v2
-      - name: Install python dependencies
-        uses: py-actions/py-dependency-install@v2
       - name: Install dependencies
         run: |
-          pip install pytest flake8 pytest-cov pytest hypothesis
-          python setup.py install
+          pip install git+https://github.com/XENONnT/straxen
+      - name: Install python dependencies
+        uses: py-actions/py-dependency-install@v2
       - name: Do the test
         if: matrix.os == 'ubuntu-latest'
         run: |
-            pytest
+            python setup.py test
       - name: goodbye
         run: echo goodbye
