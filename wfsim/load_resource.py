@@ -209,8 +209,11 @@ class Resource:
             # Photon After Pulses
             if config.get('enable_pmt_afterpulses', False):
                 self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='json.gz')
+
+            # S1 photon timing splines
             if config.get('s1_time_spline', False):
                 self.s1_time_splines = straxen.get_resource(files['s1_time_spline'], fmt='pkl')
+
         elif config.get('detector') == 'XENONnT_neutron_veto':
 
             # Neutron veto PMT QE as function of wavelength
