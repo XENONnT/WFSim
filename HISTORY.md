@@ -1,3 +1,13 @@
+v0.5.1 / 2021-05-03
+===================
+* S1 timing splines implementation for top/bottom arrays (#148)
+* Update classifiers (#150)
+* Tuck load ele ap in tpc conditions (#149)
+* Fix nveto readout (#147)
+* Map update followup (#143)
+* Add tests for #144 (#146)
+* No default for gain_model_nv defined in the class (#145)
+
 v0.5.0 / 2021-04-22
 ===================
 * McChainSimulator (major) patch (#125)
