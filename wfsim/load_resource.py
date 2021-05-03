@@ -76,6 +76,7 @@ class Resource:
                 'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
                 'noise_file': 'x1t_noise_170203_0850_00_small.npz',
                 'field_dependencies_map': '',
+                's1_time_spline': '',
              })
         elif config['detector'] == 'XENONnT_neutron_veto':
             files.update({
@@ -205,6 +206,10 @@ class Resource:
             # Photon After Pulses
             if config.get('enable_pmt_afterpulses', False):
                 self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='json.gz')
+
+            # S1 photon timing splines
+            if config.get('s1_time_spline', False):
+                self.s1_time_splines = straxen.get_resource(files['s1_time_spline'], fmt='pkl')
 
             # Electron After Pulses
             if config.get('enable_electron_afterpulses', False):
