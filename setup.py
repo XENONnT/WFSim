@@ -21,7 +21,11 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     setup_requires=['pytest-runner'],
     install_requires=requires,
-    tests_require=requires + ['pytest'],
+    tests_require=requires + ['pytest',
+                              'hypothesis',
+                              'flake8',
+                              'pytest-cov',
+                              ],
     python_requires=">=3.6",
     extras_require={
         'docs': [
@@ -33,10 +37,13 @@ setuptools.setup(
     packages=['wfsim',
               'wfsim.pax_datastructure',],
     classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
+        'Development Status :: 4 - Beta',
         'License :: OSI Approved :: BSD License',
         'Natural Language :: English',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
         'Intended Audience :: Science/Research',
         'Programming Language :: Python :: Implementation :: CPython',
         'Topic :: Scientific/Engineering :: Physics'],

@@ -76,6 +76,7 @@ class Resource:
                 'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
                 'noise_file': 'x1t_noise_170203_0850_00_small.npz',
                 'field_dependencies_map': '',
+                's1_time_spline': '',
              })
         elif config['detector'] == 'XENONnT_neutron_veto':
             files.update({
@@ -143,9 +144,7 @@ class Resource:
                     files[k] = raw_url
             log.debug(f'Downloaded {k} successfully')
 
-        self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
-
-        if config['detector'] == 'XENON1T':
+        if config.get('detector', 'XENONnT') == 'XENON1T':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='json.gz')
             self.s1_light_yield_map = make_map(files['s1_light_yield_map'], fmt='json')
             self.s2_correction_map = make_map(files['s2_correction_map'], fmt='json')
@@ -159,6 +158,10 @@ class Resource:
             # Photon After Pulses
             if config.get('enable_pmt_afterpulses', False):
                 self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
+
+            # Electron After Pulses
+            if config.get('enable_electron_afterpulses', False):
+                self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
 
         elif config.get('detector', 'XENONnT') == 'XENONnT':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
@@ -204,18 +207,21 @@ class Resource:
             if config.get('enable_pmt_afterpulses', False):
                 self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='json.gz')
 
-        elif config.get('detector') == 'XENONnT_neutron_veto':
+            # S1 photon timing splines
+            if config.get('s1_time_spline', False):
+                self.s1_time_splines = straxen.get_resource(files['s1_time_spline'], fmt='pkl')
 
+            # Electron After Pulses
+            if config.get('enable_electron_afterpulses', False):
+                self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
+
+        elif config.get('detector', 'XENONnT') == 'XENONnT_neutron_veto':
             # Neutron veto PMT QE as function of wavelength
             if config.get('neutron_veto', False):
                 self.nv_pmt_qe = straxen.get_resource(files['nv_pmt_qe'], fmt='json')
 
         # SPE area distributions
         self.photon_area_distribution = straxen.get_resource(files['photon_area_distribution'], fmt='csv')
-
-        # Electron After Pulses compressed, haven't figure out how pkl.gz works
-        if config.get('enable_electron_afterpulses', False):
-            self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
 
         # Noise sample
         if config.get('enable_noise', False):
