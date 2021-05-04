@@ -82,6 +82,40 @@ def test_sim_nT():
         _sanity_check(rr, p)
         log.info(f'All done')
 
+    with tempfile.TemporaryDirectory() as tempdir:
+        log.debug(f'Working in {tempdir}')
+        conf = straxen.contexts.xnt_common_config
+        conf['gain_model'] = ('to_pe_constant', 0.01)
+        resource, conf_override = test_load_nt()
+
+        # The SPE table in this package is for a single channel
+        # We generate the full SPE file for testing here
+        for i in range(1, 494):
+            resource.photon_area_distribution[str(i)] = \
+                resource.photon_area_distribution['0']
+        spe_file = osp.join(tempdir, 'XENONnT_spe_distributions.csv')
+        resource.photon_area_distribution.to_csv(spe_file, index=False)
+        conf_override['photon_area_distribution'] = spe_file
+
+        st = strax.Context(
+            storage=tempdir,
+            config=dict(
+                nchunk=1, event_rate=1, chunk_size=2,
+                detector='XENONnT',
+                fax_config=('https://raw.githubusercontent.com/XENONnT/WFSim'
+                '/9e6ecfab13a314a83eec9844ba40811bc4a2dc36/files/XENONnT_wfsim_config.json'),
+                **conf,
+                fax_config_override=conf_override),
+            **straxen.contexts.common_opts)
+        st.register(wfsim.RawRecordsFromFaxNT)
+
+        log.debug(f'Getting raw-records')
+        rr = st.get_array(run_id, 'raw_records')
+        log.debug(f'Getting peaks')
+        p = st.get_array(run_id, 'peaks')
+        _sanity_check(rr, p)
+        log.info(f'All done')
+
 
 def _sanity_check(raw_records, peaks):
     assert len(raw_records) > 0
