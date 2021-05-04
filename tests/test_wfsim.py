@@ -16,6 +16,10 @@ strax.mailbox.Mailbox.DEFAULT_TIMEOUT = 60
 
 run_id = '010000'
 
+def _sanity_check(raw_records, peaks):
+    assert len(raw_records) > 0
+    assert raw_records['data'].sum() > 0
+    assert peaks['data'].sum() > 0
 
 def test_sim_1T():
     """Test the 1T simulator (should always work with the publicly available files)"""
@@ -44,9 +48,8 @@ def test_sim_1T():
         _sanity_check(rr, p)
         log.info(f'All done')
 
-
-def test_sim_nT():
-    """Test the nT simulator. Works only if one has access to the XENONnT databases"""
+def test_sim_nT_basics():
+    """Test the nT simulator. Uses basic config so complicated steps are skipped"""
 
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
@@ -82,8 +85,29 @@ def test_sim_nT():
         _sanity_check(rr, p)
         log.info(f'All done')
 
+def test_sim_nT_advanced():
+    """Test the nT simulator. Works only if one has access to the XENONnT databases"""
+    
+    if not straxen.utilix_is_configured():
+        return
+    
+    with tempfile.TemporaryDirectory() as tempdir:
+        log.debug(f'Working in {tempdir}')
 
-def _sanity_check(raw_records, peaks):
-    assert len(raw_records) > 0
-    assert raw_records['data'].sum() > 0
-    assert peaks['data'].sum() > 0
+        st = strax.Context(
+            storage=tempdir,
+            config=dict(
+                nchunk=1, event_rate=1, chunk_size=2,
+                detector='XENONnT',
+                fax_config=('fax_config_design.json'),
+                **straxen.contexts.xnt_simulation_config,),
+            **straxen.contexts.common_opts)
+        st.register(wfsim.RawRecordsFromFaxNT)
+
+        log.debug(f'Getting raw-records')
+        rr = st.get_array(run_id, 'raw_records')
+        log.debug(f'Getting peaks')
+        p = st.get_array(run_id, 'peaks')
+        _sanity_check(rr, p)
+        log.info(f'All done')
+
