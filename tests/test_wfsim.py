@@ -92,8 +92,8 @@ def test_sim_nT_advanced():
         Clone the repo to dali and type 'pytest' to run. The first run will test simple s1,
         garfield s2 and noise/afterpulses. The second run will test the s1 spline model"""
     
-    # if not straxen.utilix_is_configured():
-    #     return
+    if not straxen.utilix_is_configured():
+        return
     
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
