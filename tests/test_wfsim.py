@@ -23,7 +23,7 @@ def test_sim_1T():
         log.debug(f'Working in {tempdir}')
         testing_config_1T = dict(
             hev_gain_model=('to_pe_constant', 0.0085),
-            gain_model=('to_pe_constant', 0.0085)
+            gain_model=('to_pe_constant', 0.0085),
         )
         st = strax.Context(
             storage=tempdir,
@@ -31,7 +31,10 @@ def test_sim_1T():
                 nchunk=2, event_rate=1, chunk_size=1,
                 detector='XENON1T',
                 fax_config=('https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files'
-                    '/f4ea367122f45d1ae0e90e57005a77fef7df8a2c/sim_files/fax_config_1t.json'),  # noqa
+                    '/c76f30ad20516efbcc832c97842abcba743f0017/sim_files/fax_config_1t.json'),  # noqa
+                fax_config_override=dict(
+                    url_base=("https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files"
+                              "/c76f30ad20516efbcc832c97842abcba743f0017/sim_files/"),),
                 **straxen.contexts.x1t_common_config),
             **straxen.contexts.common_opts)
         st.register(wfsim.RawRecordsFromFax1T)
