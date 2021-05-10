@@ -49,8 +49,6 @@ jobs:
       - name: Install python dependencies
         uses: py-actions/py-dependency-install@v2
       - name: Do the test
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-            python setup.py test
+        run: python setup.py test
       - name: goodbye
         run: echo goodbye
