@@ -841,6 +841,8 @@ class S2(Pulse):
             return np.zeros(0, np.int64), np.zeros(0, np.int64), np.zeros(0)
 
         n_photons_per_ele = np.random.poisson(_electron_gains)
+        n_photons_per_ele += np.random.normal(0, config.get('s2_gain_spread', 0), len(n_photons_per_ele)).astype(np.int64)
+        n_photons_per_ele[n_photons_per_ele < 0] = 0
         n_photons_per_xy = np.cumsum(np.pad(n_photons_per_ele, [1, 0]))[np.cumsum(n_electron)]
         n_photons_per_xy = np.diff(np.pad(n_photons_per_xy, [1, 0]))
 
