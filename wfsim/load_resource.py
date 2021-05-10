@@ -105,16 +105,16 @@ class Resource:
     def get_file_path(base, fname):
         """Find the full path to the resource file
         Try 4 methods in the following order
-        1. The path base is a local pass, return base + name
-        2. Check if ntauxfiles (straxauxfiles) is installed, return package path + name
-           pip install won't work, do python setup.py
+        1. The base is not url, return base + name
+        2. If ntauxfiles (straxauxfiles) is installed, return will be package dir + name
+           pip install won't work, try python setup.py in the packages
         3. Download using straxen mongo downloader from mongo database,
-           return the cached file path + hash name
+           return the cached file path + hashed name
         4. Download using straxen get_resource from the url (github raw)
            simply return base + name
 
-            Be carefull with the third and forth option, straxen will create 
-            cache files that might not be updated with the newest files.
+            Be carefull with the third and forth options, straxen creates
+            cache files that might not be updated with the latest mongodb entry or github commit.
 
         """
         if base.startswith('/'):
