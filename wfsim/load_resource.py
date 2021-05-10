@@ -106,12 +106,13 @@ class Resource:
         """Find the full path to the resource file
         Try 4 methods in the following order
         1. The path base is a local pass, return base + name
-        2. Check ntauxfiles installed, return ntauxfile path + name
+        2. Check if ntauxfiles (straxauxfiles) is installed, return package path + name
+           pip install won't work, do python setup.py
         3. Download using straxen mongo downloader from mongo database,
            return the cached file path + hash name
         4. Download using straxen get_resource from the url (github raw)
            simply return base + name
-        
+
             Be carefull with the third and forth option, straxen will create 
             cache files that might not be updated with the newest files.
 
@@ -122,9 +123,19 @@ class Resource:
             return osp.join(base, fname)
 
         try:
-            log.warning(f"Using the private repo to load {fname} locally")
             # You might want to use this, for example if you are a developer
-            import ntauxfiles
+            log.warning(f"Using the private repo to load {fname} locally")
+            import ntauxfiles  # private package for XENONnT
+            fpath = ntauxfiles.get_abspath(fname)
+            log.info(f"Loading {fname} is successfully from {fpath}")
+            return fpath
+        except (ModuleNotFoundError, ImportError, FileNotFoundError):
+            log.info(f"ntauxfiles is not installed or does not have {fname}")
+
+        try:
+            # You might want to use this, for example if you are a developer
+            log.warning(f"Using the public repo to load {fname} locally")
+            import straxauxfiles  # public package for XENON1T
             fpath = ntauxfiles.get_abspath(fname)
             log.info(f"Loading {fname} is successfully from {fpath}")
             return fpath
