@@ -17,7 +17,7 @@ on:
       - master
 
 jobs:
-   name: test_wfsim
+    name: test_wfsim
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
