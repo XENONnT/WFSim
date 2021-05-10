@@ -1147,6 +1147,9 @@ class PMT_Afterpulse(Pulse):
             delaytime_cdf = resource.uniform_to_pmt_ap[element]['delaytime_cdf']
             amplitude_cdf = resource.uniform_to_pmt_ap[element]['amplitude_cdf']
 
+            delaytime_bin_size = resource.uniform_to_pmt_ap[element]['delaytime_bin_size']
+            amplitude_bin_size = resource.uniform_to_pmt_ap[element]['amplitude_bin_size']
+
             # Assign each photon FRIST random uniform number rU0 from (0, 1] for timing
             rU0 = 1 - np.random.rand(len(signal_pulse._photon_timings))
 
@@ -1162,25 +1165,26 @@ class PMT_Afterpulse(Pulse):
 
             # The map is made so that the indices are delay time in unit of ns
             if 'Uniform' in element:
-                ap_delay = np.random.uniform(delaytime_cdf[sel_photon_channel, 0], 
+                ap_delay = (np.random.uniform(delaytime_cdf[sel_photon_channel, 0], 
                                              delaytime_cdf[sel_photon_channel, 1])
+                            * delaytime_bin_size)
                 ap_amplitude = np.ones_like(ap_delay)
             else:
                 ap_delay = (np.argmin(
                     np.abs(
                         delaytime_cdf[sel_photon_channel]
-                        - rU0[sel_photon_id][:, None]), axis=-1)
+                        - rU0[sel_photon_id][:, None]), axis=-1) * delaytime_bin_size
                             - config['pmt_ap_t_modifier'])
                 if len(amplitude_cdf.shape) == 2:
                     ap_amplitude = np.argmin(
                         np.abs(
                             amplitude_cdf[sel_photon_channel]
-                            - rU1[:, None]), axis=-1) / 100.
+                            - rU1[:, None]), axis=-1) * amplitude_bin_size
                 else:
                     ap_amplitude = np.argmin(
                         np.abs(
                             amplitude_cdf[None, :]
-                            - rU1[:, None]), axis=-1) / 100.
+                            - rU1[:, None]), axis=-1) * amplitude_bin_size
 
             _photon_timings.append(signal_pulse._photon_timings[sel_photon_id] + ap_delay)
             _photon_channels.append(signal_pulse._photon_channels[sel_photon_id])
