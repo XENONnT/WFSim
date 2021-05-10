@@ -697,16 +697,16 @@ class S2(Pulse):
 
     @staticmethod
     @njit
-    def _luminescence_timings_simple(n, dG, E0, r, dr, rr, alpha, uE, p, n_electron, shape):
-        emission_time = np.zeros(shape, np.int64)
+    def _luminescence_timings_simple(n, dG, E0, r, dr, rr, alpha, uE, p, n_photons):
         """
         Luminescence time distribution computation, calculates emission timings of photons from the excited electrons
         return 1d nested array with ints
         """
+        emission_time = np.zeros(np.sum(n_photons), np.int64)
 
         ci = 0
         for i in range(n):
-            ne = n_electron[i]
+            npho = n_photons[i]
             dt = dr / (alpha * E0[i] * rr)
             dy = E0[i] * rr / uE - 0.8 * p  # arXiv:physics/0702142
             avgt = np.sum(np.cumsum(dt) * dy) / np.sum(dy)
@@ -715,25 +715,23 @@ class S2(Pulse):
             t = np.cumsum(dt[j:]) - avgt
             y = np.cumsum(dy[j:])
 
-            probabilities = np.random.rand(ne, shape[1])
-            emission_time[ci:ci+ne, :] = np.interp(probabilities, y / y[-1], t).astype(np.int64)
-            ci += ne
+            probabilities = np.random.rand(npho)
+            emission_time[ci:ci+npho] = np.interp(probabilities, y / y[-1], t).astype(np.int64)
+            ci += npho
 
         return emission_time
 
     @staticmethod
-    def luminescence_timings_simple(xy, n_electron, shape, config, resource):
+    def luminescence_timings_simple(xy, n_photons, config, resource):
         """
         Luminescence time distribution computation according to simple s2 model (many many many single electrons)
         :param xy: 1d array with positions
-        :param n_electron: 1d array with ints for number f electrons
-        :param shape: tuple with nelectron,nphotons
+        :param n_photons: 1d array with ints for number of xy positions
         :param config: dict wfsim config
         :param resource: instance of wfsim resource
         returns _luminescence_timings_simple
         """
-        assert len(n_electron) == len(xy), 'Input number of n_electron should have same length as positions'
-        assert np.sum(n_electron) == shape[0], 'Total number of electron does not agree with shape[0]'
+        assert len(n_photons) == len(xy), 'Input number of n_photons should have same length as positions'
 
         number_density_gas = config['pressure'] / \
             (units.boltzmannConstant * config['temperature'])
@@ -758,23 +756,21 @@ class S2(Pulse):
 
         return S2._luminescence_timings_simple(len(xy), dG, E0, 
                                                r, dr, rr, alpha, uE,
-                                               pressure, n_electron, shape)
+                                               pressure, n_photons)
 
     @staticmethod
-    def luminescence_timings_garfield(xy, n_electron, shape, config, resource):
+    def luminescence_timings_garfield(xy, n_photons, config, resource):
         """
         Luminescence time distribution computation according to garfield scintillation maps
         :param xy: 1d array with positions
-        :param n_electron: 1d array with ints for number f electrons
-        :param shape: tuple with nelectron,nphotons
+        :param n_photons: 1d array with ints for number of xy positions
         :param config: dict wfsim config
         :param resource: instance of wfsim resource
 
         returns 2d array with ints for photon timings of input param 'shape'
         """
         assert 's2_luminescence' in resource.__dict__, 's2_luminescence model not found'
-        assert len(n_electron) == len(xy), 'Input number of n_electron should have same length as positions'
-        assert np.sum(n_electron) == shape[0], 'Total number of electron does not agree with shape[0]'
+        assert len(n_photons) == len(xy), 'Input number of n_electron should have same length as positions'
         assert len(resource.s2_luminescence['t'].shape) == 2, 'Timing data is expected to have D2'
 
         tilt = config.get('anode_xaxis_angle', np.pi / 4)
@@ -785,10 +781,10 @@ class S2(Pulse):
         distance = jagged(np.matmul(xy, rotation_mat)[:, 1])  # shortest distance from any wire
 
         index_row = [np.argmin(np.abs(d - resource.s2_luminescence['x'])) for d in distance]
-        index_row = np.repeat(index_row, n_electron).astype(np.int64)
-        index_col = np.random.randint(0, resource.s2_luminescence['t'].shape[1], shape, np.int64)
+        index_row = np.repeat(index_row, n_photons).astype(np.int64)
+        index_col = np.random.randint(0, resource.s2_luminescence['t'].shape[1], np.sum(n_photons), np.int64)
 
-        return resource.s2_luminescence['t'][index_row[:, None], index_col].astype(np.int64)
+        return resource.s2_luminescence['t'][index_row, index_col].astype(np.int64)
 
     @staticmethod
     @njit
@@ -843,47 +839,27 @@ class S2(Pulse):
         if len(_electron_timings) < 1:
             return np.zeros(0, np.int64), np.zeros(0, np.int64), np.zeros(0)
 
-        # For vectorized calculation, artificially top #photon per electron at +4 sigma
-        nele = len(_electron_timings)
-        npho = np.ceil(np.max(_electron_gains) +
-                       4 * np.sqrt(np.max(_electron_gains))).astype(np.int64)
+        n_photons_per_ele = np.random.poisson(_electron_gains)
+        n_photons_per_xy = np.cumsum(np.pad(n_photons_per_ele, [1, 0]))[np.cumsum(n_electron)]
+        n_photons_per_xy = np.diff(np.pad(n_photons_per_xy, [1, 0]))
 
         if config['s2_luminescence_model'] == 'simple':
-            _photon_timings = S2.luminescence_timings_simple(xy, n_electron, (nele, npho), 
+            _photon_timings = S2.luminescence_timings_simple(xy, n_photons_per_xy,
                                                              config=config,
                                                              resource=resource)
         elif config['s2_luminescence_model'] == 'garfield':
             _photon_timings = S2.luminescence_timings_garfield(
-                xy, n_electron, (nele, npho),
+                xy, n_photons_per_xy,
                 config=config,
                 resource=resource)
 
-        _photon_timings += np.repeat(_electron_timings, npho).reshape((nele, npho))
-
-        # Crop number of photons by random number generated with poisson
-        probability = np.tile(np.arange(npho), nele).reshape((nele, npho))
-        threshold = np.repeat(np.random.poisson(_electron_gains), npho).reshape((nele, npho))
-        _photon_timings = _photon_timings[probability < threshold]
-
-        # Special index for match photon to original electron poistion
-        _instruction = np.repeat(
-            np.repeat(np.arange(len(t)), n_electron), npho).reshape((nele, npho))
-        _instruction = _instruction[probability < threshold]
+        _photon_timings += np.repeat(_electron_timings, n_photons_per_ele)
+        _instruction = np.repeat(np.arange(len(xy)), n_photons_per_xy)
 
         _photon_timings += Pulse.singlet_triplet_delays(
             len(_photon_timings), config['singlet_fraction_gas'], config, phase)
 
         _photon_timings += np.random.normal(0, config['s2_time_spread'], len(_photon_timings)).astype(np.int64)
-        # The timings generated is NOT randomly ordered, must do shuffle
-        # Shuffle within each given n_electron[i]
-        # We can do this by first finding out cumulative sum of the photons
-        cumulate_npho = np.pad(np.cumsum(threshold[:, 0]), [1, 0])[np.cumsum(n_electron)]
-        for i in range(len(cumulate_npho)):
-            if i == 0:
-                s = slice(0, cumulate_npho[i])
-            else:
-                s = slice(cumulate_npho[i-1], cumulate_npho[i])
-            np.random.shuffle(_photon_timings[s])
 
         return _electron_timings, _photon_timings, _instruction
 
