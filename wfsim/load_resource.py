@@ -19,7 +19,7 @@ def load_config(config):
 
     Uses a cache to avoid re-creating instances from the same config
     """
-    h = strax.deterministic_hash(Resource.file_config(config))
+    h = strax.deterministic_hash(Resource.config_to_file(config))
     if h in _cached_configs:
         return _cached_configs[h]
     result = Resource(config)
@@ -41,7 +41,7 @@ class Resource:
             are properly setup
     """
     @staticmethod
-    def file_config(config):
+    def config_to_file(config):
         """
         Find and complete all file paths
 
@@ -164,7 +164,7 @@ class Resource:
         return furl
 
     def __init__(self, config=None):
-        files = self.file_config(config)
+        files = self.config_to_file(config)
         log.debug('Getting\n' + '\n'.join([f'{k}: {v}' for k, v in files.items()]))
 
         for k, v in files.items():
