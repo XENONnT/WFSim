@@ -101,48 +101,69 @@ class Resource:
 
         return files
 
+    @staticmethod
+    def get_file_path(base, fname):
+        """Find the full path to the resource file
+        Try 4 methods in the following order
+        1. The path base is a local pass, return base + name
+        2. Check ntauxfiles installed, return ntauxfile path + name
+        3. Download using straxen mongo downloader from mongo database,
+           return the cached file path + hash name
+        4. Download using straxen get_resource from the url (github raw)
+           simply return base + name
+        
+            Be carefull with the third and forth option, straxen will create 
+            cache files that might not be updated with the newest files.
+
+        """
+        if base.startswith('/'):
+            log.warning(f"Using local file {fname} for a resource. "
+                        f"Do not set this as a default or TravisCI tests will break")
+            return osp.join(base, fname)
+
+        try:
+            log.warning(f"Using the private repo to load {fname} locally")
+            # You might want to use this, for example if you are a developer
+            import ntauxfiles
+            fpath = ntauxfiles.get_abspath(fname)
+            log.info(f"Loading {fname} is successfully from {fpath}")
+            return fpath
+        except (ModuleNotFoundError, ImportError, FileNotFoundError):
+            log.info(f"ntauxfiles is not installed or does not have {fname}")
+
+        try:
+            # https://straxen.readthedocs.io/en/latest/config_storage.html
+            # downloading-xenonnt-files-from-the-database  # noqa
+
+            # we need to add the straxen.MongoDownloader() in this
+            # try: except NameError: logic because the NameError
+            # gets raised if we don't have access to utilix.
+            downloader = straxen.MongoDownloader()
+            # FileNotFoundError, ValueErrors can be raised if we
+            # cannot load the requested config
+            fpath = downloader.download_single(fname)
+            return fpath
+        except (FileNotFoundError, ValueError, NameError, AttributeError):
+            log.info(f"Mongo downloader not possible or does not have {fname}")
+
+        # We cannot download the file from the database. We need to
+        # try to get a placeholder file from a URL.
+        furl = osp.join(base, fname)
+        log.warning(f'{fname} did not download, trying download from {base}')
+        return furl
+
     def __init__(self, config=None):
         files = self.file_config(config)
         log.debug('Getting\n' + '\n'.join([f'{k}: {v}' for k, v in files.items()]))
 
         for k, v in files.items():
             if isinstance(v, list):
+                # It's a dummy map call, do nothing
                 continue
             if k == 'url_base':
                 continue
             log.debug(f'Obtaining {k} from {v}')
-            if v.startswith('/'):
-                log.warning(f"WARNING: Using local file {v} for a resource. "
-                            f"Do not set this as a default or TravisCI tests will break")
-                continue
-            try:
-                # First try downloading it via
-                # https://straxen.readthedocs.io/en/latest/config_storage.html
-                # downloading-xenonnt-files-from-the-database  # noqa
-
-                # we need to add the straxen.MongoDownloader() in this
-                # try: except NameError: logic because the NameError
-                # gets raised if we don't have access to utilix.
-                downloader = straxen.MongoDownloader()
-                # FileNotFoundError, ValueErrors can be raised if we
-                # cannot load the requested config
-                downloaded_file = downloader.download_single(v)
-                files[k] = downloaded_file
-            except (FileNotFoundError, ValueError, NameError, AttributeError):
-                try:
-                    log.warning(f"Trying to use the private repo to load {v} locally")
-                    # You might want to use this, for example if you are a developer
-                    import ntauxfiles
-                    files[k] = ntauxfiles.get_abspath(v)
-                    log.info(f"Loading {v} is successfully from {files[k]}")
-                except (ModuleNotFoundError, ImportError, FileNotFoundError):
-                    log.info(f"ntauxfiles is not installed or does not have {v}")
-                    # We cannot download the file from the database. We need to
-                    # try to get a placeholder file from a URL.
-                    raw_url = osp.join(files['url_base'], v)
-                    log.warning(f'{k} did not download, trying {raw_url}')
-                    files[k] = raw_url
-            log.debug(f'Downloaded {k} successfully')
+            files[k] = self.get_file_path(files['url_base'], files[v])
 
         if config.get('detector', 'XENONnT') == 'XENON1T':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='json.gz')
