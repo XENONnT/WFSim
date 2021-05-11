@@ -93,6 +93,7 @@ def test_sim_nT_advanced():
         garfield s2 and noise/afterpulses. The second run will test the s1 spline model"""
     
     if not straxen.utilix_is_configured():
+        log.warning(f"Utilix is not configured, skipping database-requiring tests!")
         return
     
     with tempfile.TemporaryDirectory() as tempdir:
