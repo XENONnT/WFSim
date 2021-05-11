@@ -5,6 +5,21 @@ import numpy as np
 import strax
 import straxen
 import logging
+
+NT_AUX_INSTALLED = False
+STRAX_AUX_INSTALLED = False
+
+try:
+    import ntauxfiles
+    NT_AUX_INSTALLED = True
+except (ModuleNotFoundError, ImportError):
+    pass
+try:
+    import straxauxfiles
+    STRAX_AUX_INSTALLED = True
+except (ModuleNotFoundError, ImportError):
+    pass
+
 logging.basicConfig(handlers=[
     # logging.handlers.WatchedFileHandler('wfsim.log'),
     logging.StreamHandler()])
@@ -108,13 +123,12 @@ class Resource:
         1. The base is not url, return base + name
         2. If ntauxfiles (straxauxfiles) is installed, return will be package dir + name
            pip install won't work, try python setup.py in the packages
-        3. Download using straxen mongo downloader from mongo database,
-           return the cached file path + hashed name
+        3. Download the latest version using straxen mongo downloader from database,
+           return the cached file path + md5
         4. Download using straxen get_resource from the url (github raw)
            simply return base + name
-
-            Be careful with the third and forth options, straxen creates
-            cache files that might not be updated with the latest mongodb entry or github commit.
+            Be careful with the forth options, straxen creates
+            cache files that might not be updated with the latest github commit.
 
         """
         if base.startswith('/'):
@@ -122,25 +136,20 @@ class Resource:
                         f"Do not set this as a default or TravisCI tests will break")
             return osp.join(base, fname)
 
-        try:
+        if NT_AUX_INSTALLED:
             # You might want to use this, for example if you are a developer
-            log.warning(f"Using the private repo to load {fname} locally")
-            import ntauxfiles  # private package for XENONnT
-            fpath = ntauxfiles.get_abspath(fname)
-            log.info(f"Loading {fname} is successfully from {fpath}")
-            return fpath
-        except (ModuleNotFoundError, ImportError, FileNotFoundError):
-            log.info(f"ntauxfiles is not installed or does not have {fname}")
+            if fname in ntauxfiles.list_private_files():
+                log.warning(f"Using the private repo to load {fname} locally")
+                fpath = ntauxfiles.get_abspath(fname)
+                log.info(f"Loading {fname} is successfully from {fpath}")
+                return fpath
 
-        try:
-            # You might want to use this, for example if you are a developer
-            log.warning(f"Using the public repo to load {fname} locally")
-            import straxauxfiles  # public package for XENON1T
-            fpath = ntauxfiles.get_abspath(fname)
-            log.info(f"Loading {fname} is successfully from {fpath}")
-            return fpath
-        except (ModuleNotFoundError, ImportError, FileNotFoundError):
-            log.info(f"straxauxfiles is not installed or does not have {fname}")
+        if STRAX_AUX_INSTALLED:
+            if fname in straxauxfiles.list_aux_files():
+                log.warning(f"Using the public repo to load {fname} locally")
+                fpath = straxauxfiles.get_abspath(fname)
+                log.info(f"Loading {fname} is successfully from {fpath}")
+                return fpath
 
         try:
             # https://straxen.readthedocs.io/en/latest/config_storage.html
