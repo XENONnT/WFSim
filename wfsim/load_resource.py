@@ -140,7 +140,7 @@ class Resource:
             log.info(f"Loading {fname} is successfully from {fpath}")
             return fpath
         except (ModuleNotFoundError, ImportError, FileNotFoundError):
-            log.info(f"ntauxfiles is not installed or does not have {fname}")
+            log.info(f"straxauxfiles is not installed or does not have {fname}")
 
         try:
             # https://straxen.readthedocs.io/en/latest/config_storage.html
