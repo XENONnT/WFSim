@@ -44,12 +44,11 @@ def test_noise(data_length, n_channels, noise_data_length):
 def test_s2_luminescence_timings_garfield(n_positions, n_photons):
     config = dict()
     xy = np.random.uniform(-10, 10, size=[n_positions, 2])
-    n_electrons = np.random.randint(0, 10, size=n_positions)
-    shape = (n_electrons.sum(), n_photons)
+    n_photons = np.random.randint(0, 10, size=n_positions)
     # We just need an instance of resource and not initialization
     resource = wfsim.load_resource.Resource.__new__(wfsim.load_resource.Resource)
     dummy_s2_luminescence = np.zeros(1000, dtype=[('x', 'f4'), ('t', 'i4', 1000)])
     dummy_s2_luminescence['x'] = np.linspace(-1, 1, 1000)
     dummy_s2_luminescence['t'] = np.random.randint(0, 10, (1000, 1000))
     resource.s2_luminescence = dummy_s2_luminescence
-    wfsim.S2.luminescence_timings_garfield(xy, n_electrons, shape, config=config, resource=resource)
+    wfsim.S2.luminescence_timings_garfield(xy, n_photons, config=config, resource=resource)
