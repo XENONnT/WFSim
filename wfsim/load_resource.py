@@ -113,7 +113,7 @@ class Resource:
         4. Download using straxen get_resource from the url (github raw)
            simply return base + name
 
-            Be carefull with the third and forth options, straxen creates
+            Be careful with the third and forth options, straxen creates
             cache files that might not be updated with the latest mongodb entry or github commit.
 
         """
