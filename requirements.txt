@@ -2,5 +2,3 @@ strax
 utilix>=0.5.3
 straxen>=0.15.7
 uproot>=4.0.0
-sphinx
-sphinx_rtd_theme
