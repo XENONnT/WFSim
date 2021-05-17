@@ -182,6 +182,11 @@ class Resource:
                 continue
             if k == 'url_base':
                 continue
+            if v == '':
+                log.warning(f'{k} has no path so this config file is set to None')
+                files[k] = None
+                continue
+
             log.debug(f'Obtaining {k} from {v}')
             files[k] = self.get_file_path(files['url_base'], v)
 
