@@ -33,6 +33,7 @@ jobs:
         uses: actions/checkout@v2
       - name: Install dependencies
         run: |
+          pip install zstd~=1.4
           pip install git+https://github.com/XENONnT/straxen
       - name: patch utilix file
         # Since we skip this step for python 3.7, we are testing without the database
