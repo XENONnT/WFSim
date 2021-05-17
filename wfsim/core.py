@@ -1297,6 +1297,9 @@ class RawData(object):
                 yield from self.ZLE()
                 
             self.source_finished = len(inst_queue) == 0 and np.sum(instb_filled) == 0
+        
+        self.digitize_pulse_cache()  # To make sure we digitize all data
+        yield from self.ZLE()
         if progress_bar:
             pbar.close()
 
