@@ -1396,7 +1396,7 @@ class RawData(object):
                 self._channel_mask['mask'][ch] = True
                 self._channel_mask['left'][ch] = min(_pulse['left'], self._channel_mask['left'][ch])
                 self._channel_mask['right'][ch] = max(_pulse['right'], self._channel_mask['right'][ch])
-                adc_wave = - np.trunc(_pulse['current'] * self.current_2_adc).astype(np.int64)
+                adc_wave = - np.around(_pulse['current'] * self.current_2_adc).astype(np.int64)
                 _slice = slice(_pulse['left'] - self.left, _pulse['right'] - self.left + 1)
 
                 self._raw_data[ch, _slice] += adc_wave
