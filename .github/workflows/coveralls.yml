@@ -28,7 +28,6 @@ jobs:
     - name: Install requirements
       run: |
         pip install coveralls
-        pip install zstd~=1.4.9
         pip install git+https://github.com/XENONnT/straxen
     - name: Install python dependencies
       uses: py-actions/py-dependency-install@v2
