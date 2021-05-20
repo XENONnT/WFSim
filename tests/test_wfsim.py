@@ -41,7 +41,8 @@ def test_sim_1T():
                     url_base=("https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files"
                               "/c76f30ad20516efbcc832c97842abcba743f0017/sim_files/"),),
                 **straxen.contexts.x1t_common_config),
-            **straxen.contexts.common_opts)
+            **straxen.contexts.x1t_context_config,
+        )
         st.register(wfsim.RawRecordsFromFax1T)
         log.debug(f'Setting testing config {testing_config_1T}')
         st.set_config(testing_config_1T)
