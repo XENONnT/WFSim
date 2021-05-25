@@ -1,3 +1,18 @@
+v0.5.2 / 2021-05-25
+===================
+* Fix zstd for testing (#163)
+* Patch 1T custom context (#162)
+* Fixing SPE reconstruciton bias due to truncation (#161)
+* Following up the change in pmt ap file (#158)
+* Fix #157 for empty files (#160)
+* Fix missing last instruction (#159)
+* Fix load resource (#157)
+* S2 photon patch (#156)
+* Fix notebook, evaluate for docs (#154)
+* Add tests (#152)
+* Use database access to increase coverage of tests (#155)
+* Update Getting_started_wfsim.ipynb (#153)
+
 v0.5.1 / 2021-05-03
 ===================
 * S1 timing splines implementation for top/bottom arrays (#148)
