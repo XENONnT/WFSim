@@ -17,7 +17,7 @@ logging.basicConfig(handlers=[
     # logging.handlers.WatchedFileHandler('wfsim.log'),
     logging.StreamHandler()])
 log = logging.getLogger('wfsim.core')
-log.setLevel('DEBUG')
+log.setLevel('WARNING')
 
 PULSE_TYPE_NAMES = ('RESERVED', 's1', 's2', 'unknown', 'pi_el', 'pmt_ap', 'pe_el')
 _cached_pmt_current_templates = {}
