@@ -1489,9 +1489,13 @@ class RawData(object):
                 tb[f't_sigma_{quantum}'] = np.nan
         
         # Endtime is the end of the last pulse
-        tb['endtime'] = np.mean(instruction['time']) if np.isnan(tb['t_last_photon']) else tb['t_last_photon'] + \
-            (self.config['samples_before_pulse_center'] + self.config['samples_after_pulse_center'] + 1) \
-            * self.config['sample_duration']
+        if np.isnan(tb['t_last_photon']):
+            tb['endtime'] = instruction['time'][0]
+        else:
+            tb['endtime'] = tb['t_last_photon'] + \
+                (self.config['samples_before_pulse_center'] + self.config['samples_after_pulse_center'] + 1) \
+                * self.config['sample_duration']
+
         channels = getattr(pulse, '_photon_channels', [])
         if self.config.get('exclude_dpe_in_truth', False):
             n_dpe = n_dpe_bot = 0
@@ -1510,7 +1514,7 @@ class RawData(object):
         # Summarize the instruction cluster in one row of the truth file
         for field in instruction.dtype.names:
             value = instruction[field]
-            if len(instruction) > 1 and field in 'txyz':
+            if len(instruction) > 1 and field in 'xyz':
                 tb[field] = np.mean(value)
             elif len(instruction) > 1 and field == 'amp':
                 tb[field] = np.sum(value)

@@ -398,8 +398,7 @@ class SimulatorPlugin(strax.Plugin):
 
         adc_2_current = (self.config['digitizer_voltage_range']
                          / 2 ** (self.config['digitizer_bits'])
-                         / self.config['pmt_circuit_load_resistor']
-                         / self.config['external_amplification'])
+                         / self.config['pmt_circuit_load_resistor'])
 
         self.config['gains'] = np.divide(adc_2_current,
                                          self.to_pe,
