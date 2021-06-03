@@ -396,9 +396,13 @@ class SimulatorPlugin(strax.Plugin):
         self.to_pe = straxen.get_to_pe(self.run_id, self.config['gain_model'],
                                        self.config['channel_map']['tpc'][1]+1)
 
-        self.config['gains'] = np.divide((1e-8 * 2.25 / 2**14) / (1.6e-19 * 10 * 50),
+        adc_2_current = (self.config['digitizer_voltage_range']
+                         / 2 ** (self.config['digitizer_bits'])
+                         / self.config['pmt_circuit_load_resistor'])
+
+        self.config['gains'] = np.divide(adc_2_current,
                                          self.to_pe,
-                                         out=np.zeros_like(self.to_pe, ),
+                                         out=np.zeros_like(self.to_pe),
                                          where=self.to_pe != 0)
 
         if self.config['seed']:

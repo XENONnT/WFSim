@@ -4,6 +4,7 @@ import straxen
 import wfsim
 import logging
 import os.path as osp
+
 from .test_load_resource import test_load_nt
 
 logging.basicConfig(
@@ -16,6 +17,10 @@ strax.mailbox.Mailbox.DEFAULT_TIMEOUT = 60
 
 run_id = '010000'
 
+def _sanity_check(raw_records, peaks):
+    assert len(raw_records) > 0
+    assert raw_records['data'].sum() > 0
+    assert peaks['data'].sum() > 0
 
 def test_sim_1T():
     """Test the 1T simulator (should always work with the publicly available files)"""
@@ -23,7 +28,7 @@ def test_sim_1T():
         log.debug(f'Working in {tempdir}')
         testing_config_1T = dict(
             hev_gain_model=('to_pe_constant', 0.0085),
-            gain_model=('to_pe_constant', 0.0085)
+            gain_model=('to_pe_constant', 0.0085),
         )
         st = strax.Context(
             storage=tempdir,
@@ -31,9 +36,13 @@ def test_sim_1T():
                 nchunk=2, event_rate=1, chunk_size=1,
                 detector='XENON1T',
                 fax_config=('https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files'
-                    '/f4ea367122f45d1ae0e90e57005a77fef7df8a2c/sim_files/fax_config_1t.json'),  # noqa
+                    '/c76f30ad20516efbcc832c97842abcba743f0017/sim_files/fax_config_1t.json'),  # noqa
+                fax_config_override=dict(
+                    url_base=("https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files"
+                              "/c76f30ad20516efbcc832c97842abcba743f0017/sim_files/"),),
                 **straxen.contexts.x1t_common_config),
-            **straxen.contexts.common_opts)
+            **straxen.contexts.x1t_context_config,
+        )
         st.register(wfsim.RawRecordsFromFax1T)
         log.debug(f'Setting testing config {testing_config_1T}')
         st.set_config(testing_config_1T)
@@ -44,9 +53,9 @@ def test_sim_1T():
         _sanity_check(rr, p)
         log.info(f'All done')
 
-
-def test_sim_nT():
-    """Test the nT simulator. Works only if one has access to the XENONnT databases"""
+def test_sim_nT_basics():
+    """Test the nT simulator. Uses basic config so complicated steps are skipped. So this will test
+       the simple s1 model and the simple s2 model"""
 
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
@@ -82,8 +91,53 @@ def test_sim_nT():
         _sanity_check(rr, p)
         log.info(f'All done')
 
+def test_sim_nT_advanced():
+    """Test the nT simulator. Works only if one has access to the XENONnT databases.
+        Clone the repo to dali and type 'pytest' to run. The first run will test simple s1,
+        garfield s2 and noise/afterpulses. The second run will test the s1 spline model"""
+    
+    if not straxen.utilix_is_configured():
+        log.warning(f"Utilix is not configured, skipping database-requiring tests!")
+        return
+    
+    with tempfile.TemporaryDirectory() as tempdir:
+        log.debug(f'Working in {tempdir}')
 
-def _sanity_check(raw_records, peaks):
-    assert len(raw_records) > 0
-    assert raw_records['data'].sum() > 0
-    assert peaks['data'].sum() > 0
+        st = strax.Context(
+            storage=tempdir,
+            config=dict(
+                nchunk=1, event_rate=1, chunk_size=2,
+                detector='XENONnT',
+                fax_config=('fax_config_nt_design.json'),
+                **straxen.contexts.xnt_simulation_config,),
+            **straxen.contexts.common_opts)
+        st.register(wfsim.RawRecordsFromFaxNT)
+
+        log.debug(f'Getting raw-records')
+        rr = st.get_array(run_id, 'raw_records')
+        log.debug(f'Getting peaks')
+        p = st.get_array(run_id, 'peaks')
+        _sanity_check(rr, p)
+        log.info(f'All done')
+        
+    with tempfile.TemporaryDirectory() as tempdir:
+        log.debug(f'Working in {tempdir}')
+
+        st = strax.Context(
+            storage=tempdir,
+            config=dict(
+                nchunk=1, event_rate=1, chunk_size=2,
+                detector='XENONnT',
+                fax_config=('fax_config_nt_design.json'),
+                fax_config_override=dict(s2_luminescence_model='simple',
+                                         s1_model_type='splinesimple',), 
+                        **straxen.contexts.xnt_simulation_config,),
+            **straxen.contexts.common_opts)
+        st.register(wfsim.RawRecordsFromFaxNT)
+
+        log.debug(f'Getting raw-records')
+        rr = st.get_array(run_id, 'raw_records')
+        log.debug(f'Getting peaks')
+        p = st.get_array(run_id, 'peaks')
+        _sanity_check(rr, p)
+        log.info(f'All done')
