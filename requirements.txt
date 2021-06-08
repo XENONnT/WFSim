@@ -1,4 +1,4 @@
 strax
 utilix>=0.5.3
-straxen==0.18.8
+straxen==0.18.7
 uproot>=4.0.0
