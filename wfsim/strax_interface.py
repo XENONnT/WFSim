@@ -249,7 +249,13 @@ class ChunkRawRecords(object):
 
             if self.blevel + records_needed > buffer_length:
                 log.warning('Chunck size too large, insufficient record buffer')
+                log.warning('No longer in sync if simulating nVeto with TPC')
+                next_left_time = self.rawdata.left * dt
+                self.chunk_time = (self.last_digitized_right + 1) * dt
+                log.debug(f'Pause sim loop at {self.chunk_time}, next pulse start at {next_left_time}')
                 yield from self.final_results()
+                self.chunk_time_pre = self.chunk_time
+                self.chunk_time += cksz
 
             if self.blevel + records_needed > buffer_length:
                 log.warning('Pulse length too large, insufficient record buffer, skipping pulse')
