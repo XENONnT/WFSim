@@ -398,7 +398,9 @@ class S1(Pulse):
             _photon_timings += np.random.exponential(config['s1_decay_time'], len(_photon_timings)).astype(np.int64)
             _photon_timings += np.random.normal(0, config['s1_decay_spread'], len(_photon_timings)).astype(np.int64)
             return _photon_timings
-        if (config['s1_model_type'] == 'simplespline' and
+        if (config['s1_model_type']=='simplespline'):
+            raise RuntimeError('This mode was renamed to spline instead of simplespline, set s1_model_type to "spline"')
+        if (config['s1_model_type'].startswith('spline') and
                 np.isin(recoil_type, NestId._ALL).all()):
             counts_start = 0
             for i, counts in enumerate(n_photons):  
@@ -410,9 +412,16 @@ class S1(Pulse):
                                                splines     = resource.s1_time_splines)
                 _photon_timings[counts_start:counts_start+counts]+=_prop_time.round().astype(np.int64)
                 counts_start += counts
-            return _photon_timings
+            # if it's combined spline, then just return
+            if config['s1_model_type']=="spline":
+                return _photon_timings
+            elif config['s1_model_type']=="spline+nest":
+                raise NotImplementedError("NEST functionality is not yet implemented")
+            elif config['s1_model_type']=="spline+analytic":
+                raise NotImplementedError("Analytic singlet+triplet state is not implemented")
+            else:
+                raise RuntimeError("Not known S1 model type : {:s}".format(config['s1_model_type']))
         
-        _photon_timings = np.repeat(t, n_photons)
         counts_start = 0
         for i, counts in enumerate(n_photons):
             for k in vars(NestId):
