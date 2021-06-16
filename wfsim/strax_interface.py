@@ -393,8 +393,8 @@ class SimulatorPlugin(strax.Plugin):
             self.config.update(overrides)
 
         # Update gains to the nT defaults
-        self.to_pe = straxen.get_to_pe(self.run_id, self.config['gain_model'],
-                                       self.config['channel_map']['tpc'][1]+1)
+        self.to_pe = straxen.get_correction_from_cmt(self.run_id,
+                               self.config['gain_model'])
 
         adc_2_current = (self.config['digitizer_voltage_range']
                          / 2 ** (self.config['digitizer_bits'])
