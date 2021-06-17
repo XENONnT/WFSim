@@ -5,6 +5,8 @@ import numpy as np
 from scipy.interpolate import interp1d
 from tqdm import tqdm
 
+import nestpy
+
 from .load_resource import load_config, DummyMap
 from strax import exporter, deterministic_hash
 from . import units
@@ -292,10 +294,14 @@ class S1(Pulse):
     Given temperal inputs as well as number of photons
     Random generate photon timing and channel distribution.
     """
-
+    nestpy_calc=None
     def __init__(self, config):
         super().__init__(config)
         self.phase = 'liquid'  # To distinguish singlet/triplet time delay.
+        if config['s1_model_type'].endswith('nest') and (S1.nestpy_calc is None):
+            print("INFO! Using NEST for scintillation time without set calculator")
+            print("Creating new nestpy calculator")
+            S1.nestpy_calc = nestpy.NESTcalc(nestpy.DetectorExample_XENON10())
 
     def __call__(self, instruction):
         """Main s1 simulation function. Called by RawData for s1 simulation. 
@@ -307,27 +313,39 @@ class S1(Pulse):
             # shape of recarr is a bit strange
             instruction = np.array([instruction])
 
-        _, _, t, x, y, z, n_photons, recoil_type, *rest = [
-            np.array(v).reshape(-1) for v in zip(*instruction)]
+        #_, _, t, x, y, z, n_photons, recoil_type, *rest = [
+        #    np.array(v).reshape(-1) for v in zip(*instruction)]
+        t = instruction['time']
+        x = instruction['x']
+        y = instruction['y']
+        z = instruction['z']
+        n_photons = instruction['amp']
+        recoil_type = instruction['recoil']
         positions = np.array([x, y, z]).T  # For map interpolation
-        n_photons = self.get_n_photons(n_photons=n_photons,
+        n_photon_hits = self.get_n_photons(n_photons=n_photons,
                                        positions=positions,
                                        s1_light_yield_map=self.resource.s1_light_yield_map,
                                        config=self.config)
         # The new way interpolation is written always require a list
         self._photon_channels = self.photon_channels(positions=positions,
-                                                     n_photons=n_photons,
+                                                     n_photon_hits=n_photon_hits,
                                                      config=self.config, 
                                                      s1_pattern_map=self.resource.s1_pattern_map)
-
+        extra_targs = {}
+        if self.config['s1_model_type'].endswith("nest"):
+            extra_targs['n_photons_emitted']=n_photons
+            extra_targs['n_excitons'] = instruction['n_excitons']
+            extra_targs['local_field'] = instruction['local_field']
+            extra_targs['e_dep'] = instruction['e_dep']
         self._photon_timings = self.photon_timings(t=t,
-                                                   n_photons=n_photons, 
+                                                   n_photon_hits=n_photon_hits, 
                                                    recoil_type=recoil_type,
                                                    config=self.config,
                                                    phase=self.phase,
                                                    channels=self._photon_channels,
                                                    positions = positions,
-                                                   resource=self.resource )
+                                                   resource=self.resource, 
+                                                   **extra_targs )
         # Sorting times according to the channel, as non-explicit sorting
         # is performed later and this breaks timing of individual channels/arrays
         sortind = np.argsort(self._photon_channels)
@@ -338,7 +356,7 @@ class S1(Pulse):
     @staticmethod
     def get_n_photons(n_photons, positions, s1_light_yield_map, config):
         """Calculates number of detected photons based on number of photons in total and the positions
-        :param n_photons: 1d array of ints with number of photons:
+        :param n_photons: 1d array of ints with number of emitted S1 photons:
         :param positions: 2d array with xyz positions of interactions
         :param s1_light_yield_map: interpolator instance of s1 light yield map
         :param config: dict wfsim config 
@@ -350,14 +368,14 @@ class S1(Pulse):
         elif config['detector'] == 'XENON1T':
             ly = s1_light_yield_map(positions)
             ly *= config['s1_detection_efficiency']
-        n_photons = np.random.binomial(n=n_photons, p=ly)
-        return n_photons
+        n_photon_hits = np.random.binomial(n=n_photons, p=ly)
+        return n_photon_hits
 
     @staticmethod
-    def photon_channels(positions, n_photons, config, s1_pattern_map):
+    def photon_channels(positions, n_photon_hits, config, s1_pattern_map):
         """Calculate photon arrival channels
         :params positions: 2d array with xy positions of interactions
-        :params n_photons: 1d array of ints with number of photons to simulate
+        :params n_photon_hits: 1d array of ints with number of photon hits to simulate
         :params config: dict wfsim config
         :params s1_pattern_map: interpolator instance of the s1 pattern map
 
@@ -368,7 +386,7 @@ class S1(Pulse):
         p_per_channel[:, np.in1d(channels, config['turned_off_pmts'])] = 0
 
         _photon_channels = np.array([]).astype(np.int64)
-        for ppc, n in zip(p_per_channel, n_photons):
+        for ppc, n in zip(p_per_channel, n_photon_hits):
             _photon_channels = np.append(_photon_channels,
                                          np.random.choice(
                                              channels,
@@ -378,18 +396,22 @@ class S1(Pulse):
         return _photon_channels
 
     @staticmethod
-    def photon_timings(t, n_photons, recoil_type, config, phase, channels=None,positions=None,resource=None):
+    def photon_timings(t, n_photon_hits, recoil_type, config, phase, channels=None,positions=None,e_dep=None,n_photons_emitted=None,n_excitons=None,local_field=None,resource=None):
         """Calculate distribution of photon arrival timnigs
         :param t: 1d array of ints
-        :param n_photons: 1d array of ints
+        :param n_photon_hits: number of photon hits, 1d array of ints
         :param recoil_type: 1d array of ints
         :param config: dict wfsim config
         :param phase: str "liquid"
         :param channels: list of photon hit channels 
-        :params positions: nx3 array of true XYZ positions from instruction
-        :parans resource: pointer to resources class of wfsim that contains s1 timing splines
+        :param positions: nx3 array of true XYZ positions from instruction
+        :param e_dep: energy of the deposit, 1d float array
+        :param n_photons_emitted: number of orignally emitted photons/quanta, 1d int array
+        :param n_excitons: number of exctions in deposit, 1d int array
+        :param local_field: local field in the point of the deposit, 1d array of floats
+        :param resource: pointer to resources class of wfsim that contains s1 timing splines
         returns photon timing array"""
-        _photon_timings = np.repeat(t, n_photons)
+        _photon_timings = np.repeat(t, n_photon_hits)
         if len(_photon_timings) == 0:
             return _photon_timings.astype(np.int64)
         if (config['s1_model_type'] == 'simple' and
@@ -403,7 +425,7 @@ class S1(Pulse):
         if (config['s1_model_type'].startswith('spline') and
                 np.isin(recoil_type, NestId._ALL).all()):
             counts_start = 0
-            for i, counts in enumerate(n_photons):  
+            for i, counts in enumerate(n_photon_hits):  
                 _prop_time = S1.spline_delay(counts_start = counts_start, 
                                                counts      = counts, 
                                                channels    = channels,
@@ -415,15 +437,24 @@ class S1(Pulse):
             # if it's combined spline, then just return
             if config['s1_model_type']=="spline":
                 return _photon_timings
-            elif config['s1_model_type']=="spline+nest":
-                raise NotImplementedError("NEST functionality is not yet implemented")
+            elif config['s1_model_type'].endswith("nest"):
+                counts_start = 0
+                for i, counts in enumerate(n_photon_hits): 
+                    _scint_time = S1.nestpy_calc.GetPhotonTimes(
+                                       nestpy.INTERACTION_TYPE(recoil_type[i]), 
+                                       n_photons_emitted[i], 
+                                       n_excitons[i], 
+                                       local_field[i], 
+                                       e_dep[i])
+                    _photon_timings[counts_start:counts_start+counts]+= np.array(_scint_time)[0:counts].round().astype(np.int64)
+                    counts_start += counts
             elif config['s1_model_type']=="spline+analytic":
                 raise NotImplementedError("Analytic singlet+triplet state is not implemented")
             else:
                 raise RuntimeError("Not known S1 model type : {:s}".format(config['s1_model_type']))
         
         counts_start = 0
-        for i, counts in enumerate(n_photons):
+        for i, counts in enumerate(n_photon_hits):
             for k in vars(NestId):
                 if k.startswith('_'):
                     continue
