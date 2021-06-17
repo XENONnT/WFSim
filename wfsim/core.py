@@ -5,7 +5,11 @@ import numpy as np
 from scipy.interpolate import interp1d
 from tqdm import tqdm
 
-import nestpy
+import importlib.util
+if importlib.util.find_spec("nestpy") is not None:
+    import nestpy
+else:
+    print("WARNING! Nestpy is not found, +nest mode will not work!")
 
 from .load_resource import load_config, DummyMap
 from strax import exporter, deterministic_hash
