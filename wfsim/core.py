@@ -424,106 +424,72 @@ class S1(Pulse):
         :param resource: pointer to resources class of wfsim that contains s1 timing splines
         returns photon timing array"""
         _photon_timings = np.repeat(t, n_photon_hits)
+        _n_hits_total = len(_photon_timings)
+
         if len(_photon_timings) == 0:
             return _photon_timings.astype(np.int64)
-        if (config['s1_model_type'] == 'simple' and
-                np.isin(recoil_type, NestId._ALL).all()):
+
+        if 'optical_propagation' in config['s1_model_type']:
+            z_positions = np.repeat(positions[:, 2], n_photon_hits)
+            _photon_timings += S1.optical_propagation(channels, z_positions, config,
+                                                      spline=resource.s1_optical_propagation_spline).astype(np.int64)
+
+        if 'simple' in config['s1_model_type']:
             # Simple S1 model enabled: use it for ER and NR.
-            _photon_timings += np.random.exponential(config['s1_decay_time'], len(_photon_timings)).astype(np.int64)
-            _photon_timings += np.random.normal(0, config['s1_decay_spread'], len(_photon_timings)).astype(np.int64)
+            _photon_timings += np.random.exponential(config['s1_decay_time'], _n_hits_total).astype(np.int64)
+            _photon_timings += np.random.normal(0, config['s1_decay_spread'], _n_hits_total).astype(np.int64)
             return _photon_timings
 
-        if (config['s1_model_type']=='simplespline'):
-            raise RuntimeError('This mode was renamed to spline instead of simplespline, set s1_model_type to "spline"')
-
-        if (config['s1_model_type'].startswith('spline') and
-                np.isin(recoil_type, NestId._ALL).all()):
+        if 'nest' in config['s1_model_type'] or 'custom' in config['s1_model_type']:
+            # Pulse model depends on recoil type
             counts_start = 0
-            for i, counts in enumerate(n_photon_hits):  
-                _prop_time = S1.spline_delay(counts_start = counts_start, 
-                                             counts       = counts, 
-                                             channels     = channels,
-                                             position     = positions[i],
-                                             config       = config,       
-                                             splines      = resource.s1_time_splines)
-                _photon_timings[counts_start:counts_start + counts] += _prop_time.round().astype(np.int64)
-                counts_start += counts
+            for i, counts in enumerate(n_photon_hits):
 
-            # if it's combined spline, then just return
-            if config['s1_model_type']=="spline":
-                return _photon_timings
+                if 'custom' in config['s1_model_type']:
+                    for k in vars(NestId):
+                        if k.startswith('_'):
+                            continue
+                        if recoil_type[i] in getattr(NestId, k):
+                            str_recoil_type = k
+                    try:
+                        _photon_timings[counts_start: counts_start + counts] += \
+                            getattr(S1, str_recoil_type.lower())(
+                            size=counts,
+                            config=config,
+                            phase=phase).astype(np.int64)
+                    except AttributeError:
+                        raise AttributeError(f"Recoil type must be ER, NR, alpha or LED, not {recoil_type}. Check nest ids")
 
-            elif config['s1_model_type'].endswith("nest"):
-                counts_start = 0
-                for i, counts in enumerate(n_photon_hits):
-                    _scint_time = S1.nestpy_calc.GetPhotonTimes(
-                                       nestpy.INTERACTION_TYPE(recoil_type[i]), 
-                                       n_photons_emitted[i], 
-                                       n_excitons[i], 
-                                       local_field[i], 
-                                       e_dep[i])
-                    _photon_timings[counts_start:counts_start + counts] += np.array(_scint_time)[0:counts].round().astype(np.int64)
-                    counts_start += counts
+                if 'nest' in config['s1_model_type']:
+                    _photon_timings[counts_start: counts_start + counts] += S1.nestpy_calc.GetPhotonTimes(
+                        nestpy.INTERACTION_TYPE(recoil_type[i]),
+                        n_photons_emitted[i],
+                        n_excitons[i],
+                        local_field[i],
+                        e_dep[i])
 
-            elif config['s1_model_type']=="spline+analytic":
-                raise NotImplementedError("Analytic singlet+triplet state is not implemented")
-
-            else:
-                raise RuntimeError("Not known S1 model type : {:s}".format(config['s1_model_type']))
-
-        counts_start = 0
-        for i, counts in enumerate(n_photon_hits):
-            for k in vars(NestId):
-                if k.startswith('_'):
-                    continue
-                if recoil_type[i] in getattr(NestId, k):
-                    str_recoil_type = k
-            try:
-                _photon_timings[counts_start: counts_start + counts] += \
-                    getattr(S1, str_recoil_type.lower())(
-                    size=counts,
-                    config=config,
-                    phase=phase).astype(np.int64)
-            except AttributeError:
-                raise AttributeError(f"Recoil type must be ER, NR, alpha or LED, not {recoil_type}. Check nest ids")
-            counts_start += counts
         return _photon_timings
 
     @staticmethod
-    def spline_delay(counts_start, counts, channels, position, config, splines):
+    def optical_propagation(channels, z_positions, config, spline):
         """Function gettting times from s1 timing splines:
-        
-        :param counts_start: first count corresponding to current instruction
-        :param counts: number of counts corresponding to current instruction
-        :param position: 1x3 array for XYZ position of current instruction
+
+        :param z_positions: The Z positions of all s1 photon
         :param config: current configuration of wfsim
-        :param splines: pointer to s1 timing splines from resources
+        :param splines: pointer to s1 optical propagation splines from resources
         """
-        extra_times = np.zeros(counts)
+        assert len(z_positions) == len(channels), 'Give each photon a z position'
 
-        # interpolation functions inside make resorting and result in sorted times
-        # argsort is used to avoid this issue 
-        ## doing top arrays
-        _top_bool = channels[counts_start:counts_start + counts] < config['n_top_pmts']
-        _n_top_hit = np.sum(_top_bool)
-        _top_times = np.zeros(_n_top_hit)
-        _top_rng = np.random.uniform(0, 1, size=_n_top_hit)
-        _top_argsort = _top_rng.argsort()
-        _top_times[_top_argsort] = splines['top'](position[2], _top_rng[_top_argsort] )[:,0]
-        ### doing bottom array
-        _bottom_bool = channels[counts_start:counts_start + counts] >= config['n_top_pmts']
-        _n_bottom_hit = np.sum(_bottom_bool)     
-        _bottom_times = np.zeros(_n_bottom_hit)  
-        _bottom_rng = np.random.uniform(0, 1, size=_n_bottom_hit)
-        _bottom_argsort = _bottom_rng.argsort()
-        _bottom_times[_bottom_argsort] = splines['bottom'](position[2],
-                                                           _bottom_rng[_bottom_argsort] )[:,0]
+        prop_time = np.zeros_like(channels)
+        z_rand = np.array(z_positions, np.random.rand(len(channels)))
 
-        ### Addting propagation/scintillation delay to final times
-        extra_times[_top_bool] = _top_times
-        extra_times[_bottom_bool] = _bottom_times
+        is_top = channels < config['n_top_pmts']
+        prop_time[is_top] = spline(z_rand[is_top], map_name='top')
 
-        return(extra_times)     
+        is_bottom = channels >= config['n_top_pmts']
+        prop_time[is_bottom] = spline(z_rand[is_bottom], map_name='bottom')
+
+        return prop_time
 
     @staticmethod
     def alpha(size, config, phase):
