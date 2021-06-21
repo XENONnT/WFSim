@@ -5,12 +5,6 @@ import numpy as np
 from scipy.interpolate import interp1d
 from tqdm import tqdm
 
-import importlib.util
-if importlib.util.find_spec("nestpy") is not None:
-    import nestpy
-else:
-    print("WARNING! Nestpy is not found, +nest mode will not work!")
-
 from .load_resource import load_config, DummyMap
 from strax import exporter, deterministic_hash
 from . import units
@@ -24,6 +18,13 @@ logging.basicConfig(handlers=[
     logging.StreamHandler()])
 log = logging.getLogger('wfsim.core')
 log.setLevel('WARNING')
+
+import importlib.util
+if importlib.util.find_spec("nestpy") is not None:
+    import nestpy
+else:
+    log.warning('Nestpy is not found, +nest mode will not work!')
+
 
 PULSE_TYPE_NAMES = ('RESERVED', 's1', 's2', 'unknown', 'pi_el', 'pmt_ap', 'pe_el')
 _cached_pmt_current_templates = {}
@@ -303,8 +304,8 @@ class S1(Pulse):
         super().__init__(config)
         self.phase = 'liquid'  # To distinguish singlet/triplet time delay.
         if config['s1_model_type'].endswith('nest') and (S1.nestpy_calc is None):
-            print("INFO! Using NEST for scintillation time without set calculator")
-            print("Creating new nestpy calculator")
+            log.info('Using NEST for scintillation time without set calculator\n'
+                     'Creating new nestpy calculator')
             S1.nestpy_calc = nestpy.NESTcalc(nestpy.DetectorExample_XENON10())
 
     def __call__(self, instruction):
@@ -330,17 +331,20 @@ class S1(Pulse):
                                        positions=positions,
                                        s1_light_yield_map=self.resource.s1_light_yield_map,
                                        config=self.config)
+
         # The new way interpolation is written always require a list
         self._photon_channels = self.photon_channels(positions=positions,
                                                      n_photon_hits=n_photon_hits,
                                                      config=self.config, 
                                                      s1_pattern_map=self.resource.s1_pattern_map)
+
         extra_targs = {}
         if self.config['s1_model_type'].endswith("nest"):
             extra_targs['n_photons_emitted']=n_photons
             extra_targs['n_excitons'] = instruction['n_excitons']
             extra_targs['local_field'] = instruction['local_field']
             extra_targs['e_dep'] = instruction['e_dep']
+
         self._photon_timings = self.photon_timings(t=t,
                                                    n_photon_hits=n_photon_hits, 
                                                    recoil_type=recoil_type,
@@ -401,7 +405,10 @@ class S1(Pulse):
         return _photon_channels
 
     @staticmethod
-    def photon_timings(t, n_photon_hits, recoil_type, config, phase, channels=None,positions=None,e_dep=None,n_photons_emitted=None,n_excitons=None,local_field=None,resource=None):
+    def photon_timings(t, n_photon_hits, recoil_type, config, phase, 
+                       channels=None, positions=None, e_dep=None,
+                       n_photons_emitted=None, n_excitons=None, 
+                       local_field=None, resource=None):
         """Calculate distribution of photon arrival timnigs
         :param t: 1d array of ints
         :param n_photon_hits: number of photon hits, 1d array of ints
@@ -425,39 +432,45 @@ class S1(Pulse):
             _photon_timings += np.random.exponential(config['s1_decay_time'], len(_photon_timings)).astype(np.int64)
             _photon_timings += np.random.normal(0, config['s1_decay_spread'], len(_photon_timings)).astype(np.int64)
             return _photon_timings
+
         if (config['s1_model_type']=='simplespline'):
             raise RuntimeError('This mode was renamed to spline instead of simplespline, set s1_model_type to "spline"')
+
         if (config['s1_model_type'].startswith('spline') and
                 np.isin(recoil_type, NestId._ALL).all()):
             counts_start = 0
             for i, counts in enumerate(n_photon_hits):  
                 _prop_time = S1.spline_delay(counts_start = counts_start, 
-                                               counts      = counts, 
-                                               channels    = channels,
-                                               position    = positions[i],
-                                               config      = config,       
-                                               splines     = resource.s1_time_splines)
-                _photon_timings[counts_start:counts_start+counts]+=_prop_time.round().astype(np.int64)
+                                             counts       = counts, 
+                                             channels     = channels,
+                                             position     = positions[i],
+                                             config       = config,       
+                                             splines      = resource.s1_time_splines)
+                _photon_timings[counts_start:counts_start + counts] += _prop_time.round().astype(np.int64)
                 counts_start += counts
+
             # if it's combined spline, then just return
             if config['s1_model_type']=="spline":
                 return _photon_timings
+
             elif config['s1_model_type'].endswith("nest"):
                 counts_start = 0
-                for i, counts in enumerate(n_photon_hits): 
+                for i, counts in enumerate(n_photon_hits):
                     _scint_time = S1.nestpy_calc.GetPhotonTimes(
                                        nestpy.INTERACTION_TYPE(recoil_type[i]), 
                                        n_photons_emitted[i], 
                                        n_excitons[i], 
                                        local_field[i], 
                                        e_dep[i])
-                    _photon_timings[counts_start:counts_start+counts]+= np.array(_scint_time)[0:counts].round().astype(np.int64)
+                    _photon_timings[counts_start:counts_start + counts] += np.array(_scint_time)[0:counts].round().astype(np.int64)
                     counts_start += counts
+
             elif config['s1_model_type']=="spline+analytic":
                 raise NotImplementedError("Analytic singlet+triplet state is not implemented")
+
             else:
                 raise RuntimeError("Not known S1 model type : {:s}".format(config['s1_model_type']))
-        
+
         counts_start = 0
         for i, counts in enumerate(n_photon_hits):
             for k in vars(NestId):
@@ -487,31 +500,31 @@ class S1(Pulse):
         :param splines: pointer to s1 timing splines from resources
         """
         extra_times = np.zeros(counts)
-        
+
         # interpolation functions inside make resorting and result in sorted times
         # argsort is used to avoid this issue 
         ## doing top arrays
-        _top_bool = channels[counts_start:counts_start+counts]<(config['n_top_pmts'])
+        _top_bool = channels[counts_start:counts_start + counts] < config['n_top_pmts']
         _n_top_hit = np.sum(_top_bool)
         _top_times = np.zeros(_n_top_hit)
-        _top_rng = np.random.uniform(0,1,size=_n_top_hit)
+        _top_rng = np.random.uniform(0, 1, size=_n_top_hit)
         _top_argsort = _top_rng.argsort()
         _top_times[_top_argsort] = splines['top'](position[2], _top_rng[_top_argsort] )[:,0]
         ### doing bottom array
-        _bottom_bool = channels[counts_start:counts_start+counts]>=(config['n_top_pmts'])
+        _bottom_bool = channels[counts_start:counts_start + counts] >= config['n_top_pmts']
         _n_bottom_hit = np.sum(_bottom_bool)     
         _bottom_times = np.zeros(_n_bottom_hit)  
-        _bottom_rng = np.random.uniform(0,1,size=_n_bottom_hit)
+        _bottom_rng = np.random.uniform(0, 1, size=_n_bottom_hit)
         _bottom_argsort = _bottom_rng.argsort()
         _bottom_times[_bottom_argsort] = splines['bottom'](position[2],
-                                                                   _bottom_rng[_bottom_argsort] )[:,0]
-            
+                                                           _bottom_rng[_bottom_argsort] )[:,0]
+
         ### Addting propagation/scintillation delay to final times
         extra_times[_top_bool] = _top_times
         extra_times[_bottom_bool] = _bottom_times
 
         return(extra_times)     
-        
+
     @staticmethod
     def alpha(size, config, phase):
         """  Calculate S1 photon timings for an alpha decay. Neglible recombination time, not validated
