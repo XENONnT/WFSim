@@ -151,6 +151,10 @@ def test_sim_nT_advanced():
 def test_sim_mc_chain():
     """Test the nT simulator by Geant4 output file"""
 
+    if not straxen.utilix_is_configured():
+        log.warning(f"Utilix is not configured, skipping database-requiring tests!")
+        return
+
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
 
