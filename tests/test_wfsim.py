@@ -180,9 +180,9 @@ def test_sim_mc_chain():
             fax_config_override_nveto=dict(enable_noise=False,
                                            enable_pmt_afterpulses=False,
                                            enable_electron_afterpulses=False),
-            targets=('tpc', 'nveto')),
+            targets=('tpc', 'nveto'),
             baseline_samples_nv=("nv_baseline_constant", 26, True),
-        )
+        ))
 
         log.debug(f'Getting raw-records')
         rr = st.get_array(run_id, 'raw_records')
@@ -198,3 +198,6 @@ def test_sim_mc_chain():
         assert len(truth_nv) > 0
 
         log.info(f'All done')
+
+if __name__ == '__main__':
+    test_sim_mc_chain()
