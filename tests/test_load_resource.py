@@ -41,3 +41,4 @@ def test_load_nt():
     }
     result = load_config(config)
     return result, config
+
