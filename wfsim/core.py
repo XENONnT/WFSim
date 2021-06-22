@@ -461,12 +461,14 @@ class S1(Pulse):
                         raise AttributeError(f"Recoil type must be ER, NR, alpha or LED, not {recoil_type}. Check nest ids")
 
                 if 'nest' in config['s1_model_type']:
-                    _photon_timings[counts_start: counts_start + counts] += S1.nestpy_calc.GetPhotonTimes(
+                    scint_time = S1.nestpy_calc.GetPhotonTimes(
                         nestpy.INTERACTION_TYPE(recoil_type[i]),
                         n_photons_emitted[i],
                         n_excitons[i],
                         local_field[i],
                         e_dep[i])
+                        
+                    _photon_timings[counts_start: counts_start + counts] += np.array(scint_time[:counts], np.int64)
 
         return _photon_timings
 
@@ -481,7 +483,7 @@ class S1(Pulse):
         assert len(z_positions) == len(channels), 'Give each photon a z position'
 
         prop_time = np.zeros_like(channels)
-        z_rand = np.array(z_positions, np.random.rand(len(channels)))
+        z_rand = np.array([z_positions, np.random.rand(len(channels))]).T
 
         is_top = channels < config['n_top_pmts']
         prop_time[is_top] = spline(z_rand[is_top], map_name='top')
