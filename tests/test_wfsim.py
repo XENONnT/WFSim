@@ -18,10 +18,12 @@ strax.mailbox.Mailbox.DEFAULT_TIMEOUT = 60
 
 run_id = '010000'
 
+
 def _sanity_check(raw_records, peaks):
     assert len(raw_records) > 0
     assert raw_records['data'].sum() > 0
     assert peaks['data'].sum() > 0
+
 
 def test_sim_1T():
     """Test the 1T simulator (should always work with the publicly available files)"""
@@ -37,10 +39,10 @@ def test_sim_1T():
                 nchunk=2, event_rate=1, chunk_size=1,
                 detector='XENON1T',
                 fax_config=('https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files'
-                    '/c76f30ad20516efbcc832c97842abcba743f0017/sim_files/fax_config_1t.json'),  # noqa
+                            '/c76f30ad20516efbcc832c97842abcba743f0017/sim_files/fax_config_1t.json'),  # noqa
                 fax_config_override=dict(
                     url_base=("https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files"
-                              "/c76f30ad20516efbcc832c97842abcba743f0017/sim_files/"),),
+                              "/c76f30ad20516efbcc832c97842abcba743f0017/sim_files/"), ),
                 **straxen.contexts.x1t_common_config),
             **straxen.contexts.x1t_context_config,
         )
@@ -53,6 +55,7 @@ def test_sim_1T():
         p = st.get_array(run_id, 'peaks')
         _sanity_check(rr, p)
         log.info(f'All done')
+
 
 def test_sim_nT_basics():
     """Test the nT simulator. Uses basic config so complicated steps are skipped. So this will test
@@ -79,7 +82,7 @@ def test_sim_nT_basics():
                 nchunk=1, event_rate=1, chunk_size=2,
                 detector='XENONnT',
                 fax_config=('https://raw.githubusercontent.com/XENONnT/WFSim'
-                '/9e6ecfab13a314a83eec9844ba40811bc4a2dc36/files/XENONnT_wfsim_config.json'),
+                            '/9e6ecfab13a314a83eec9844ba40811bc4a2dc36/files/XENONnT_wfsim_config.json'),
                 **conf,
                 fax_config_override=conf_override),
             **straxen.contexts.common_opts)
@@ -92,15 +95,16 @@ def test_sim_nT_basics():
         _sanity_check(rr, p)
         log.info(f'All done')
 
+
 def test_sim_nT_advanced():
     """Test the nT simulator. Works only if one has access to the XENONnT databases.
         Clone the repo to dali and type 'pytest' to run. The first run will test simple s1,
         garfield s2 and noise/afterpulses. The second run will test the s1 spline model"""
-    
+
     if not straxen.utilix_is_configured():
         log.warning(f"Utilix is not configured, skipping database-requiring tests!")
         return
-    
+
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
 
@@ -110,7 +114,7 @@ def test_sim_nT_advanced():
                 nchunk=1, event_rate=1, chunk_size=2,
                 detector='XENONnT',
                 fax_config=('fax_config_nt_design.json'),
-                **straxen.contexts.xnt_simulation_config,),
+                **straxen.contexts.xnt_simulation_config, ),
             **straxen.contexts.common_opts)
         st.register(wfsim.RawRecordsFromFaxNT)
 
@@ -120,7 +124,7 @@ def test_sim_nT_advanced():
         p = st.get_array(run_id, 'peaks')
         _sanity_check(rr, p)
         log.info(f'All done')
-        
+
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
 
@@ -131,8 +135,8 @@ def test_sim_nT_advanced():
                 detector='XENONnT',
                 fax_config=('fax_config_nt_design.json'),
                 fax_config_override=dict(s2_luminescence_model='simple',
-                                         s1_model_type='splinesimple',), 
-                        **straxen.contexts.xnt_simulation_config,),
+                                         s1_model_type='splinesimple', ),
+                **straxen.contexts.xnt_simulation_config, ),
             **straxen.contexts.common_opts)
         st.register(wfsim.RawRecordsFromFaxNT)
 
@@ -170,10 +174,11 @@ def test_sim_mc_chain():
             event_rate=100.,
             chunk_size=5.,
             entry_start=0,
-            #entry_stop=5000,
+            # entry_stop=5000,
             fax_config='fax_config_nt_low_field.json',
-            fax_config_override=dict(url_base='https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/master/sim_files',
-                                     enable_electron_afterpulses=False),
+            fax_config_override=dict(
+                url_base='https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/master/sim_files',
+                enable_electron_afterpulses=False),
             epix_config=epix_config,
             neutron_veto=True,
             fax_config_nveto='fax_config_nt_nveto.json',
@@ -186,18 +191,14 @@ def test_sim_mc_chain():
 
         log.debug(f'Getting raw-records')
         rr = st.get_array(run_id, 'raw_records')
-        log.debug(f'Getting peaks')
-        p = st.get_array(run_id, 'peaks')
-        _sanity_check(rr, p)
+        assert len(rr) > 0
         rr_nv = st.get_array(run_id, 'raw_records_nv')
         assert len(rr_nv) > 0
 
+        log.debug(f'Getting truths')
         truth = st.get_array(run_id, 'truth', progress_bar=False)
         truth_nv = st.get_array(run_id, 'truth_nv', progress_bar=False)
         assert len(truth) > 0
         assert len(truth_nv) > 0
 
         log.info(f'All done')
-
-if __name__ == '__main__':
-    test_sim_mc_chain()
