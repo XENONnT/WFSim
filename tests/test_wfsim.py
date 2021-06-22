@@ -150,6 +150,13 @@ def test_sim_mc_chain():
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
 
+        # Download test file
+        import requests
+        test_g4 = 'https://raw.githubusercontent.com/XENONnT/WFSim/nveto_autotest/tests/geant_test_data_small.root'
+        url_data = requests.get(test_g4).content
+        with open('test.root', mode='wb') as f:
+            f.write(url_data)
+
         st = straxen.contexts.xenonnt_simulation()
 
         epix_config = {'cut_by_eventid': True, 'debug': True, 'source_rate': 0, 'micro_separation_time': 10.,
@@ -159,7 +166,7 @@ def test_sim_mc_chain():
         st.register(wfsim.RawRecordsFromMcChain)
         st.set_config(dict(
             detector='XENONnT',
-            fax_file='/Users/mzks/xenon/WFSim/bench/tpc_and_nveto_cryoneutrons_200.root',
+            fax_file='./test.root',
             event_rate=100.,
             chunk_size=5.,
             entry_start=0,
