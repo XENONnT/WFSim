@@ -328,6 +328,11 @@ class S1(Pulse):
                                                    channels=self._photon_channels,
                                                    positions = positions,
                                                    resource=self.resource )
+        # Sorting times according to the channel, as non-explicit sorting
+        # is performed later and this breaks timing of individual channels/arrays
+        sortind = np.argsort(self._photon_channels)
+        self._photon_channels = self._photon_channels[sortind]
+        self._photon_timings = self._photon_timings[sortind]
         super().__call__()
 
     @staticmethod
