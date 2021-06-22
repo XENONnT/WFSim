@@ -1,10 +1,11 @@
-import tempfile
-import strax
-import straxen
-import wfsim
 import logging
 import os.path as osp
+import tempfile
 
+import strax
+import straxen
+
+import wfsim
 from .test_load_resource import test_load_nt
 
 logging.basicConfig(
@@ -148,30 +149,33 @@ def test_sim_mc_chain():
 
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
-        conf = straxen.contexts.xnt_common_config
-        conf['gain_model'] = ('to_pe_constant', 0.01)
-        resource, conf_override = test_load_nt()
 
-        # The SPE table in this package is for a single channel
-        # We generate the full SPE file for testing here
-        for i in range(1, 494):
-            resource.photon_area_distribution[str(i)] = \
-                resource.photon_area_distribution['0']
-        spe_file = osp.join(tempdir, 'XENONnT_spe_distributions.csv')
-        resource.photon_area_distribution.to_csv(spe_file, index=False)
-        conf_override['photon_area_distribution'] = spe_file
+        st = straxen.contexts.xenonnt_simulation()
 
-        st = strax.Context(
-            storage=tempdir,
-            config=dict(
-                nchunk=1, event_rate=1, chunk_size=2,
-                detector='XENONnT',
-                fax_config=('https://raw.githubusercontent.com/XENONnT/WFSim'
-                            '/9e6ecfab13a314a83eec9844ba40811bc4a2dc36/files/XENONnT_wfsim_config.json'),
-                **conf,
-                fax_config_override=conf_override),
-            **straxen.contexts.common_opts)
+        epix_config = {'cut_by_eventid': True, 'debug': True, 'source_rate': 0, 'micro_separation_time': 10.,
+                       'max_delay': 1e7, 'detector_config_override': None, 'micro_separation': 0.05,
+                       'tag_cluster_by': 'time'}
+
         st.register(wfsim.RawRecordsFromMcChain)
+        st.set_config(dict(
+            detector='XENONnT',
+            fax_file='/Users/mzks/xenon/WFSim/bench/tpc_and_nveto_cryoneutrons_200.root',
+            event_rate=100.,
+            chunk_size=5.,
+            entry_start=0,
+            #entry_stop=5000,
+            fax_config='fax_config_nt_low_field.json',
+            fax_config_override=dict(url_base='https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/master/sim_files',
+                                     enable_electron_afterpulses=False),
+            epix_config=epix_config,
+            neutron_veto=True,
+            fax_config_nveto='fax_config_nt_nveto.json',
+            fax_config_override_nveto=dict(enable_noise=False,
+                                           enable_pmt_afterpulses=False,
+                                           enable_electron_afterpulses=False),
+            targets=('tpc', 'nveto')),
+            baseline_samples_nv=("nv_baseline_constant", 26, True),
+        )
 
         log.debug(f'Getting raw-records')
         rr = st.get_array(run_id, 'raw_records')
@@ -180,4 +184,10 @@ def test_sim_mc_chain():
         _sanity_check(rr, p)
         rr_nv = st.get_array(run_id, 'raw_records_nv')
         assert len(rr_nv) > 0
+
+        truth = st.get_array(run_id, 'truth', progress_bar=False)
+        truth_nv = st.get_array(run_id, 'truth_nv', progress_bar=False)
+        assert len(truth) > 0
+        assert len(truth_nv) > 0
+
         log.info(f'All done')
