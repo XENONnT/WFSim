@@ -3,3 +3,4 @@ utilix>=0.5.3
 straxen==0.18.4
 uproot>=4.0.0
 epix
+nestpy
