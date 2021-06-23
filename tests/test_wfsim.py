@@ -27,8 +27,8 @@ def test_sim_1T():
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
         testing_config_1T = dict(
-            hev_gain_model=('to_pe_constant', 0.0085),
-            gain_model=('to_pe_constant', 0.0085),
+            hev_gain_model=("1T_to_pe_placeholder", True),
+            gain_model=("1T_to_pe_placeholder", True),
         )
         st = strax.Context(
             storage=tempdir,
@@ -60,7 +60,8 @@ def test_sim_nT_basics():
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
         conf = straxen.contexts.xnt_common_config
-        conf['gain_model'] = ('to_pe_constant', 0.01)
+        conf['gain_model'] = ("to_pe_placeholder", True)
+        conf['hev_gain_model'] = ("to_pe_placeholder", True)
         resource, conf_override = test_load_nt()
 
         # The SPE table in this package is for a single channel
