@@ -300,13 +300,14 @@ class S1(Pulse):
     Random generate photon timing and channel distribution.
     """
     nestpy_calc=None
+
     def __init__(self, config):
         super().__init__(config)
         self.phase = 'liquid'  # To distinguish singlet/triplet time delay.
-        if config['s1_model_type'].endswith('nest') and (S1.nestpy_calc is None):
+        if 'nest' in self.config['s1_model_type'] and (self.nestpy_calc is None):
             log.info('Using NEST for scintillation time without set calculator\n'
                      'Creating new nestpy calculator')
-            S1.nestpy_calc = nestpy.NESTcalc(nestpy.DetectorExample_XENON10())
+            self.nestpy_calc = nestpy.NESTcalc(nestpy.DetectorExample_XENON10())
 
     def __call__(self, instruction):
         """Main s1 simulation function. Called by RawData for s1 simulation. 
@@ -339,11 +340,12 @@ class S1(Pulse):
                                                      s1_pattern_map=self.resource.s1_pattern_map)
 
         extra_targs = {}
-        if self.config['s1_model_type'].endswith("nest"):
+        if 'nest' in self.config['s1_model_type']:
             extra_targs['n_photons_emitted']=n_photons
             extra_targs['n_excitons'] = instruction['n_excitons']
             extra_targs['local_field'] = instruction['local_field']
             extra_targs['e_dep'] = instruction['e_dep']
+            extra_targs['nestpy_calc'] = self.nestpy_calc
 
         self._photon_timings = self.photon_timings(t=t,
                                                    n_photon_hits=n_photon_hits, 
@@ -351,9 +353,9 @@ class S1(Pulse):
                                                    config=self.config,
                                                    phase=self.phase,
                                                    channels=self._photon_channels,
-                                                   positions = positions,
-                                                   resource=self.resource, 
-                                                   **extra_targs )
+                                                   positions=positions,
+                                                   resource=self.resource,
+                                                   **extra_targs)
 
         # Sorting times according to the channel, as non-explicit sorting
         # is performed later and this breaks timing of individual channels/arrays
@@ -408,7 +410,7 @@ class S1(Pulse):
     def photon_timings(t, n_photon_hits, recoil_type, config, phase, 
                        channels=None, positions=None, e_dep=None,
                        n_photons_emitted=None, n_excitons=None, 
-                       local_field=None, resource=None):
+                       local_field=None, resource=None, nestpy_calc=None):
         """Calculate distribution of photon arrival timnigs
         :param t: 1d array of ints
         :param n_photon_hits: number of photon hits, 1d array of ints
@@ -461,14 +463,16 @@ class S1(Pulse):
                         raise AttributeError(f"Recoil type must be ER, NR, alpha or LED, not {recoil_type}. Check nest ids")
 
                 if 'nest' in config['s1_model_type']:
-                    scint_time = S1.nestpy_calc.GetPhotonTimes(
+                    scint_time = nestpy_calc.GetPhotonTimes(
                         nestpy.INTERACTION_TYPE(recoil_type[i]),
                         n_photons_emitted[i],
                         n_excitons[i],
                         local_field[i],
                         e_dep[i])
-                        
+
                     _photon_timings[counts_start: counts_start + counts] += np.array(scint_time[:counts], np.int64)
+
+                counts_start += counts
 
         return _photon_timings
 
