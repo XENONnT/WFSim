@@ -354,6 +354,8 @@ class ChunkRawRecords(object):
     strax.Option('fax_config', default='fax_config_nt_design.json'),
     strax.Option('fax_config_override', default=None,
                  help="Dictionary with configuration option overrides"),
+    strax.Option('fax_config_overide_from_cmt', default=[],
+                 help="List of parameter names that the values will be replaced by CMT"),
     strax.Option('gain_model', default=('to_pe_per_run', 'to_pe_nt.npy'), track=False,
                  help='PMT gain model. Specify as (model_type, model_config).'),
     strax.Option('channel_map', track=False, type=immutabledict,
@@ -419,6 +421,10 @@ class SimulatorPlugin(strax.Plugin):
         self.config['channel_map'] = dict(self.config['channel_map'])
         self.config['channel_map']['sum_signal'] = 800
         self.config['channels_bottom'] = np.arange(self.config['n_top_pmts'], self.config['n_tpc_pmts'])
+
+        # Update some values stored in CMT
+        for field in self.config['fax_config_overide_from_cmt']:
+            self.config[field] = straxen.get_correction_from_cmt(self.run_id, field)
 
     def _setup(self):
         # Set in inheriting class
