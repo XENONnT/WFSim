@@ -354,7 +354,7 @@ class ChunkRawRecords(object):
     strax.Option('fax_config', default='fax_config_nt_design.json'),
     strax.Option('fax_config_override', default=None,
                  help="Dictionary with configuration option overrides"),
-    strax.Option('gain_model', default=('to_pe_per_run', 'to_pe_nt.npy'),
+    strax.Option('gain_model', default=('to_pe_per_run', 'to_pe_nt.npy'), track=False,
                  help='PMT gain model. Specify as (model_type, model_config).'),
     strax.Option('channel_map', track=False, type=immutabledict,
                  help="immutabledict mapping subdetector to (min, max) "
