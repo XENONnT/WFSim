@@ -614,7 +614,7 @@ class S2(Pulse):
             drift_velocity_liquid = resource.field_dependencies_map(z_obs, positions, map_name='drift_speed_map')  # mm/µs
             drift_velocity_liquid *= 1e-4  # cm/ns
         else:
-            drift_velocity_liquid = config['drift_velocity_liquid']
+            drift_velocity_liquid = config['electron_drift_velocity']
 
         if config['enable_field_dependencies']['diffusion_longitudinal_map']:
             diffusion_constant_longitudinal = resource.field_dependencies_map(z_obs, positions, map_name='diffusion_longitudinal_map')  # cm²/s
