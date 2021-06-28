@@ -248,8 +248,15 @@ class ChunkRawRecords(object):
                 self.chunk_time += cksz
 
             if self.blevel + records_needed > buffer_length:
-                log.warning('Chunck size too large, insufficient record buffer')
+                log.warning('Chunck size too large, insufficient record buffer \n'
+                            'No longer in sync if simulating nVeto with TPC \n'
+                            'Consider reducing the chunk size')
+                next_left_time = self.rawdata.left * dt
+                self.chunk_time = (self.last_digitized_right + 1) * dt
+                log.debug(f'Pause sim loop at {self.chunk_time}, next pulse start at {next_left_time}')
                 yield from self.final_results()
+                self.chunk_time_pre = self.chunk_time
+                self.chunk_time += cksz
 
             if self.blevel + records_needed > buffer_length:
                 log.warning('Pulse length too large, insufficient record buffer, skipping pulse')
@@ -393,8 +400,8 @@ class SimulatorPlugin(strax.Plugin):
             self.config.update(overrides)
 
         # Update gains to the nT defaults
-        self.to_pe = straxen.get_to_pe(self.run_id, self.config['gain_model'],
-                                       self.config['channel_map']['tpc'][1]+1)
+        self.to_pe = straxen.get_correction_from_cmt(self.run_id,
+                               self.config['gain_model'])
 
         adc_2_current = (self.config['digitizer_voltage_range']
                          / 2 ** (self.config['digitizer_bits'])
@@ -586,8 +593,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             # Why epix removes many of the g4ids?
             # Remove nveto event if no tpc event of the same g4id is found
             if len(self.g4id) > 0:
-                nv_inst_to_keep = np.isin(self.instructions_nveto['g4id'], self.g4id[0])
-                nv_inst_to_keep &= (self.instructions_nveto['_last'] - self.instructions_nveto['_first']) > 0
+                nv_inst_to_keep = (self.instructions_nveto['_last'] - self.instructions_nveto['_first']) >= 0
             self.instructions_nveto = self.instructions_nveto[nv_inst_to_keep]
             self.g4id.append(self.instructions_nveto['g4id'])
             log.debug("Epix produced %d instructions in nv" % (len(self.instructions_nveto)))
