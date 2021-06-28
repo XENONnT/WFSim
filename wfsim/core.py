@@ -623,7 +623,7 @@ class S2(Pulse):
             diffusion_constant_longitudinal = config['diffusion_constant_longitudinal']
 
         drift_time_mean = - z_obs / \
-            drift_velocity_liquid + config['drift_time_gate']
+            drift_velocity_liquid + config['electron_drift_time_gate']
         _drift_time_mean = np.clip(drift_time_mean, 0, np.inf)
         drift_time_spread = np.sqrt(2 * diffusion_constant_longitudinal * _drift_time_mean)
         drift_time_spread /= drift_velocity_liquid
@@ -661,7 +661,7 @@ class S2(Pulse):
 
         # Absorb electrons during the drift
         electron_lifetime_correction = np.exp(- 1 * drift_time_mean /
-                                              config['electron_lifetime_liquid'])
+                                              config['elife'])
         cy = config['electron_extraction_yield'] * electron_lifetime_correction
 
         # Remove electrons in insensitive volumne
@@ -884,7 +884,7 @@ class S2(Pulse):
         :param config: dict of the wfsim config
         :param resource: instance of the resource class
         """
-        drift_time_gate = config['drift_time_gate']
+        drift_time_gate = config['electron_drift_time_gate']
         drift_velocity_liquid = config['drift_velocity_liquid']
         diffusion_constant_transverse = getattr(config, 'diffusion_constant_transverse', 0)
 
@@ -1011,7 +1011,7 @@ class PhotoIonization_Electron(S2):
                                        * self.config['photoionization_modifier'])
 
         ap_delay = delaytime_pmf_hist.get_random(n_electron).clip(
-            self.config['drift_time_gate'] + 1, None)
+            self.config['electron_drift_time_gate'] + 1, None)
 
         # Randomly select original photon as time zeros
         t_zeros = signal_pulse._photon_timings[np.random.randint(
@@ -1021,7 +1021,7 @@ class PhotoIonization_Electron(S2):
         instruction = np.repeat(signal_pulse_instruction[0], n_electron)
 
         instruction['type'] = 4  # pi_el
-        instruction['time'] = t_zeros + self.config['drift_time_gate']
+        instruction['time'] = t_zeros + self.config['electron_drift_time_gate']
         instruction['x'], instruction['y'] = self._rand_position(n_electron)
         instruction['z'] = - ap_delay * self.config['drift_velocity_liquid']
         instruction['amp'] = 1
@@ -1059,7 +1059,7 @@ class PhotoElectric_Electron(S2):
                                        * self.config['photoelectric_modifier'])
 
         ap_delay = np.clip(
-            np.random.normal(self.config['photoelectric_t_center'] + self.config['drift_time_gate'], 
+            np.random.normal(self.config['photoelectric_t_center'] + self.config['electron_drift_time_gate'], 
                              self.config['photoelectric_t_spread'],
                              n_electron), 0, None)
 
@@ -1072,7 +1072,7 @@ class PhotoElectric_Electron(S2):
         instruction = np.repeat(signal_pulse_instruction[0], n_electron)
 
         instruction['type'] = 6  # pe_el
-        instruction['time'] = t_zeros + self.config['drift_time_gate']
+        instruction['time'] = t_zeros + self.config['electron_drift_time_gate']
         instruction['x'], instruction['y'] = self._rand_position(n_electron)
         instruction['z'] = - ap_delay * self.config['drift_velocity_liquid']
         instruction['amp'] = 1
