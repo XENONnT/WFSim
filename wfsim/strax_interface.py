@@ -354,7 +354,7 @@ class ChunkRawRecords(object):
     strax.Option('fax_config', default='fax_config_nt_design.json'),
     strax.Option('fax_config_override', default=None,
                  help="Dictionary with configuration option overrides"),
-    strax.Option('fax_config_override_from_cmt', default=[],
+    strax.Option('fax_config_override_from_cmt', default={},
                  help="Dictionary of fax parameter names (key) mapped to CMT config names (value)"
                       "where the fax parameter values will be replaced by CMT"),
     strax.Option('gain_model', default=('to_pe_per_run', 'to_pe_nt.npy'), track=False,
