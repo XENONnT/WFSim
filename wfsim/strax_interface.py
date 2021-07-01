@@ -27,7 +27,10 @@ instruction_dtype = [(('Waveform simulator event number.', 'event_number'), np.i
                      (('Recoil type of interaction.', 'recoil'), np.int8),
                      (('Energy deposit of interaction', 'e_dep'), np.float32),
                      (('Eventid like in geant4 output rootfile', 'g4id'), np.int32),
-                     (('Volume id giving the detector subvolume', 'vol_id'), np.int32)]
+                     (('Volume id giving the detector subvolume', 'vol_id'), np.int32),
+                     (('Local field [ V / cm ]', 'local_field'), np.float64),
+                     (('Number of excitons', 'n_excitons'), np.int32),
+]
 
 
 optical_extra_dtype = [(('first optical input index', '_first'), np.int32),
