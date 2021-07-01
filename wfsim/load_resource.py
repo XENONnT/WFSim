@@ -255,7 +255,8 @@ class Resource:
 
             # S1 photon timing splines
             if config.get('s1_time_spline', False):
-                self.s1_time_splines = straxen.get_resource(files['s1_time_spline'], fmt='pkl')
+                self.s1_optical_propagation_spline = make_map(files['s1_time_spline'], fmt='json.gz',
+                                                              method='RegularGridInterpolator')
 
             # Electron After Pulses
             if config.get('enable_electron_afterpulses', False):
@@ -276,7 +277,7 @@ class Resource:
         log.debug(f'{self.__class__.__name__} fully initialized')
 
 
-def make_map(map_file, fmt='text'):
+def make_map(map_file, fmt='text', method='WeightedNearestNeighbors'):
     """Fetch and make an instance of InterpolatingMap based on map_file
     Alternatively map_file can be a list of ["constant dummy", constant: int, shape: list]
     return an instance of  DummyMap"""
@@ -289,7 +290,7 @@ def make_map(map_file, fmt='text'):
     elif isinstance(map_file, str):
         log.debug(f'Initialize map interpolator for file {map_file}')
         map_data = straxen.get_resource(map_file, fmt=fmt)
-        return straxen.InterpolatingMap(map_data)
+        return straxen.InterpolatingMap(map_data, method=method)
 
     else:
         raise TypeError("Can't handle map_file except a string or a list")
