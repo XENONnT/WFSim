@@ -1,10 +1,8 @@
 from copy import deepcopy
 import os.path as osp
-
 import numpy as np
 import strax
 import straxen
-import logging
 
 NT_AUX_INSTALLED = False
 STRAX_AUX_INSTALLED = False
@@ -20,15 +18,20 @@ try:
 except (ModuleNotFoundError, ImportError):
     pass
 
+import logging
 logging.basicConfig(handlers=[
     # logging.handlers.WatchedFileHandler('wfsim.log'),
     logging.StreamHandler()])
 log = logging.getLogger('wfsim.resource')
 log.setLevel('WARNING')
 
+from strax import exporter
+export, __all__ = exporter()
+
 _cached_configs = dict()
 
 
+@export
 def load_config(config):
     """Create a Resource instance from the configuration
 
@@ -296,6 +299,7 @@ def make_map(map_file, fmt='text', method='WeightedNearestNeighbors'):
         raise TypeError("Can't handle map_file except a string or a list")
 
 
+@export
 class DummyMap:
     """Return constant results
         the length match the length of input
