@@ -240,11 +240,11 @@ class Pulse(object):
                 tmp_photon_timing = photon_timings[i]
             else:
                 gain_total += photon_gains[i]
-        else:
-            start = int(tmp_photon_timing // dt) - pulse_left
-            reminder = int(tmp_photon_timing % dt)
-            pulse_current[start:start + template_length] += \
-                pmt_current_templates[reminder] * gain_total
+
+        start = int(tmp_photon_timing // dt) - pulse_left
+        reminder = int(tmp_photon_timing % dt)
+        pulse_current[start:start + template_length] += \
+            pmt_current_templates[reminder] * gain_total
 
     @staticmethod
     def singlet_triplet_delays(size, singlet_ratio, config, phase):
