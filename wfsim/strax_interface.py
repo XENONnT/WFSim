@@ -672,7 +672,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
 
         if 'nveto' in self.config['targets']:
             self.sim_nv = ChunkRawRecords(self.config_nveto,
-                                          rawdata_generator=wfsim.core.RawDataOptical,
+                                          rawdata_generator=wfsim.RawDataOptical,
                                           channels=self.nveto_channels,
                                           timings=self.nveto_timings,)
             self.sim_nv.truth_buffer = np.zeros(10000, dtype=instruction_dtype + optical_extra_dtype
