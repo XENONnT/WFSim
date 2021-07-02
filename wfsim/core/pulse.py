@@ -1,7 +1,7 @@
 from numba import njit
 import numpy as np
 from scipy.interpolate import interp1d
-import wfsim
+from ..load_resource import load_config
 
 import logging
 logging.basicConfig(handlers=[
@@ -12,6 +12,11 @@ log.setLevel('WARNING')
 
 from strax import exporter, deterministic_hash
 export, __all__ = exporter()
+__all__ += ['_cached_pmt_current_templates', '_cached_uniform_to_pe_arr']
+
+_cached_pmt_current_templates = {}
+_cached_uniform_to_pe_arr = {}
+
 
 @export
 class Pulse(object):
@@ -20,7 +25,7 @@ class Pulse(object):
     def __init__(self, config):
         self.config = config
         self.config.update(self.config.get(self.__class__.__name__, {}))
-        self.resource = wfsim.load_config(config)
+        self.resource = load_config(config)
 
         self.init_pmt_current_templates()
         self.init_spe_scaling_factor_distributions()

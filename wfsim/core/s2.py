@@ -1,7 +1,8 @@
 from numba import njit
 import numpy as np
-import wfsim
+from .pulse import Pulse
 from .. import units
+from ..load_resource import DummyMap
 
 import logging
 log = logging.getLogger('wfsim.core')
@@ -11,7 +12,7 @@ export, __all__ = exporter()
 
 
 @export
-class S2(wfsim.Pulse):
+class S2(Pulse):
     """
     Given temperal inputs as well as number of electrons
     Random generate photon timing and channel distribution.
@@ -366,7 +367,7 @@ class S2(wfsim.Pulse):
         # Should be done natually with the s2 pattern map, however, there's some bug there so we apply this hard cut
         mask = np.sum(xy_multi ** 2, axis=1) <= config['tpc_radius'] ** 2
 
-        if isinstance(resource.s2_pattern_map, wfsim.DummyMap):
+        if isinstance(resource.s2_pattern_map, DummyMap):
             output_dim = resource.s2_pattern_map.shape[-1]
         else:
             output_dim = resource.s2_pattern_map.data['map'].shape[-1]

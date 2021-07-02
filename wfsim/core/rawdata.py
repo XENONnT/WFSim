@@ -1,7 +1,12 @@
 from numba import njit
 import numpy as np
 from tqdm import tqdm
-import wfsim
+from .pulse import Pulse
+from .s1 import S1
+from .s2 import S2
+from .afterpulse import PhotoIonization_Electron, PhotoElectric_Electron, PMT_Afterpulse
+from ..load_resource import load_config
+from ..utils import find_intervals_below_threshold
 
 import logging
 log = logging.getLogger('wfsim.core')
@@ -19,13 +24,13 @@ class RawData(object):
     def __init__(self, config):
         self.config = config
         self.pulses = dict(
-            s1=wfsim.S1(config),
-            s2=wfsim.S2(config),
-            pi_el=wfsim.PhotoIonization_Electron(config),
-            pe_el=wfsim.PhotoElectric_Electron(config),
-            pmt_ap=wfsim.PMT_Afterpulse(config),
+            s1=S1(config),
+            s2=S2(config),
+            pi_el=PhotoIonization_Electron(config),
+            pe_el=PhotoElectric_Electron(config),
+            pmt_ap=PMT_Afterpulse(config),
         )
-        self.resource = wfsim.load_config(self.config)
+        self.resource = load_config(self.config)
 
     def __call__(self, instructions, truth_buffer=None, progress_bar=True, **kwargs):
         if truth_buffer is None:
@@ -272,7 +277,7 @@ class RawData(object):
             else:
                 threshold = self.config['digitizer_reference_baseline'] - self.config['zle_threshold'] - 1
 
-            n_itvs_found = wfsim.find_intervals_below_threshold(
+            n_itvs_found = find_intervals_below_threshold(
                 data,
                 threshold=threshold,
                 holdoff=self.config['trigger_window'] + self.config['trigger_window'] + 1,
@@ -408,11 +413,11 @@ class RawDataOptical(RawData):
     def __init__(self, config, channels=[], timings=[]):
         self.config = config
         self.pulses = dict(
-            s1=wfsim.Pulse(config),
-            pi_el=wfsim.PhotoIonization_Electron(config),
-            pe_el=wfsim.PhotoElectric_Electron(config),
-            pmt_ap=wfsim.PMT_Afterpulse(config))
-        self.resource = wfsim.load_config(config)
+            s1=Pulse(config),
+            pi_el=PhotoIonization_Electron(config),
+            pe_el=PhotoElectric_Electron(config),
+            pmt_ap=PMT_Afterpulse(config))
+        self.resource = load_config(config)
         self.channels = channels
         self.timings = timings
 

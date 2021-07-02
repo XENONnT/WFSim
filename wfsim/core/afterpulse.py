@@ -1,5 +1,6 @@
 import numpy as np
-import wfsim
+from .pulse import Pulse
+from .s2 import S2
 
 from strax import exporter
 export, __all__ = exporter()
@@ -9,7 +10,7 @@ log = logging.getLogger('wfsim.core')
 
 
 @export
-class PhotoIonization_Electron(wfsim.S2):
+class PhotoIonization_Electron(S2):
     """
     Produce electron after pulse simulation, using already built cdfs
     The cdfs follow distribution parameters extracted from data.
@@ -63,7 +64,7 @@ class PhotoIonization_Electron(wfsim.S2):
 
 
 @export
-class PhotoElectric_Electron(wfsim.S2):
+class PhotoElectric_Electron(S2):
     """
     Produce electron after S2 pulse simulation, using a gaussian distribution
     """
@@ -114,7 +115,7 @@ class PhotoElectric_Electron(wfsim.S2):
 
 
 @export
-class PMT_Afterpulse(wfsim.Pulse):
+class PMT_Afterpulse(Pulse):
     """
     Produce pmt after pulse simulation, using already built cdfs
     The cdfs follow distribution parameters extracted from data.

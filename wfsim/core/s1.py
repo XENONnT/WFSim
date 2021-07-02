@@ -1,6 +1,6 @@
 from numba import njit
 import numpy as np
-import wfsim
+from .pulse import Pulse
 
 import logging
 log = logging.getLogger('wfsim.core')
@@ -26,7 +26,7 @@ class NestId:
 
 
 @export
-class S1(wfsim.Pulse):
+class S1(Pulse):
     """
     Given temperal inputs as well as number of photons
     Random generate photon timing and channel distribution.
