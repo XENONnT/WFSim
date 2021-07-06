@@ -5,7 +5,7 @@ from copy import deepcopy
 from scipy.interpolate import interp1d
 
 import strax
-export, __all__ = strax.exporter(export_self=False)
+export, __all__ = strax.exporter(export_self=True)
 PULSE_MAX_DURATION = int(1e3)
 N_SPLIT_LOOP = 5
 
@@ -135,7 +135,6 @@ def split_long_optical_pulse(firsts, lasts, timings, channels):
         firsts[ix] = cnt + 1
 
 
-@export
 def optical_adjustment(instructions, timings, channels):
     """
     Helper function to process optical instructions so that for each entry

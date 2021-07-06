@@ -1,19 +1,17 @@
+import logging
+
 import numpy as np
 import pandas as pd
 import uproot
-from immutabledict import immutabledict
-from scipy.interpolate import interp1d
-from copy import deepcopy
 
 import strax
 import straxen
-import wfsim
-
-import logging
-logging.basicConfig(handlers=[logging.StreamHandler()])
-log = logging.getLogger('wfsim.interface')
-log.setLevel('WARNING')
-
+from .core import RawData, RawDataOptical
+from .load_resource import load_config
+from .utils import optical_adjustment
+from immutabledict import immutabledict
+from scipy.interpolate import interp1d
+from copy import deepcopy
 export, __all__ = strax.exporter()
 __all__ += ['instruction_dtype', 'optical_extra_dtype', 'truth_extra_dtype']
 _cached_wavelength_to_qe_arr = {}
@@ -52,6 +50,11 @@ truth_extra_dtype = [
     (('Arrival time of the last electron [ns]', 't_last_electron'), np.float64),
     (('Mean time of the electrons [ns]', 't_mean_electron'), np.float64),
     (('Standard deviation of electron arrival times [ns]', 't_sigma_electron'), np.float64),]
+
+
+logging.basicConfig(handlers=[logging.StreamHandler()])
+log = logging.getLogger('wfsim.interface')
+log.setLevel('WARNING')
 
 
 def rand_instructions(c):
@@ -100,7 +103,7 @@ def _read_optical_nveto(config, events, mask):
     h = strax.deterministic_hash(config)
     nveto_channels = np.arange(config['channel_map']['nveto'][0], config['channel_map']['nveto'][1] + 1)
     if h not in _cached_wavelength_to_qe_arr:
-        resource = wfsim.load_config(config)
+        resource = load_config(config)
         if getattr(resource, 'nv_pmt_qe', None) is None:
             log.warning('nv pmt qe data not specified all qe default to 100 %')
             _cached_wavelength_to_qe_arr[h] = np.ones([len(nveto_channels), 1000]) * 100
@@ -176,7 +179,7 @@ def read_optical(config):
     ins['_last'] = np.cumsum(amplitudes)
 
     # Need to shift the timing and split long pulses
-    ins = wfsim.optical_adjustment(ins, timings, channels)
+    ins = optical_adjustment(ins, timings, channels)
     return ins, channels, timings
 
 
@@ -199,7 +202,7 @@ def instruction_from_csv(filename):
 
 @export
 class ChunkRawRecords(object):
-    def __init__(self, config, rawdata_generator=wfsim.RawData, **kwargs):
+    def __init__(self, config, rawdata_generator=RawData, **kwargs):
         log.debug(f'Starting {self.__class__.__name__}')
         self.config = config
         log.debug(f'Setting raw data with {rawdata_generator.__name__}')
@@ -672,7 +675,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
 
         if 'nveto' in self.config['targets']:
             self.sim_nv = ChunkRawRecords(self.config_nveto,
-                                          rawdata_generator=wfsim.RawDataOptical,
+                                          rawdata_generator=RawDataOptical,
                                           channels=self.nveto_channels,
                                           timings=self.nveto_timings,)
             self.sim_nv.truth_buffer = np.zeros(10000, dtype=instruction_dtype + optical_extra_dtype
@@ -726,16 +729,16 @@ class RawRecordsFromMcChain(SimulatorPlugin):
         for data_type in self.provides:
             if 'nv' in data_type:
                 if 'nveto' in self.config['targets']:
-                    chunk[data_type] = self.chunk(start=self.sim_nv.chunk_time_pre,
-                                                  end=self.sim_nv.chunk_time,
-                                                  data=result_nv[data_type.strip('_nv')],
-                                                  data_type=data_type)
+                  chunk[data_type] = self.chunk(start=self.sim_nv.chunk_time_pre,
+                                                end=self.sim_nv.chunk_time,
+                                                data=result_nv[data_type.strip('_nv')],
+                                                data_type=data_type)
                 #If nv is not one of the targets just return an empty chunk
                 else:
-                    chunk[data_type] = self.chunk(start=self.sim.chunk_time_pre,
-                                                  end=self.sim.chunk_time,
-                                                  data=np.array([]),
-                                                  data_type=data_type)
+                  chunk[data_type] = self.chunk(start=self.sim.chunk_time_pre,
+                                                end=self.sim.chunk_time,
+                                                data=np.array([]),
+                                                data_type=data_type)
             else:
                 chunk[data_type] = self.chunk(start=self.sim.chunk_time_pre,
                                               end=self.sim.chunk_time,
