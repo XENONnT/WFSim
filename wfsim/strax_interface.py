@@ -357,10 +357,10 @@ class ChunkRawRecords(object):
     strax.Option('fax_config', default='fax_config_nt_design.json'),
     strax.Option('fax_config_override', default=None,
                  help="Dictionary with configuration option overrides"),
-    strax.Option('fax_config_override_from_cmt', default={},
+    strax.Option('fax_config_override_from_cmt', default=None,
                  help="Dictionary of fax parameter names (key) mapped to CMT config names (value)"
                       "where the fax parameter values will be replaced by CMT"),
-    strax.Option('gain_model', default=('to_pe_per_run', 'to_pe_nt.npy'), track=False,
+    strax.Option('gain_model_mc', default=('to_pe_per_run', 'to_pe_nt.npy'),
                  help='PMT gain model. Specify as (model_type, model_config).'),
     strax.Option('channel_map', track=False, type=immutabledict,
                  help="immutabledict mapping subdetector to (min, max) "
@@ -407,7 +407,7 @@ class SimulatorPlugin(strax.Plugin):
 
         # Update gains to the nT defaults
         self.to_pe = straxen.get_correction_from_cmt(self.run_id,
-                               self.config['gain_model'])
+                               self.config['gain_model_mc'])
 
         adc_2_current = (self.config['digitizer_voltage_range']
                          / 2 ** (self.config['digitizer_bits'])
@@ -427,11 +427,12 @@ class SimulatorPlugin(strax.Plugin):
         self.config['channels_bottom'] = np.arange(self.config['n_top_pmts'], self.config['n_tpc_pmts'])
 
         # Update some values stored in CMT
-        for fax_field, cmt_option in self.config['fax_config_override_from_cmt'].items():
-            cmt_value = straxen.get_correction_from_cmt(self.run_id, cmt_option)
-            if fax_field in self.config:
-                log.warn(f'Replacing {fax_field} with CMT option {cmt_option} to {cmt_value}')
-            self.config[fax_field] = cmt_value
+        if self.config['fax_config_override_from_cmt'] is not None:
+            for fax_field, cmt_option in self.config['fax_config_override_from_cmt'].items():
+                cmt_value = straxen.get_correction_from_cmt(self.run_id, cmt_option)
+                if fax_field in self.config:
+                    log.warn(f'Replacing {fax_field} with CMT option {cmt_option} to {cmt_value}')
+                self.config[fax_field] = cmt_value
 
     def _setup(self):
         # Set in inheriting class
