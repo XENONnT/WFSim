@@ -556,9 +556,8 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             if overrides is not None:
                 self.config_nveto.update(overrides)
 
-            self.to_pe_nveto = straxen.get_to_pe(
-                self.run_id, self.config_nveto['gain_model_nv'],
-                self.config['channel_map']['nveto'][1] - self.config['channel_map']['nveto'][0] + 1)
+            self.to_pe_nveto = straxen.get_correction_from_cmt(self.run_id,
+                               self.config['gain_model_nv'])
 
             self.config_nveto['gains'] = np.divide((2e-9 * 2 / 2**14) / (1.6e-19 * 1 * 50),
                                                    self.to_pe_nveto,
