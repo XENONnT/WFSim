@@ -592,10 +592,9 @@ class RawRecordsFromMcChain(SimulatorPlugin):
         if 'nveto' in self.config['targets']:
             self.instructions_nveto, self.nveto_channels, self.nveto_timings =\
                 read_optical(self.config_nveto)
-            # Why epix removes many of the g4ids?
-            # Remove nveto event if no tpc event of the same g4id is found
             if len(self.g4id) > 0:
                 nv_inst_to_keep = (self.instructions_nveto['_last'] - self.instructions_nveto['_first']) >= 0
+
             self.instructions_nveto = self.instructions_nveto[nv_inst_to_keep]
             self.g4id.append(self.instructions_nveto['g4id'])
             log.debug("Epix produced %d instructions in nv" % (len(self.instructions_nveto)))
