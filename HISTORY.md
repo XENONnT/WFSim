@@ -1,3 +1,21 @@
+v0.5.5 / 2021-07-07
+===================
+* Bug fix in strax interface (#184)
+
+
+v0.5.4 / 2021-06-24
+===================
+* Get gains from CMT (#172)
+* Not to remove nVeto events whose related TPC events don't exist (#171)
+* Remove travis for testing in wfsim (#176)
+* Oversize chunk handling (#168)
+* Adding Kr83m notebook (#167)
+* Sorting of S1 photons by channel number to preserve timing (#169)
+
+v0.5.3 / 2021-06-03
+===================
+* Truth chunk patch (#164)
+
 v0.5.2 / 2021-05-25
 ===================
 * Fix zstd for testing (#163)
