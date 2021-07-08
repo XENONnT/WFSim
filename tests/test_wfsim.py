@@ -160,7 +160,7 @@ def test_sim_mc_chain():
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
 
-        # Download test file
+        # Download test file on the test directory
         import requests
         test_g4 = 'https://raw.githubusercontent.com/XENONnT/WFSim/nveto_autotest/tests/geant_test_data_small.root'
         url_data = requests.get(test_g4).content
@@ -180,8 +180,7 @@ def test_sim_mc_chain():
             event_rate=100.,
             chunk_size=5.,
             entry_start=0,
-            # entry_stop=5000,
-            fax_config='fax_config_nt_low_field.json',
+            fax_config='fax_config_nt_design.json',
             fax_config_override=dict(
                 url_base='https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/master/sim_files',
                 enable_electron_afterpulses=False),
