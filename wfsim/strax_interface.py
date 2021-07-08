@@ -27,7 +27,10 @@ instruction_dtype = [(('Waveform simulator event number.', 'event_number'), np.i
                      (('Recoil type of interaction.', 'recoil'), np.int8),
                      (('Energy deposit of interaction', 'e_dep'), np.float32),
                      (('Eventid like in geant4 output rootfile', 'g4id'), np.int32),
-                     (('Volume id giving the detector subvolume', 'vol_id'), np.int32)]
+                     (('Volume id giving the detector subvolume', 'vol_id'), np.int32),
+                     (('Local field [ V / cm ]', 'local_field'), np.float64),
+                     (('Number of excitons', 'n_excitons'), np.int32),
+]
 
 
 optical_extra_dtype = [(('first optical input index', '_first'), np.int32),
@@ -248,8 +251,15 @@ class ChunkRawRecords(object):
                 self.chunk_time += cksz
 
             if self.blevel + records_needed > buffer_length:
-                log.warning('Chunck size too large, insufficient record buffer')
+                log.warning('Chunck size too large, insufficient record buffer \n'
+                            'No longer in sync if simulating nVeto with TPC \n'
+                            'Consider reducing the chunk size')
+                next_left_time = self.rawdata.left * dt
+                self.chunk_time = (self.last_digitized_right + 1) * dt
+                log.debug(f'Pause sim loop at {self.chunk_time}, next pulse start at {next_left_time}')
                 yield from self.final_results()
+                self.chunk_time_pre = self.chunk_time
+                self.chunk_time += cksz
 
             if self.blevel + records_needed > buffer_length:
                 log.warning('Pulse length too large, insufficient record buffer, skipping pulse')
@@ -393,8 +403,8 @@ class SimulatorPlugin(strax.Plugin):
             self.config.update(overrides)
 
         # Update gains to the nT defaults
-        self.to_pe = straxen.get_to_pe(self.run_id, self.config['gain_model'],
-                                       self.config['channel_map']['tpc'][1]+1)
+        self.to_pe = straxen.get_correction_from_cmt(self.run_id,
+                               self.config['gain_model'])
 
         adc_2_current = (self.config['digitizer_voltage_range']
                          / 2 ** (self.config['digitizer_bits'])
@@ -546,9 +556,8 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             if overrides is not None:
                 self.config_nveto.update(overrides)
 
-            self.to_pe_nveto = straxen.get_to_pe(
-                self.run_id, self.config_nveto['gain_model_nv'],
-                self.config['channel_map']['nveto'][1] - self.config['channel_map']['nveto'][0] + 1)
+            self.to_pe_nveto = straxen.get_correction_from_cmt(self.run_id,
+                               self.config['gain_model_nv'])
 
             self.config_nveto['gains'] = np.divide((2e-9 * 2 / 2**14) / (1.6e-19 * 1 * 50),
                                                    self.to_pe_nveto,
