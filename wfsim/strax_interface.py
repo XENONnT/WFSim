@@ -597,7 +597,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
 
             self.instructions_nveto = self.instructions_nveto[nv_inst_to_keep]
             self.g4id.append(self.instructions_nveto['g4id'])
-            log.debug("Epix produced %d instructions in nv" % (len(self.instructions_nveto)))
+            log.debug("%d instructions were produced in nv" % (len(self.instructions_nveto)))
 
         self.g4id = np.unique(np.concatenate(self.g4id))
         self.set_timing()
