@@ -206,7 +206,8 @@ class Pulse(object):
                 scaled_bins = np.zeros_like(cdf)
 
             grid_cdf = np.linspace(0, 1, 2001)
-            grid_scale = interp1d(cdf, scaled_bins, 
+            grid_scale = interp1d(cdf, scaled_bins,
+                                  kind='next',
                                   bounds_error=False,
                                   fill_value=(scaled_bins[0], scaled_bins[-1]))(grid_cdf)
 
