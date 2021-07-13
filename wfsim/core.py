@@ -206,7 +206,8 @@ class Pulse(object):
                 scaled_bins = np.zeros_like(cdf)
 
             grid_cdf = np.linspace(0, 1, 2001)
-            grid_scale = interp1d(cdf, scaled_bins, 
+            grid_scale = interp1d(cdf, scaled_bins,
+                                  kind='next',
                                   bounds_error=False,
                                   fill_value=(scaled_bins[0], scaled_bins[-1]))(grid_cdf)
 
@@ -263,11 +264,11 @@ class Pulse(object):
                 tmp_photon_timing = photon_timings[i]
             else:
                 gain_total += photon_gains[i]
-        else:
-            start = int(tmp_photon_timing // dt) - pulse_left
-            reminder = int(tmp_photon_timing % dt)
-            pulse_current[start:start + template_length] += \
-                pmt_current_templates[reminder] * gain_total
+
+        start = int(tmp_photon_timing // dt) - pulse_left
+        reminder = int(tmp_photon_timing % dt)
+        pulse_current[start:start + template_length] += \
+            pmt_current_templates[reminder] * gain_total
 
     @staticmethod
     def singlet_triplet_delays(size, singlet_ratio, config, phase):
