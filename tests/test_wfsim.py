@@ -32,6 +32,7 @@ def test_sim_1T():
         testing_config_1T = dict(
             hev_gain_model=("1T_to_pe_placeholder", True),
             gain_model=("1T_to_pe_placeholder", True),
+            gain_model_mc=("1T_to_pe_placeholder", True),
         )
         st = strax.Context(
             storage=tempdir,
@@ -65,6 +66,7 @@ def test_sim_nT_basics():
         log.debug(f'Working in {tempdir}')
         conf = straxen.contexts.xnt_common_config
         conf['gain_model'] = ("to_pe_placeholder", True)
+        conf['gain_model_mc'] = ("to_pe_placeholder", True)
         conf['hev_gain_model'] = ("to_pe_placeholder", True)
         conf['hit_min_amplitude'] = 'pmt_commissioning_initial'
         resource, conf_override = test_load_nt()
@@ -119,6 +121,7 @@ def test_sim_nT_advanced():
                 **straxen.contexts.xnt_simulation_config, ),
             **straxen.contexts.common_opts)
         st.register(wfsim.RawRecordsFromFaxNT)
+        st.set_config({'gain_model_mc': straxen.contexts.xnt_simulation_config['gain_model']})
 
         log.debug(f'Getting raw-records')
         rr = st.get_array(run_id, 'raw_records')
@@ -141,6 +144,7 @@ def test_sim_nT_advanced():
                 **straxen.contexts.xnt_simulation_config, ),
             **straxen.contexts.common_opts)
         st.register(wfsim.RawRecordsFromFaxNT)
+        st.set_config({'gain_model_mc': straxen.contexts.xnt_simulation_config['gain_model']})
 
         log.debug(f'Getting raw-records')
         rr = st.get_array(run_id, 'raw_records')

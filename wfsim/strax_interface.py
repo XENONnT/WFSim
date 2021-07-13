@@ -357,7 +357,10 @@ class ChunkRawRecords(object):
     strax.Option('fax_config', default='fax_config_nt_design.json'),
     strax.Option('fax_config_override', default=None,
                  help="Dictionary with configuration option overrides"),
-    strax.Option('gain_model', default=('to_pe_per_run', 'to_pe_nt.npy'),
+    strax.Option('fax_config_override_from_cmt', default=None,
+                 help="Dictionary of fax parameter names (key) mapped to CMT config names (value)"
+                      "where the fax parameter values will be replaced by CMT"),
+    strax.Option('gain_model_mc', default=('to_pe_per_run', 'to_pe_nt.npy'),
                  help='PMT gain model. Specify as (model_type, model_config).'),
     strax.Option('channel_map', track=False, type=immutabledict,
                  help="immutabledict mapping subdetector to (min, max) "
@@ -404,7 +407,7 @@ class SimulatorPlugin(strax.Plugin):
 
         # Update gains to the nT defaults
         self.to_pe = straxen.get_correction_from_cmt(self.run_id,
-                               self.config['gain_model'])
+                               self.config['gain_model_mc'])
 
         adc_2_current = (self.config['digitizer_voltage_range']
                          / 2 ** (self.config['digitizer_bits'])
@@ -422,6 +425,14 @@ class SimulatorPlugin(strax.Plugin):
         self.config['channel_map'] = dict(self.config['channel_map'])
         self.config['channel_map']['sum_signal'] = 800
         self.config['channels_bottom'] = np.arange(self.config['n_top_pmts'], self.config['n_tpc_pmts'])
+
+        # Update some values stored in CMT
+        if self.config['fax_config_override_from_cmt'] is not None:
+            for fax_field, cmt_option in self.config['fax_config_override_from_cmt'].items():
+                cmt_value = straxen.get_correction_from_cmt(self.run_id, cmt_option)
+                if fax_field in self.config:
+                    log.warn(f'Replacing {fax_field} with CMT option {cmt_option} to {cmt_value}')
+                self.config[fax_field] = cmt_value
 
     def _setup(self):
         # Set in inheriting class
@@ -592,13 +603,12 @@ class RawRecordsFromMcChain(SimulatorPlugin):
         if 'nveto' in self.config['targets']:
             self.instructions_nveto, self.nveto_channels, self.nveto_timings =\
                 read_optical(self.config_nveto)
-            # Why epix removes many of the g4ids?
-            # Remove nveto event if no tpc event of the same g4id is found
             if len(self.g4id) > 0:
                 nv_inst_to_keep = (self.instructions_nveto['_last'] - self.instructions_nveto['_first']) >= 0
+
             self.instructions_nveto = self.instructions_nveto[nv_inst_to_keep]
             self.g4id.append(self.instructions_nveto['g4id'])
-            log.debug("Epix produced %d instructions in nv" % (len(self.instructions_nveto)))
+            log.debug("%d instructions were produced in nv" % (len(self.instructions_nveto)))
 
         self.g4id = np.unique(np.concatenate(self.g4id))
         self.set_timing()
