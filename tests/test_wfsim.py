@@ -1,6 +1,7 @@
 import logging
 import os.path as osp
 import tempfile
+import copy
 
 import strax
 import straxen
@@ -64,7 +65,7 @@ def test_sim_nT_basics():
 
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
-        conf = straxen.contexts.xnt_common_config
+        conf = copy.deepcopy(straxen.contexts.xnt_common_config)
         conf['gain_model'] = ("to_pe_placeholder", True)
         conf['gain_model_mc'] = ("to_pe_placeholder", True)
         conf['hev_gain_model'] = ("to_pe_placeholder", True)
@@ -111,17 +112,7 @@ def test_sim_nT_advanced():
 
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
-
-        st = strax.Context(
-            storage=tempdir,
-            config=dict(
-                nchunk=1, event_rate=1, chunk_size=2,
-                detector='XENONnT',
-                fax_config=('fax_config_nt_design.json'),
-                **straxen.contexts.xnt_simulation_config, ),
-            **straxen.contexts.common_opts)
-        st.register(wfsim.RawRecordsFromFaxNT)
-        st.set_config({'gain_model_mc': straxen.contexts.xnt_simulation_config['gain_model']})
+        st = straxen.contexts.xenonnt_simulation()
 
         log.debug(f'Getting raw-records')
         rr = st.get_array(run_id, 'raw_records')
@@ -132,19 +123,9 @@ def test_sim_nT_advanced():
 
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
-
-        st = strax.Context(
-            storage=tempdir,
-            config=dict(
-                nchunk=1, event_rate=1, chunk_size=2,
-                detector='XENONnT',
-                fax_config=('fax_config_nt_design.json'),
-                fax_config_override=dict(s2_luminescence_model='simple',
-                                         s1_model_type='splinesimple', ),
-                **straxen.contexts.xnt_simulation_config, ),
-            **straxen.contexts.common_opts)
-        st.register(wfsim.RawRecordsFromFaxNT)
-        st.set_config({'gain_model_mc': straxen.contexts.xnt_simulation_config['gain_model']})
+        st = straxen.contexts.xenonnt_simulation()
+        st.set_config({'fax_config_override': dict(s2_luminescence_model='simple',
+                                                   s1_model_type='optical_propagation+simple',)})
 
         log.debug(f'Getting raw-records')
         rr = st.get_array(run_id, 'raw_records')
@@ -186,13 +167,13 @@ def test_sim_mc_chain():
             entry_start=0,
             fax_config='fax_config_nt_design.json',
             fax_config_override=dict(
+                s1_model_type='nest',
                 url_base='https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/master/sim_files',
                 enable_electron_afterpulses=False),
             epix_config=epix_config,
             neutron_veto=True,
             fax_config_nveto='fax_config_nt_nveto.json',
-            fax_config_override_nveto=dict(s1_model_type='nest',
-                                           enable_noise=False,
+            fax_config_override_nveto=dict(enable_noise=False,
                                            enable_pmt_afterpulses=False,
                                            enable_electron_afterpulses=False),
             targets=('tpc', 'nveto'),
