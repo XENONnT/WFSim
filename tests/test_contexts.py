@@ -13,6 +13,9 @@ def test_nt_context(register=None, context=None):
     :param context: Test with some other context than the nT simulation
     context
     """
+    if not straxen.utilix_is_configured():
+        return
+
     if context is None:
         context = straxen.contexts.xenonnt_simulation()
     assert isinstance(context, strax.Context), f'{context} is not a context'
