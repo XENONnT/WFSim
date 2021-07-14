@@ -151,7 +151,7 @@ def test_sim_mc_chain():
 
         # Download test file on the test directory
         import requests
-        test_g4 = 'https://raw.githubusercontent.com/XENONnT/WFSim/nveto_autotest/tests/geant_test_data_small.root'
+        test_g4 = 'https://raw.githubusercontent.com/XENONnT/WFSim/master/tests/geant_test_data_small.root'
         url_data = requests.get(test_g4).content
         with open('test.root', mode='wb') as f:
             f.write(url_data)

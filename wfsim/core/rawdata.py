@@ -88,7 +88,7 @@ class RawData(object):
             instb_queue = np.argsort(instb_time, kind='stable')
             instb_queue = np.split(instb_queue, 
                                    np.where(np.diff(instb_time[instb_queue]) > rext)[0]+1)
-            
+
             # C) Push pulse cache out first if nothing comes right after them
             if np.min(instb_time) - self.last_pulse_end_time > rext and not np.isinf(self.last_pulse_end_time):
                 self.digitize_pulse_cache()

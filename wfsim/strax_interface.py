@@ -429,7 +429,7 @@ class SimulatorPlugin(strax.Plugin):
             for fax_field, cmt_option in self.config['fax_config_override_from_cmt'].items():
                 cmt_value = straxen.get_correction_from_cmt(self.run_id, cmt_option)
                 if fax_field in self.config:
-                    log.warn(f'Replacing {fax_field} with CMT option {cmt_option} to {cmt_value}')
+                    log.warning(f'Replacing {fax_field} with CMT option {cmt_option} to {cmt_value}')
                 self.config[fax_field] = cmt_value
 
     def _setup(self):

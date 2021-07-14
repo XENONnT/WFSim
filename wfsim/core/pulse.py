@@ -2,8 +2,8 @@ import logging
 from numba import njit
 import numpy as np
 from scipy.interpolate import interp1d
-from strax import exporter
-from ..load_resource import DummyMap
+from strax import exporter, deterministic_hash
+from ..load_resource import load_config
 
 
 export, __all__ = exporter()

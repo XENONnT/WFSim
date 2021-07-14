@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 from strax import exporter
 from .pulse import Pulse
