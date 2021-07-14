@@ -2,3 +2,5 @@ strax
 utilix>=0.5.3
 straxen>=0.19.1
 uproot>=4.0.0
+epix
+nestpy
