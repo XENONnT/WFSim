@@ -84,8 +84,8 @@ class RawData(object):
             instb_indx = np.where(instb_filled)[0]
             instb_type = instb[instb_indx]['type']
             instb_time = instb[instb_indx]['time'] + \
-                         (instb[instb_indx]['z']  / v * (instb_type % 2 - 1)).astype(np.int64)
-            instb_queue = np.argsort(instb_time,  kind='stable')
+                         (instb[instb_indx]['z'] / v * (instb_type % 2 - 1)).astype(np.int64)
+            instb_queue = np.argsort(instb_time, kind='stable')
             instb_queue = np.split(instb_queue, 
                                    np.where(np.diff(instb_time[instb_queue]) > rext)[0]+1)
             

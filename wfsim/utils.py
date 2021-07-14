@@ -5,32 +5,9 @@ from copy import deepcopy
 from scipy.interpolate import interp1d
 
 import strax
-export, __all__ = strax.exporter(export_self=True)
+export, __all__ = strax.exporter(export_self=False)
 PULSE_MAX_DURATION = int(1e3)
 N_SPLIT_LOOP = 5
-
-
-def init_spe_scaling_factor_distributions(file):
-    # Extract the spe pdf from a csv file into a pandas dataframe
-    spe_shapes = pd.read_csv(file)
-
-    # Create a converter array from uniform random numbers to SPE gains (one interpolator per channel)
-    # Scale the distributions so that they have an SPE mean of 1 and then calculate the cdf
-    uniform_to_pe_arr = []
-    for ch in spe_shapes.columns[1:]:  # skip the first element which is the 'charge' header
-        if spe_shapes[ch].sum() > 0:
-            mean_spe = (spe_shapes['charge'] * spe_shapes[ch]).sum() / spe_shapes[ch].sum()
-            scaled_bins = spe_shapes['charge'] / mean_spe
-            cdf = np.cumsum(spe_shapes[ch]) / np.sum(spe_shapes[ch])
-        else:
-            # if sum is 0, just make some dummy axes to pass to interpolator
-            cdf = np.linspace(0, 1, 10)
-            scaled_bins = np.zeros_like(cdf)
-
-        uniform_to_pe_arr.append(interp1d(cdf, scaled_bins))
-
-    if uniform_to_pe_arr != []:
-        return uniform_to_pe_arr
 
 
 @export
@@ -135,6 +112,7 @@ def split_long_optical_pulse(firsts, lasts, timings, channels):
         firsts[ix] = cnt + 1
 
 
+@export
 def optical_adjustment(instructions, timings, channels):
     """
     Helper function to process optical instructions so that for each entry

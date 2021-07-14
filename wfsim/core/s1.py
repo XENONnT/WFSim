@@ -33,7 +33,7 @@ class S1(Pulse):
     Given temperal inputs as well as number of photons
     Random generate photon timing and channel distribution.
     """
-    nestpy_calc=None
+    nestpy_calc = None
 
     def __init__(self, config):
         super().__init__(config)
@@ -53,7 +53,7 @@ class S1(Pulse):
             # shape of recarr is a bit strange
             instruction = np.array([instruction])
 
-        #_, _, t, x, y, z, n_photons, recoil_type, *rest = [
+        # _, _, t, x, y, z, n_photons, recoil_type, *rest = [
         #    np.array(v).reshape(-1) for v in zip(*instruction)]
         t = instruction['time']
         x = instruction['x']
@@ -63,9 +63,9 @@ class S1(Pulse):
         recoil_type = instruction['recoil']
         positions = np.array([x, y, z]).T  # For map interpolation
         n_photon_hits = self.get_n_photons(n_photons=n_photons,
-                                       positions=positions,
-                                       s1_light_yield_map=self.resource.s1_light_yield_map,
-                                       config=self.config)
+                                           positions=positions,
+                                           s1_light_yield_map=self.resource.s1_light_yield_map,
+                                           config=self.config)
 
         # The new way interpolation is written always require a list
         self._photon_channels = self.photon_channels(positions=positions,
@@ -75,7 +75,7 @@ class S1(Pulse):
 
         extra_targs = {}
         if 'nest' in self.config['s1_model_type']:
-            extra_targs['n_photons_emitted']=n_photons
+            extra_targs['n_photons_emitted'] = n_photons
             extra_targs['n_excitons'] = instruction['n_excitons']
             extra_targs['local_field'] = instruction['local_field']
             extra_targs['e_dep'] = instruction['e_dep']
@@ -194,7 +194,8 @@ class S1(Pulse):
                             config=config,
                             phase=phase).astype(np.int64)
                     except AttributeError:
-                        raise AttributeError(f"Recoil type must be ER, NR, alpha or LED, not {recoil_type}. Check nest ids")
+                        raise AttributeError(f"Recoil type must be ER, NR, alpha or LED, "
+                                             f"not {recoil_type}. Check nest ids")
 
                 if 'nest' in config['s1_model_type']:
                     scint_time = nestpy_calc.GetPhotonTimes(
@@ -214,9 +215,10 @@ class S1(Pulse):
     def optical_propagation(channels, z_positions, config, spline):
         """Function gettting times from s1 timing splines:
 
+        :param channels: The channels of all s1 photon
         :param z_positions: The Z positions of all s1 photon
         :param config: current configuration of wfsim
-        :param splines: pointer to s1 optical propagation splines from resources
+        :param spline: pointer to s1 optical propagation splines from resources
         """
         assert len(z_positions) == len(channels), 'Give each photon a z position'
 
