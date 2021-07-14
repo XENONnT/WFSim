@@ -35,6 +35,7 @@ setuptools.setup(
             'recommonmark',
             'graphviz']},
     packages=['wfsim',
+              'wfsim.core',
               'wfsim.pax_datastructure',],
     classifiers=[
         'Development Status :: 4 - Beta',

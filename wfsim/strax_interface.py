@@ -134,6 +134,7 @@ def _read_optical_nveto(config, events, mask):
     return channels[hit_mask], timings[hit_mask], np.array(amplitudes, int)
 
 
+@export
 def read_optical(config):
     """Function will be executed when wfsim in run in optical mode. This function expects c['fax_file'] 
     to be a root file from optical mc
