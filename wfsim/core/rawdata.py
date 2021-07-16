@@ -379,6 +379,9 @@ class RawData(object):
         """
         Get chunk(s) of noise sample from real noise data
         """
+        if channel_mask['mask'].sum() == 0:
+            return
+
         left = np.min(channel_mask['left'][channel_mask['mask']])
         right = np.max(channel_mask['right'][channel_mask['mask']])
 
