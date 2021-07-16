@@ -276,7 +276,9 @@ class Resource:
 
         # Noise sample
         if config.get('enable_noise', False):
-            self.noise_data = straxen.get_resource(files['noise_file'], fmt='npy')['arr_0'].flatten()
+            self.noise_data = straxen.get_resource(files['noise_file'], fmt='npy')['arr_0']
+            n_channels = len(self.noise_data[0])
+            log.warning(f'Using noise data {files["noise_file"]} with {n_channels} channels for {config["detector"]}')
 
         log.debug(f'{self.__class__.__name__} fully initialized')
 
