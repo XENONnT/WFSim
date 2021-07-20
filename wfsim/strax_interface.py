@@ -219,6 +219,10 @@ class ChunkRawRecords(object):
         :param time_zero: Starting time of the first chunk
         """
         samples_per_record = strax.DEFAULT_RECORD_LENGTH
+        if len(instructions) == 0: # Empty
+            yield from np.array([], dtype=strax.raw_record_dtype(samples_per_record=samples_per_record))
+            self.rawdata.source_finished = True
+            return
         dt = self.config['sample_duration']
         buffer_length = len(self.record_buffer)
         rext = int(self.config['right_raw_extension'])
@@ -597,6 +601,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             self.instructions_epix = epix.run_epix.main(
                 epix.run_epix.setup(epix_config),
                 return_wfsim_instructions=True)
+
             self.g4id.append(self.instructions_epix['g4id'])
             log.debug("Epix produced %d instructions in tpc" % (len(self.instructions_epix)))
 
@@ -715,8 +720,9 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                     log.debug('TPC instructions are already depleted')
                     result = dict([(data_type, np.zeros(0, self.dtype_for(data_type)))
                                    for data_type in self.provides if 'nv' not in data_type])
-                    self.sim.chunk_time = self.sim_nv.chunk_time
-                    self.sim.chunk_time_pre = self.sim_nv.chunk_time_pre
+                    if sum([len(v) for k, v in result.items()]) != 0:
+                        self.sim.chunk_time = self.sim_nv.chunk_time
+                        self.sim.chunk_time_pre = self.sim_nv.chunk_time_pre
                 else:
                     raise RuntimeError("Bug in getting source finished")
 
@@ -749,10 +755,15 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                                                 data=np.array([]),
                                                 data_type=data_type)
             else:
-                chunk[data_type] = self.chunk(start=self.sim.chunk_time_pre,
-                                              end=self.sim.chunk_time,
+                if result[data_type]:
+                    chunk[data_type] = self.chunk(start=self.sim.chunk_time_pre,
+                                                  end=self.sim.chunk_time,
                                               data=result[data_type],
                                               data_type=data_type)
+                else:
+                    # result is empty
+                    chunk[data_type] = self.chunk(start=0, end=0, data=np.array([]),
+                                                  data_type=data_type)
 
         self._sort_check([chunk[data_type].data for data_type in self.provides])
 
