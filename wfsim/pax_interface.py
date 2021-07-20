@@ -9,7 +9,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from .core import RawData
+import wfsim
 from .pax_datastructure import datastructure
 from .strax_interface import *
 from strax import exporter
@@ -22,7 +22,7 @@ export, __all__ = exporter()
 class PaxEvents(object):
     def __init__(self, config):
         self.config = config
-        self.rawdata = RawData(self.config)
+        self.rawdata = wfsim.RawData(self.config)
         
         self.truth_buffer = np.zeros(100000,
                                      dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)])  # 500 s1 + 500 s2
