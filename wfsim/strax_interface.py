@@ -719,7 +719,9 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                     log.debug('TPC instructions are already depleted')
                     result = dict([(data_type, np.zeros(0, self.dtype_for(data_type)))
                                    for data_type in self.provides if 'nv' not in data_type])
-                    if sum([len(v) for k, v in result.items()]) != 0:
+
+                    num_of_results = sum([len(v) for _, v in result.items()])
+                    if num_of_results != 0:
                         self.sim.chunk_time = self.sim_nv.chunk_time
                         self.sim.chunk_time_pre = self.sim_nv.chunk_time_pre
                 else:
