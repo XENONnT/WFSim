@@ -1,7 +1,15 @@
+v0.5.6 / 2021-07-19
+===================
+* Core splitting 2 (#188)
+* Github McChain test using G4 file (#177)
+* Fix removed nveto (#185)
+* No context testing for py3.6 (#187)
+* Overwrite detector parameters with CMT (#179)
+* Fix the 0.5% bias in gain sampling (#186)
+
 v0.5.5 / 2021-07-07
 ===================
 * Bug fix in strax interface (#184)
-
 
 v0.5.4 / 2021-06-24
 ===================
