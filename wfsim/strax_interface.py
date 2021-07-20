@@ -602,8 +602,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
         if 'nveto' in self.config['targets']:
             self.instructions_nveto, self.nveto_channels, self.nveto_timings =\
                 read_optical(self.config_nveto)
-            if len(self.g4id) > 0:
-                nv_inst_to_keep = (self.instructions_nveto['_last'] - self.instructions_nveto['_first']) >= 0
+            nv_inst_to_keep = (self.instructions_nveto['_last'] - self.instructions_nveto['_first']) >= 0
 
             self.instructions_nveto = self.instructions_nveto[nv_inst_to_keep]
             self.g4id.append(self.instructions_nveto['g4id'])
@@ -748,10 +747,14 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                                                 data=np.array([]),
                                                 data_type=data_type)
             else:
-                chunk[data_type] = self.chunk(start=self.sim.chunk_time_pre,
-                                              end=self.sim.chunk_time,
+                try:
+                    chunk[data_type] = self.chunk(start=self.sim.chunk_time_pre,
+                                                  end=self.sim.chunk_time,
                                               data=result[data_type],
                                               data_type=data_type)
+                except:
+                    chunk[data_type] = self.chunk(start=0, end=0, data=np.array([]),
+                                                  data_type=data_type)
 
         self._sort_check([chunk[data_type].data for data_type in self.provides])
 
