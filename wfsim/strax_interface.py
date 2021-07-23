@@ -741,29 +741,49 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                 else:
                     raise RuntimeError("Bug in getting source finished")
 
+        exist_tpc_result, exist_nveto_result = False, False
+        for data_type in self.provides:
+            if 'nv' in data_type:
+                if len(result_nv[data_type.strip('_nv')]) > 0:
+                    exist_nveto_result = True
+            else:
+                if len(result[data_type]) > 0:
+                    exist_tpc_result = True
         chunk = {}
         for data_type in self.provides:
             if 'nv' in data_type:
-                if 'nveto' in self.config['targets']:
-                  chunk[data_type] = self.chunk(start=self.sim_nv.chunk_time_pre,
+                if exist_nveto_result:
+                    chunk[data_type] = self.chunk(start=self.sim_nv.chunk_time_pre,
                                                 end=self.sim_nv.chunk_time,
                                                 data=result_nv[data_type.strip('_nv')],
                                                 data_type=data_type)
-                #If nv is not one of the targets just return an empty chunk
+                # If nv is not one of the targets just return an empty chunk
+                # If there is TPC event, set TPC time for the start and end
                 else:
-                  chunk[data_type] = self.chunk(start=self.sim.chunk_time_pre,
+                    dummy_dtype = wfsim.truth_extra_dtype if 'truth' in data_type else strax.raw_record_dtype()
+                    if exist_tpc_result:
+                        chunk[data_type] = self.chunk(start=self.sim.chunk_time_pre,
                                                 end=self.sim.chunk_time,
-                                                data=np.array([]),
+                                                data=np.array([], dtype=dummy_dtype),
                                                 data_type=data_type)
+                    else:
+                        chunk[data_type] = self.chunk(start=0, end=0, data=np.array([]),
+                                                  data_type=data_type, dtype=dummy_dtype)
             else:
-                if result[data_type]:
+                if exist_tpc_result:
                     chunk[data_type] = self.chunk(start=self.sim.chunk_time_pre,
                                                   end=self.sim.chunk_time,
                                               data=result[data_type],
                                               data_type=data_type)
                 else:
-                    # result is empty
-                    chunk[data_type] = self.chunk(start=0, end=0, data=np.array([]),
+                    dummy_dtype = wfsim.truth_extra_dtype if 'truth' in data_type else strax.raw_record_dtype()
+                    if exist_nveto_result:
+                        chunk[data_type] = self.chunk(start=self.sim_nv.chunk_time_pre,
+                                                      end=self.sim_nv.chunk_time,
+                                                  data=np.array([], dtype=dummy_dtype),
+                                                  data_type=data_type)
+                    else:
+                        chunk[data_type] = self.chunk(start=0, end=0, data=np.array([], dtype=dummy_dtype),
                                                   data_type=data_type)
 
         self._sort_check([chunk[data_type].data for data_type in self.provides])
