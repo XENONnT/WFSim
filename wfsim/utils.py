@@ -142,10 +142,10 @@ def optical_adjustment(instructions, timings, channels):
                                                         timings,
                                                         channels):
 
-            tmp = deepcopy(instructions[ix])
+            tmp = deepcopy(instructions[np.where(long_pulse)[0][ix]])
             tmp['_first'] = first
             tmp['_last'] = last
-            instructions[ix]['_first']=last
+            instructions[np.where(long_pulse)[0][ix]]['_first']=last
 
             extra_inst.append(tmp)
 
