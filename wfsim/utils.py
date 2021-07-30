@@ -1,8 +1,6 @@
 import numba
 import numpy as np
-import pandas as pd
 from copy import deepcopy
-from scipy.interpolate import interp1d
 
 import strax
 export, __all__ = strax.exporter(export_self=False)
@@ -64,7 +62,7 @@ def find_optical_t_range(firsts, lasts, timings, tmins, tmaxs, start=0):
     Helper function find the min and max of each optical entry
     also substract tmin from the timings within each entry
     """
-    
+
     for ix in range(start, len(firsts)):
         tmin = timings[firsts[ix]]
         tmax = timings[firsts[ix]]
@@ -78,7 +76,6 @@ def find_optical_t_range(firsts, lasts, timings, tmins, tmaxs, start=0):
         tmaxs[ix] = tmax
 
         timings[firsts[ix]: lasts[ix]] -= tmin
-
 
 @numba.njit
 def split_long_optical_pulse(firsts, lasts, timings, channels):
@@ -107,10 +104,8 @@ def split_long_optical_pulse(firsts, lasts, timings, channels):
                 tmp = channels[cnt]                
                 channels[cnt] = channels[iy]
                 channels[iy] = tmp
-
         yield ix, firsts[ix], cnt + 1
         firsts[ix] = cnt + 1
-
 
 @export
 def optical_adjustment(instructions, timings, channels):
@@ -125,7 +120,7 @@ def optical_adjustment(instructions, timings, channels):
 
     start = 0
     for i in range(N_SPLIT_LOOP):
-        find_optical_t_range(instructions['_first'], 
+        timings=find_optical_t_range(instructions['_first'], 
                              instructions['_last'],
                              timings, tmins, tmaxs,
                              start=start)
@@ -145,6 +140,7 @@ def optical_adjustment(instructions, timings, channels):
             tmp = deepcopy(instructions[ix])
             tmp['_first'] = first
             tmp['_last'] = last
+            instructions[ix]['_first']=last
 
             extra_inst.append(tmp)
 
