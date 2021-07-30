@@ -120,7 +120,7 @@ def optical_adjustment(instructions, timings, channels):
 
     start = 0
     for i in range(N_SPLIT_LOOP):
-        timings=find_optical_t_range(instructions['_first'], 
+        find_optical_t_range(instructions['_first'], 
                              instructions['_last'],
                              timings, tmins, tmaxs,
                              start=start)
