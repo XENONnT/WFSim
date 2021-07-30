@@ -1,18 +1,21 @@
+from copy import deepcopy
+from immutabledict import immutabledict
 import logging
-
 import numpy as np
 import pandas as pd
+from scipy.interpolate import interp1d
 import uproot
 
 import strax
 import straxen
-from .core import RawData, RawDataOptical
-from .load_resource import load_config
-from .utils import optical_adjustment
-from immutabledict import immutabledict
-from scipy.interpolate import interp1d
-from copy import deepcopy
+import wfsim
+
 export, __all__ = strax.exporter()
+logging.basicConfig(handlers=[logging.StreamHandler()])
+log = logging.getLogger('wfsim.interface')
+log.setLevel('WARNING')
+
+
 __all__ += ['instruction_dtype', 'optical_extra_dtype', 'truth_extra_dtype']
 _cached_wavelength_to_qe_arr = {}
 
@@ -27,7 +30,10 @@ instruction_dtype = [(('Waveform simulator event number.', 'event_number'), np.i
                      (('Recoil type of interaction.', 'recoil'), np.int8),
                      (('Energy deposit of interaction', 'e_dep'), np.float32),
                      (('Eventid like in geant4 output rootfile', 'g4id'), np.int32),
-                     (('Volume id giving the detector subvolume', 'vol_id'), np.int32)]
+                     (('Volume id giving the detector subvolume', 'vol_id'), np.int32),
+                     (('Local field [ V / cm ]', 'local_field'), np.float64),
+                     (('Number of excitons', 'n_excitons'), np.int32),
+]
 
 
 optical_extra_dtype = [(('first optical input index', '_first'), np.int32),
@@ -47,11 +53,6 @@ truth_extra_dtype = [
     (('Arrival time of the last electron [ns]', 't_last_electron'), np.float64),
     (('Mean time of the electrons [ns]', 't_mean_electron'), np.float64),
     (('Standard deviation of electron arrival times [ns]', 't_sigma_electron'), np.float64),]
-
-
-logging.basicConfig(handlers=[logging.StreamHandler()])
-log = logging.getLogger('wfsim.interface')
-log.setLevel('WARNING')
 
 
 def rand_instructions(c):
@@ -100,7 +101,7 @@ def _read_optical_nveto(config, events, mask):
     h = strax.deterministic_hash(config)
     nveto_channels = np.arange(config['channel_map']['nveto'][0], config['channel_map']['nveto'][1] + 1)
     if h not in _cached_wavelength_to_qe_arr:
-        resource = load_config(config)
+        resource = wfsim.load_config(config)
         if getattr(resource, 'nv_pmt_qe', None) is None:
             log.warning('nv pmt qe data not specified all qe default to 100 %')
             _cached_wavelength_to_qe_arr[h] = np.ones([len(nveto_channels), 1000]) * 100
@@ -133,6 +134,7 @@ def _read_optical_nveto(config, events, mask):
     return channels[hit_mask], timings[hit_mask], np.array(amplitudes, int)
 
 
+@export
 def read_optical(config):
     """Function will be executed when wfsim in run in optical mode. This function expects c['fax_file'] 
     to be a root file from optical mc
@@ -176,7 +178,7 @@ def read_optical(config):
     ins['_last'] = np.cumsum(amplitudes)
 
     # Need to shift the timing and split long pulses
-    ins = optical_adjustment(ins, timings, channels)
+    ins = wfsim.optical_adjustment(ins, timings, channels)
     return ins, channels, timings
 
 
@@ -199,7 +201,7 @@ def instruction_from_csv(filename):
 
 @export
 class ChunkRawRecords(object):
-    def __init__(self, config, rawdata_generator=RawData, **kwargs):
+    def __init__(self, config, rawdata_generator=wfsim.RawData, **kwargs):
         log.debug(f'Starting {self.__class__.__name__}')
         self.config = config
         log.debug(f'Setting raw data with {rawdata_generator.__name__}')
@@ -248,8 +250,15 @@ class ChunkRawRecords(object):
                 self.chunk_time += cksz
 
             if self.blevel + records_needed > buffer_length:
-                log.warning('Chunck size too large, insufficient record buffer')
+                log.warning('Chunck size too large, insufficient record buffer \n'
+                            'No longer in sync if simulating nVeto with TPC \n'
+                            'Consider reducing the chunk size')
+                next_left_time = self.rawdata.left * dt
+                self.chunk_time = (self.last_digitized_right + 1) * dt
+                log.debug(f'Pause sim loop at {self.chunk_time}, next pulse start at {next_left_time}')
                 yield from self.final_results()
+                self.chunk_time_pre = self.chunk_time
+                self.chunk_time += cksz
 
             if self.blevel + records_needed > buffer_length:
                 log.warning('Pulse length too large, insufficient record buffer, skipping pulse')
@@ -347,7 +356,10 @@ class ChunkRawRecords(object):
     strax.Option('fax_config', default='fax_config_nt_design.json'),
     strax.Option('fax_config_override', default=None,
                  help="Dictionary with configuration option overrides"),
-    strax.Option('gain_model', default=('to_pe_per_run', 'to_pe_nt.npy'),
+    strax.Option('fax_config_override_from_cmt', default=None,
+                 help="Dictionary of fax parameter names (key) mapped to CMT config names (value)"
+                      "where the fax parameter values will be replaced by CMT"),
+    strax.Option('gain_model_mc', default=('to_pe_per_run', 'to_pe_nt.npy'),
                  help='PMT gain model. Specify as (model_type, model_config).'),
     strax.Option('channel_map', track=False, type=immutabledict,
                  help="immutabledict mapping subdetector to (min, max) "
@@ -393,12 +405,16 @@ class SimulatorPlugin(strax.Plugin):
             self.config.update(overrides)
 
         # Update gains to the nT defaults
-        self.to_pe = straxen.get_to_pe(self.run_id, self.config['gain_model'],
-                                       self.config['channel_map']['tpc'][1]+1)
+        self.to_pe = straxen.get_correction_from_cmt(self.run_id,
+                               self.config['gain_model_mc'])
 
-        self.config['gains'] = np.divide((1e-8 * 2.25 / 2**14) / (1.6e-19 * 10 * 50),
+        adc_2_current = (self.config['digitizer_voltage_range']
+                         / 2 ** (self.config['digitizer_bits'])
+                         / self.config['pmt_circuit_load_resistor'])
+
+        self.config['gains'] = np.divide(adc_2_current,
                                          self.to_pe,
-                                         out=np.zeros_like(self.to_pe, ),
+                                         out=np.zeros_like(self.to_pe),
                                          where=self.to_pe != 0)
 
         if self.config['seed']:
@@ -408,6 +424,14 @@ class SimulatorPlugin(strax.Plugin):
         self.config['channel_map'] = dict(self.config['channel_map'])
         self.config['channel_map']['sum_signal'] = 800
         self.config['channels_bottom'] = np.arange(self.config['n_top_pmts'], self.config['n_tpc_pmts'])
+
+        # Update some values stored in CMT
+        if self.config['fax_config_override_from_cmt'] is not None:
+            for fax_field, cmt_option in self.config['fax_config_override_from_cmt'].items():
+                cmt_value = straxen.get_correction_from_cmt(self.run_id, cmt_option)
+                if fax_field in self.config:
+                    log.warning(f'Replacing {fax_field} with CMT option {cmt_option} to {cmt_value}')
+                self.config[fax_field] = cmt_value
 
     def _setup(self):
         # Set in inheriting class
@@ -542,9 +566,8 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             if overrides is not None:
                 self.config_nveto.update(overrides)
 
-            self.to_pe_nveto = straxen.get_to_pe(
-                self.run_id, self.config_nveto['gain_model_nv'],
-                self.config['channel_map']['nveto'][1] - self.config['channel_map']['nveto'][0] + 1)
+            self.to_pe_nveto = straxen.get_correction_from_cmt(self.run_id,
+                               self.config['gain_model_nv'])
 
             self.config_nveto['gains'] = np.divide((2e-9 * 2 / 2**14) / (1.6e-19 * 1 * 50),
                                                    self.to_pe_nveto,
@@ -579,14 +602,12 @@ class RawRecordsFromMcChain(SimulatorPlugin):
         if 'nveto' in self.config['targets']:
             self.instructions_nveto, self.nveto_channels, self.nveto_timings =\
                 read_optical(self.config_nveto)
-            # Why epix removes many of the g4ids?
-            # Remove nveto event if no tpc event of the same g4id is found
             if len(self.g4id) > 0:
-                nv_inst_to_keep = np.isin(self.instructions_nveto['g4id'], self.g4id[0])
-                nv_inst_to_keep &= (self.instructions_nveto['_last'] - self.instructions_nveto['_first']) > 0
+                nv_inst_to_keep = (self.instructions_nveto['_last'] - self.instructions_nveto['_first']) >= 0
+
             self.instructions_nveto = self.instructions_nveto[nv_inst_to_keep]
             self.g4id.append(self.instructions_nveto['g4id'])
-            log.debug("Epix produced %d instructions in nv" % (len(self.instructions_nveto)))
+            log.debug("%d instructions were produced in nv" % (len(self.instructions_nveto)))
 
         self.g4id = np.unique(np.concatenate(self.g4id))
         self.set_timing()
@@ -662,7 +683,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
 
         if 'nveto' in self.config['targets']:
             self.sim_nv = ChunkRawRecords(self.config_nveto,
-                                          rawdata_generator=RawDataOptical,
+                                          rawdata_generator=wfsim.RawDataOptical,
                                           channels=self.nveto_channels,
                                           timings=self.nveto_timings,)
             self.sim_nv.truth_buffer = np.zeros(10000, dtype=instruction_dtype + optical_extra_dtype

@@ -16,7 +16,6 @@ def test_load_1t():
     result = load_config(config)
     return result, config
 
-
 def test_load_nt():
     config = {
         "detector": "XENONnT",

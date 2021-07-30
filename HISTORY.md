@@ -1,3 +1,44 @@
+v0.5.6 / 2021-07-19
+===================
+* Core splitting 2 (#188)
+* Github McChain test using G4 file (#177)
+* Fix removed nveto (#185)
+* No context testing for py3.6 (#187)
+* Overwrite detector parameters with CMT (#179)
+* Fix the 0.5% bias in gain sampling (#186)
+
+v0.5.5 / 2021-07-07
+===================
+* Bug fix in strax interface (#184)
+
+v0.5.4 / 2021-06-24
+===================
+* Get gains from CMT (#172)
+* Not to remove nVeto events whose related TPC events don't exist (#171)
+* Remove travis for testing in wfsim (#176)
+* Oversize chunk handling (#168)
+* Adding Kr83m notebook (#167)
+* Sorting of S1 photons by channel number to preserve timing (#169)
+
+v0.5.3 / 2021-06-03
+===================
+* Truth chunk patch (#164)
+
+v0.5.2 / 2021-05-25
+===================
+* Fix zstd for testing (#163)
+* Patch 1T custom context (#162)
+* Fixing SPE reconstruciton bias due to truncation (#161)
+* Following up the change in pmt ap file (#158)
+* Fix #157 for empty files (#160)
+* Fix missing last instruction (#159)
+* Fix load resource (#157)
+* S2 photon patch (#156)
+* Fix notebook, evaluate for docs (#154)
+* Add tests (#152)
+* Use database access to increase coverage of tests (#155)
+* Update Getting_started_wfsim.ipynb (#153)
+
 v0.5.1 / 2021-05-03
 ===================
 * S1 timing splines implementation for top/bottom arrays (#148)
