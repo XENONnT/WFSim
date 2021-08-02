@@ -124,7 +124,7 @@ def test_sim_nT_advanced():
 
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
-        st = straxen.contexts.xenonnt_simulation()
+        st = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000')
         st.set_config(dict(nchunk=1, event_rate=1, chunk_size=2,))
 
         st.set_config({'fax_config_override': dict(s2_luminescence_model='simple',
@@ -156,7 +156,7 @@ def test_sim_mc_chain():
         with open('test.root', mode='wb') as f:
             f.write(url_data)
 
-        st = straxen.contexts.xenonnt_simulation()
+        st = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000')
 
         epix_config = {'cut_by_eventid': True, 'debug': True, 'source_rate': 0, 'micro_separation_time': 10.,
                        'max_delay': 1e7, 'detector_config_override': None, 'micro_separation': 0.05,
