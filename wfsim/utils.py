@@ -66,6 +66,12 @@ def find_optical_t_range(firsts, lasts, timings, tmins, tmaxs, start=0):
     """
     
     for ix in range(start, len(firsts)):
+        if firsts[ix] == lasts[ix]:
+           tmins[ix] = -1
+           tmaxs[ix] = -1
+           # No photons in this instruction
+           continue
+
         tmin = timings[firsts[ix]]
         tmax = timings[firsts[ix]]
         for iy in range(firsts[ix], lasts[ix]):
@@ -142,9 +148,10 @@ def optical_adjustment(instructions, timings, channels):
                                                         timings,
                                                         channels):
 
-            tmp = deepcopy(instructions[ix])
+            tmp = deepcopy(instructions[np.where(long_pulse)[0][ix]])
             tmp['_first'] = first
             tmp['_last'] = last
+            instructions[np.where(long_pulse)[0][ix]]['_first']=last
 
             extra_inst.append(tmp)
 
