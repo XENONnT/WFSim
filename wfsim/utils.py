@@ -66,6 +66,12 @@ def find_optical_t_range(firsts, lasts, timings, tmins, tmaxs, start=0):
     """
     
     for ix in range(start, len(firsts)):
+        if firsts[ix] == lasts[ix]:
+           tmins[ix] = -1
+           tmaxs[ix] = -1
+           # No photons in this instruction
+           continue
+
         tmin = timings[firsts[ix]]
         tmax = timings[firsts[ix]]
         for iy in range(firsts[ix], lasts[ix]):
