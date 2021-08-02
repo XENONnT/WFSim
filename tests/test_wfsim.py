@@ -112,7 +112,7 @@ def test_sim_nT_advanced():
 
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
-        st = straxen.contexts.xenonnt_simulation()
+        st = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000')
         st.set_config(dict(nchunk=1, event_rate=1, chunk_size=2,))
 
         log.debug(f'Getting raw-records')
