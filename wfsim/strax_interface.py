@@ -767,8 +767,8 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                                                 data=np.array([], dtype=dummy_dtype),
                                                 data_type=data_type)
                     else:
-                        chunk[data_type] = self.chunk(start=0, end=0, data=np.array([]),
-                                                  data_type=data_type, dtype=dummy_dtype)
+                        chunk[data_type] = self.chunk(start=0, end=0, data=np.array([], dtype=dummy_dtype),
+                                                  data_type=data_type)
             else:
                 if exist_tpc_result:
                     chunk[data_type] = self.chunk(start=self.sim.chunk_time_pre,
