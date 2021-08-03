@@ -395,6 +395,9 @@ class SimulatorPlugin(strax.Plugin):
 
     # A very very long input timeout, our simulator takes time
     input_timeout = 3600  # as an hour
+    
+    # only save raw records if specifically told to
+    save_when = strax.SaveWhen.TARGET
 
     def setup(self):
         self.set_config()
