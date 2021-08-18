@@ -248,12 +248,14 @@ class RawData(object):
             self._channel_mask['right'] -= self.left - self.config['trigger_window']
 
             # Adding noise, baseline and digitizer saturation
-            
+
             if self.config.get('enable_noise', True):
                 self.add_noise(data=self._raw_data,
                                channel_mask=self._channel_mask,
                                noise_data=self.resource.noise_data,
-                               noise_data_length=len(self.resource.noise_data))
+                               noise_data_length=len(self.resource.noise_data),
+                               noise_data_channels=len(self.resource.noise_data[0]))
+
             self.add_baseline(self._raw_data, self._channel_mask, 
                               self.config['digitizer_reference_baseline'],)
             self.digitizer_saturation(self._raw_data, self._channel_mask)
@@ -373,20 +375,40 @@ class RawData(object):
 
     @staticmethod
     @njit
-    def add_noise(data, channel_mask, noise_data, noise_data_length):
+    def add_noise(data, channel_mask, noise_data, noise_data_length, noise_data_channels):
         """
         Get chunk(s) of noise sample from real noise data
         """
+        if channel_mask['mask'].sum() == 0:
+            return
+
+        left = np.min(channel_mask['left'][channel_mask['mask']])
+        right = np.max(channel_mask['right'][channel_mask['mask']])
+
+        if noise_data_length-right+left-1 < 0:
+            ix_rand = np.random.randint(low=0, high=noise_data_length-1)
+        else:
+            ix_rand = np.random.randint(low=0, high=noise_data_length-right+left-1)
+
         for ch in range(data.shape[0]):
+            # In case adding noise to he channels is not supported
+            if ch >= noise_data_channels:
+                continue
+
             if not channel_mask['mask'][ch]:
                 continue
+
             left, right = channel_mask['left'][ch], channel_mask['right'][ch]
-            id_t = np.random.randint(low=0, high=noise_data_length-right+left)
-            for ix in range(left, right+1):
-                if id_t+ix >= noise_data_length or ix >= len(data[ch]):
+            for ix_data in range(left, right+1):
+                ix_noise = ix_rand + ix_data - left
+                if ix_data >= len(data[ch]):
                     # Don't create value-errors
                     continue
-                data[ch, ix] += noise_data[id_t+ix]
+
+                if ix_noise >= noise_data_length:
+                    ix_noise -= noise_data_length * (ix_noise // noise_data_length)
+
+                data[ch, ix_data] += noise_data[ix_noise, ch]
 
     @staticmethod
     @njit
