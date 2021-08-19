@@ -412,6 +412,10 @@ class S2(Pulse):
         if pattern.shape[1] - 1 not in bottom_index:
             pattern = np.pad(pattern, [[0, 0], [0, len(bottom_index)]], 
                              'constant', constant_values=1)
+
+        # Remove turned off pmts
+        pattern[:, np.in1d(channels, config['turned_off_pmts'])] = 0
+
         sum_pat = np.sum(pattern, axis=1).reshape(-1, 1)
         pattern = np.divide(pattern, sum_pat, out=np.zeros_like(pattern), where=sum_pat != 0)
 

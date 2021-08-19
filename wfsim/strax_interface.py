@@ -218,6 +218,10 @@ class ChunkRawRecords(object):
         :param time_zero: Starting time of the first chunk
         """
         samples_per_record = strax.DEFAULT_RECORD_LENGTH
+        if len(instructions) == 0: # Empty
+            yield from np.array([], dtype=strax.raw_record_dtype(samples_per_record=samples_per_record))
+            self.rawdata.source_finished = True
+            return
         dt = self.config['sample_duration']
         buffer_length = len(self.record_buffer)
         rext = int(self.config['right_raw_extension'])
@@ -596,6 +600,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             self.instructions_epix = epix.run_epix.main(
                 epix.run_epix.setup(epix_config),
                 return_wfsim_instructions=True)
+
             self.g4id.append(self.instructions_epix['g4id'])
             log.debug("Epix produced %d instructions in tpc" % (len(self.instructions_epix)))
 
@@ -714,8 +719,11 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                     log.debug('TPC instructions are already depleted')
                     result = dict([(data_type, np.zeros(0, self.dtype_for(data_type)))
                                    for data_type in self.provides if 'nv' not in data_type])
-                    self.sim.chunk_time = self.sim_nv.chunk_time
-                    self.sim.chunk_time_pre = self.sim_nv.chunk_time_pre
+
+                    num_of_results = sum([len(v) for _, v in result.items()])
+                    if num_of_results != 0:
+                        self.sim.chunk_time = self.sim_nv.chunk_time
+                        self.sim.chunk_time_pre = self.sim_nv.chunk_time_pre
                 else:
                     raise RuntimeError("Bug in getting source finished")
 
@@ -733,25 +741,50 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                 else:
                     raise RuntimeError("Bug in getting source finished")
 
+        exist_tpc_result, exist_nveto_result = False, False
+        for data_type in self.provides:
+            if 'nv' in data_type:
+                if len(result_nv[data_type.strip('_nv')]) > 0:
+                    exist_nveto_result = True
+            else:
+                if len(result[data_type]) > 0:
+                    exist_tpc_result = True
         chunk = {}
         for data_type in self.provides:
             if 'nv' in data_type:
-                if 'nveto' in self.config['targets']:
-                  chunk[data_type] = self.chunk(start=self.sim_nv.chunk_time_pre,
+                if exist_nveto_result:
+                    chunk[data_type] = self.chunk(start=self.sim_nv.chunk_time_pre,
                                                 end=self.sim_nv.chunk_time,
                                                 data=result_nv[data_type.strip('_nv')],
                                                 data_type=data_type)
-                #If nv is not one of the targets just return an empty chunk
+                # If nv is not one of the targets just return an empty chunk
+                # If there is TPC event, set TPC time for the start and end
                 else:
-                  chunk[data_type] = self.chunk(start=self.sim.chunk_time_pre,
+                    dummy_dtype = wfsim.truth_extra_dtype if 'truth' in data_type else strax.raw_record_dtype()
+                    if exist_tpc_result:
+                        chunk[data_type] = self.chunk(start=self.sim.chunk_time_pre,
                                                 end=self.sim.chunk_time,
-                                                data=np.array([]),
+                                                data=np.array([], dtype=dummy_dtype),
                                                 data_type=data_type)
+                    else:
+                        chunk[data_type] = self.chunk(start=0, end=0, data=np.array([], dtype=dummy_dtype),
+                                                  data_type=data_type)
             else:
-                chunk[data_type] = self.chunk(start=self.sim.chunk_time_pre,
-                                              end=self.sim.chunk_time,
+                if exist_tpc_result:
+                    chunk[data_type] = self.chunk(start=self.sim.chunk_time_pre,
+                                                  end=self.sim.chunk_time,
                                               data=result[data_type],
                                               data_type=data_type)
+                else:
+                    dummy_dtype = wfsim.truth_extra_dtype if 'truth' in data_type else strax.raw_record_dtype()
+                    if exist_nveto_result:
+                        chunk[data_type] = self.chunk(start=self.sim_nv.chunk_time_pre,
+                                                      end=self.sim_nv.chunk_time,
+                                                  data=np.array([], dtype=dummy_dtype),
+                                                  data_type=data_type)
+                    else:
+                        chunk[data_type] = self.chunk(start=0, end=0, data=np.array([], dtype=dummy_dtype),
+                                                  data_type=data_type)
 
         self._sort_check([chunk[data_type].data for data_type in self.provides])
 

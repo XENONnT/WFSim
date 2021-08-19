@@ -94,6 +94,7 @@ class S1(Pulse):
         # Sorting times according to the channel, as non-explicit sorting
         # is performed later and this breaks timing of individual channels/arrays
         sortind = np.argsort(self._photon_channels)
+
         self._photon_channels = self._photon_channels[sortind]
         self._photon_timings = self._photon_timings[sortind]
         super().__call__()
@@ -174,7 +175,6 @@ class S1(Pulse):
             # Simple S1 model enabled: use it for ER and NR.
             _photon_timings += np.random.exponential(config['s1_decay_time'], _n_hits_total).astype(np.int64)
             _photon_timings += np.random.normal(0, config['s1_decay_spread'], _n_hits_total).astype(np.int64)
-            return _photon_timings
 
         if 'nest' in config['s1_model_type'] or 'custom' in config['s1_model_type']:
             # Pulse model depends on recoil type
@@ -205,6 +205,7 @@ class S1(Pulse):
                         local_field[i],
                         e_dep[i])
 
+                    scint_time = np.clip(scint_time, 0, config.get('maximum_recombination_time', 10000))
                     _photon_timings[counts_start: counts_start + counts] += np.array(scint_time[:counts], np.int64)
 
                 counts_start += counts
