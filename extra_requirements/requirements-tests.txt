@@ -1,6 +1,6 @@
 # Test compatibility with these most often:
-strax==0.16.1
-straxen==0.19.3
+strax==1.0.0rc
+straxen==1.0.0rc
 
 # File for the requirements of straxen with the automated tests
 blosc==1.10.4                                   # Strax dependency
