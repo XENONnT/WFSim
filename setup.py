@@ -39,8 +39,7 @@ setuptools.setup(
               'wfsim.pax_datastructure',
               'extra_requirements'],
     package_dir={'extra_requirements': 'extra_requirements'},
-    package_data={'extra_requirements': ['requirements-docs.txt',
-                                         'requirements-tests.txt']},
+    package_data={'extra_requirements': ['requirements-tests.txt']},
     classifiers=[
         'Development Status :: 4 - Beta',
         'License :: OSI Approved :: BSD License',
