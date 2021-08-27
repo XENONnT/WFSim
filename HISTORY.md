@@ -1,3 +1,14 @@
+v0.5.7 / 2021-08-27
+===================
+* Reinstate optical simulation (#199)
+* Run with new strax (#198)
+* Pinned tests (#197)
+* S1 photon timing patching (#196)
+* Bug fix for wrong place to write dtype (#195)
+* Fix optical readout (#194)
+* Only nveto mc chain (#190)
+* Use real noise (#189)
+
 v0.5.6 / 2021-07-19
 ===================
 * Core splitting 2 (#188)
