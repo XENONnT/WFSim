@@ -112,14 +112,11 @@ def test_sim_nT_advanced():
 
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
-        st = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000',
-                                                 cmt_option_overwrite_proc={
-                                                     'gain_model':("to_pe_placeholder", True),
-                                                     'hit_min_amplitude':'pmt_commissioning_initial',},
-                                                 _config_overlap={},
-                                                )
-
-        st.set_config(dict(gain_model_mc=("to_pe_placeholder", True)))
+        st = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000', _config_overlap={},)
+        st.set_config(dict(gain_model_mc=("to_pe_placeholder", True),
+                           gain_model=("to_pe_placeholder", True),
+                           hit_min_amplitude='pmt_commissioning_initial'
+                          ))
         st.set_config(dict(nchunk=1, event_rate=1, chunk_size=2,))
 
         log.debug(f'Getting raw-records')
@@ -131,14 +128,11 @@ def test_sim_nT_advanced():
 
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
-        st = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000',
-                                                 cmt_option_overwrite_proc={
-                                                     'gain_model':("to_pe_placeholder", True),
-                                                     'hit_min_amplitude':'pmt_commissioning_initial',},
-                                                 _config_overlap={},
-                                                )
-
-        st.set_config(dict(gain_model_mc=("to_pe_placeholder", True)))
+        st = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000', _config_overlap={},)
+        st.set_config(dict(gain_model_mc=("to_pe_placeholder", True),
+                           gain_model=("to_pe_placeholder", True),
+                           hit_min_amplitude='pmt_commissioning_initial'
+                          ))
         st.set_config(dict(nchunk=1, event_rate=1, chunk_size=2,))
 
         st.set_config({'fax_config_override': dict(s2_luminescence_model='simple',
@@ -169,16 +163,12 @@ def test_sim_mc_chain():
         url_data = requests.get(test_g4).content
         with open('test.root', mode='wb') as f:
             f.write(url_data)
-
-        st = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000',
-                                                 cmt_option_overwrite_proc={
-                                                     'gain_model':("to_pe_placeholder", True),
-                                                     'gain_model_nv':("adc_nv", True),
-                                                     'hit_min_amplitude':'pmt_commissioning_initial',},
-                                                 _config_overlap={},
-                                                )
-
-        st.set_config(dict(gain_model_mc=("to_pe_placeholder", True)))
+        st = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000', _config_overlap={},)
+        st.set_config(dict(gain_model_mc=("to_pe_placeholder", True),
+                           gain_model=("to_pe_placeholder", True),
+                           gain_model_nv=("adc_nv", True),
+                           hit_min_amplitude='pmt_commissioning_initial'
+                          ))
 
         epix_config = {'cut_by_eventid': True, 'debug': True, 'source_rate': 0, 'micro_separation_time': 10.,
                        'max_delay': 1e7, 'detector_config_override': None, 'micro_separation': 0.05,
