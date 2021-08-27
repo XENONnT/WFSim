@@ -550,7 +550,7 @@ class RawRecordsFromFaxOpticalNT(RawRecordsFromFaxNT):
         self.sim_iter = self.sim(self.instructions)
     
     def get_instructions(self):
-        assert self.config['fax_file'].endswith('.root') 'You need to supply a root file for optical simulation!'
+        assert self.config['fax_file'].endswith('.root'), 'You need to supply a root file for optical simulation!'
         self.instructions, self.channels, self.timings = read_optical(self.config)
         
     
