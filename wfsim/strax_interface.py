@@ -545,8 +545,8 @@ class RawRecordsFromFaxOpticalNT(RawRecordsFromFaxNT):
     def _setup(self):
         self.sim = ChunkRawRecords(self.config,
                                    rawdata_generator=wfsim.RawDataOptical,
-                                   channels=self.nveto_channels,
-                                   timings=self.nveto_timings,)
+                                   channels=self.channels,
+                                   timings=self.timings,)
         self.sim_iter = self.sim(self.instructions)
     
     def get_instructions(self):
