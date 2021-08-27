@@ -547,8 +547,11 @@ class RawRecordsFromFaxOpticalNT(RawRecordsFromFaxNT):
                                    rawdata_generator=wfsim.RawDataOptical,
                                    channels=self.channels,
                                    timings=self.timings,)
+        self.sim.truth_buffer = np.zeros(10000, dtype=instruction_dtype + optical_extra_dtype
+                                                + truth_extra_dtype + [('fill', bool)])
         self.sim_iter = self.sim(self.instructions)
-    
+        
+        
     def get_instructions(self):
         assert self.config['fax_file'].endswith('.root'), 'You need to supply a root file for optical simulation!'
         self.instructions, self.channels, self.timings = read_optical(self.config)
