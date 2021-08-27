@@ -65,4 +65,9 @@ def remove_from_registry(context, endswith):
     for p in list(context._plugin_class_registry.keys()):
         if p.endswith(endswith):
             del context._plugin_class_registry[p]
+        elif ('events_tagged' in context._plugin_class_registry[p].provides or
+              'peak_veto_tags' in context._plugin_class_registry[p].provides):
+            # These plugins are known to mix nv/mv/tpc
+            del context._plugin_class_registry[p]
+    
     return context
