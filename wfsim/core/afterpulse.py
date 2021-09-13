@@ -52,7 +52,7 @@ class PhotoIonization_Electron(S2):
         instruction = np.repeat(signal_pulse_instruction[0], n_instruction)
 
         instruction['type'] = 4  # pi_el
-        instruction['time'] = t_zeros + self.config['drift_time_gate']
+        instruction['time'] = t_zeros - self.config['drift_time_gate']
         instruction['x'], instruction['y'] = self._rand_position(n_instruction)
         instruction['z'] = - ap_delay_i * self.config['drift_velocity_liquid']
         instruction['amp'] = n_electron_i
