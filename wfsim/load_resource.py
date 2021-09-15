@@ -94,6 +94,7 @@ class Resource:
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
                 'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
                 'noise_file': 'x1t_noise_170203_0850_00_small.npz',
+                'cable_map': 'xenonnt_cable_map.csv',
                 'field_dependencies_map': '',
                 's1_time_spline': '',
              })
@@ -265,6 +266,10 @@ class Resource:
             # Electron After Pulses
             if config.get('enable_electron_afterpulses', False):
                 self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
+
+            # Daq channel map
+            if config.get('daq_board_async', False):
+                self.cable_map = straxen.get_resource(files['cable_map'], fmt='csv')
 
         elif config.get('detector', 'XENONnT') == 'XENONnT_neutron_veto':
             # Neutron veto PMT QE as function of wavelength

@@ -29,6 +29,8 @@ class Pulse(object):
         self.init_pmt_current_templates()
         self.init_spe_scaling_factor_distributions()
         self.config['turned_off_pmts'] = np.arange(len(config['gains']))[np.array(config['gains']) == 0]
+        if self.config.get('daq_board_async', False):
+            self.init_daq_board_delay()
         
         self.clear_pulse_cache()
 
@@ -62,6 +64,10 @@ class Pulse(object):
             counts_start += counts
             if channel in self.config['turned_off_pmts']:
                 continue
+
+            # Add daq delay if asked for
+            if self.config.get('daq_board_async', False):
+                _channel_photon_timings += self._cached_daq_delay[channel]
 
             # If gain of each photon is not specifically assigned
             # Sample from spe scaling factor distribution and to individual gain
@@ -194,6 +200,21 @@ class Pulse(object):
             _cached_uniform_to_pe_arr[h] = self.__uniform_to_pe_arr
 
         log.debug('Spe scaling factors created, cached with key %s' % h)
+
+    def init_daq_board_delay(self):
+        @np.vectorize
+        def strip_channel_number(x):
+            x = x.split('.')[:-1]
+            return '.'.join(x)
+    
+        if isinstance(self.config['daq_board_async'], int):
+            dt = self.config['daq_board_async']
+        else:
+            dt = self.config.get('sample_duration', 10)
+
+        cable_map = self.resource.cable_map
+        u, u_inv = np.unique(strip_channel_number(cable_map['ADC (crate.slot.channel)']), return_inverse=True)
+        self._cached_daq_delay = np.random.randint(- (dt // 2), dt - dt // 2, size=len(u))[u_inv]
 
     def uniform_to_pe_arr(self, p, channel=0):
         indices = (p * 2000).astype(np.int64) + 1
