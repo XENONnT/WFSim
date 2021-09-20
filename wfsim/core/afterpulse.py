@@ -37,23 +37,46 @@ class PhotoIonization_Electron(S2):
                                        * len(signal_pulse._photon_timings)
                                        * self.config['photoionization_modifier'])
 
-        ap_delay = delaytime_pmf_hist.get_random(n_electron).clip(
-            self.config['drift_time_gate'] + 1, None)
+        ap_delay = delaytime_pmf_hist.get_random(n_electron)
+        # Reasonably bin delay time that would be diffuse out together
+        ap_delay_i, n_electron_i = self._reduce_instruction_timing(
+            ap_delay,
+            delaytime_pmf_hist)
+        n_instruction = len(ap_delay_i)
 
         # Randomly select original photon as time zeros
         t_zeros = signal_pulse._photon_timings[np.random.randint(
             low=0, high=len(signal_pulse._photon_timings),
-            size=n_electron)]
+            size=n_instruction)]
 
-        instruction = np.repeat(signal_pulse_instruction[0], n_electron)
+        instruction = np.repeat(signal_pulse_instruction[0], n_instruction)
 
         instruction['type'] = 4  # pi_el
-        instruction['time'] = t_zeros + self.config['drift_time_gate']
-        instruction['x'], instruction['y'] = self._rand_position(n_electron)
-        instruction['z'] = - ap_delay * self.config['drift_velocity_liquid']
-        instruction['amp'] = 1
+        instruction['time'] = t_zeros - self.config['drift_time_gate']
+        instruction['x'], instruction['y'] = self._rand_position(n_instruction)
+        instruction['z'] = - ap_delay_i * self.config['drift_velocity_liquid']
+        instruction['amp'] = n_electron_i
 
         return instruction
+
+    def _reduce_instruction_timing(self, ap_delay, delaytime_pmf_hist):
+        # Binning the delay time, so electron timing within each
+        # will be diffused to fill the whole bin
+        
+        delaytime_spread = np.sqrt(2 * self.config['diffusion_constant_longitudinal']\
+                                   * delaytime_pmf_hist.bin_centers)
+        delaytime_spread /= self.config['drift_velocity_liquid']
+
+        coarse_time, coarse_time_i = [], 100 # Start at 100ns, as its smaller than single electron width
+        while coarse_time_i < delaytime_pmf_hist.bin_centers[-1]:
+            coarse_time.append(coarse_time_i)
+            coarse_time_i += delaytime_spread[np.argmin(np.abs(coarse_time_i - delaytime_pmf_hist.bin_centers))]
+        coarse_time = np.array(coarse_time)
+
+        idx = np.digitize(ap_delay[ap_delay < coarse_time[-1]], coarse_time)
+        idxs, n = np.unique(idx, return_counts=True)
+        _ap_delay = coarse_time[idxs]
+        return _ap_delay, n
 
     def _rand_position(self, n):
         Rupper = self.config['tpc_radius']
