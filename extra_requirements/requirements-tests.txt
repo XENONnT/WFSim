@@ -1,5 +1,5 @@
 # Test compatibility with these most often:
-strax==1.0.0rc
+strax==1.0.0
 straxen==1.0.0rc
 
 # File for the requirements of straxen with the automated tests
