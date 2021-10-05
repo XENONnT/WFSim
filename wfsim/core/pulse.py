@@ -176,7 +176,7 @@ class Pulse(object):
                 # mean_spe = (spe_shapes['charge'].values * spe_shapes[ch]).sum() / spe_shapes[ch].sum()
                 scaled_bins = spe_shapes['charge'].values  # / mean_spe
                 spe_shape = self.apply_additional_spread(scaled_bins, spe_shapes[ch])
-                cdf = np.cumsum(spe_shapes) / np.sum(spe_shape)
+                cdf = np.cumsum(spe_shape) / np.sum(spe_shape)
             else:
                 # if sum is 0, just make some dummy axes to pass to interpolator
                 cdf = np.linspace(0, 1, 10)
