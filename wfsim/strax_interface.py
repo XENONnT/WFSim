@@ -432,9 +432,14 @@ class SimulatorPlugin(strax.Plugin):
         # Update some values stored in CMT
         if self.config['fax_config_override_from_cmt'] is not None:
             for fax_field, cmt_option in self.config['fax_config_override_from_cmt'].items():
+                if (fax_field in ['fdc_3d', 's1_light_yield_map']
+                    and self.config.get('default_reconstruction_algorithm', False)):
+                    cmt_option = tuple(['suffix',
+                                        self.config['default_reconstruction_algorithm'],
+                                        *cmt_option])
+
                 cmt_value = straxen.get_correction_from_cmt(self.run_id, cmt_option)
-                if fax_field in self.config:
-                    log.warning(f'Replacing {fax_field} with CMT option {cmt_option} to {cmt_value}')
+                log.warning(f'Replacing {fax_field} with CMT option {cmt_option} to {cmt_value}')
                 self.config[fax_field] = cmt_value
 
     def _setup(self):
