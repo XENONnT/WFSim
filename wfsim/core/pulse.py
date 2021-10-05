@@ -175,7 +175,8 @@ class Pulse(object):
             if spe_shapes[ch].sum() > 0:
                 # mean_spe = (spe_shapes['charge'].values * spe_shapes[ch]).sum() / spe_shapes[ch].sum()
                 scaled_bins = spe_shapes['charge'].values  # / mean_spe
-                cdf = np.cumsum(spe_shapes[ch]) / np.sum(spe_shapes[ch])
+                spe_shape = self.apply_additional_spread(scaled_bins, spe_shapes[ch])
+                cdf = np.cumsum(spe_shapes) / np.sum(spe_shape)
             else:
                 # if sum is 0, just make some dummy axes to pass to interpolator
                 cdf = np.linspace(0, 1, 10)
@@ -194,6 +195,25 @@ class Pulse(object):
             _cached_uniform_to_pe_arr[h] = self.__uniform_to_pe_arr
 
         log.debug('Spe scaling factors created, cached with key %s' % h)
+
+    def gaussian(self, x, mu=0, sigma=1):
+        return np.exp(-(x - mu)**2 / (2*sigma**2))
+
+    def apply_additional_spread(self, scaled_bins, spe_shape):
+        '''
+        Apply additional gaussian composition spread with charge
+        The unit of sigma is charge.
+        '''
+        sigma = self.config.get('additional_spe_spread_charge', 0.0)
+        if np.abs(sigma) < 0.000001:
+            sigma = 0.000001  # very small value to avoid zero-diviation
+        spe_shape_with_spread = np.zeros_like(spe_shape)
+        for i_bin in range(len(spe_shape)):
+            charges = self.gaussian(scaled_bins, mu=scaled_bins[i_bin], sigma=sigma)
+            charges = spe_shape[i_bin] * charges / np.sum(charges)
+            spe_shape_with_spread += charges
+        return spe_shape_with_spread
+
 
     def uniform_to_pe_arr(self, p, channel=0):
         indices = (p * 2000).astype(np.int64) + 1
