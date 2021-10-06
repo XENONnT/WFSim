@@ -208,7 +208,7 @@ class Pulse(object):
         if np.abs(sigma) < 0.000001:
             sigma = 0.000001  # very small value to avoid zero-diviation
         spe_shape_with_spread = np.zeros_like(spe_shape)
-        for i_bin in range(len(spe_shape)):
+        for i_bin, _ in enumerate(spe_shape):
             charges = self.gaussian(scaled_bins, mu=scaled_bins[i_bin], sigma=sigma)
             charges = spe_shape[i_bin] * charges / np.sum(charges)
             spe_shape_with_spread += charges
