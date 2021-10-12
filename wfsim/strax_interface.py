@@ -9,6 +9,7 @@ import typing as ty
 import strax
 import straxen
 import wfsim
+from strax.utils import tqdm
 
 export, __all__ = strax.exporter()
 logging.basicConfig(handlers=[logging.StreamHandler()])
