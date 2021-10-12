@@ -69,7 +69,8 @@ def rand_instructions(c):
                               n_chunk=c.get('n_chunk', 2),
                               energy_range=[1, 100],  # keV
                               drift_field=c.get('drift_field', 100),  # V/cm
-                              tpc_length=c.get('tpc_radius', straxen.tpc_r),
+                              tpc_radius=c.get('tpc_radius', straxen.tpc_r),
+                              tpc_length=c.get('tpc_length', straxen.tpc_z),
                               nest_inst_types=[7]
                               )
 
