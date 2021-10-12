@@ -19,7 +19,10 @@ except (ModuleNotFoundError, ImportError):
 
 @export
 class NestId:
-    """Nest ids for referring to different scintillation models, only ER is actually validated"""
+    """
+    Nest ids for referring to different scintillation models, only ER is actually validated
+    See github.com/NESTCollaboration/nestpy/blob/8eb79414e5f834eb6cf6ddba5d6c433c6b0cbc70/src/nestpy/helpers.py#L27
+    """
     NR = [0]
     ALPHA = [6]
     ER = [7, 8, 11, 12]
