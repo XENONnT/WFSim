@@ -16,7 +16,7 @@ log.setLevel('WARNING')
 @export
 class S2(Pulse):
     """
-    Given temperal inputs as well as number of electrons
+    Given temporal inputs as well as number of electrons
     Random generate photon timing and channel distribution.
     """
 
@@ -35,8 +35,11 @@ class S2(Pulse):
             np.array(v).reshape(-1) for v in zip(*instruction)]
         
         # Reverse engineerring FDC
-        if self.config['field_distortion_on']:
-            z_obs, positions = self.inverse_field_distortion(x, y, z, resource=self.resource)
+        if self.config['field_distortion_model'] == 'inverse_fdc':
+            z_obs, positions = self.inverse_field_distortion_correction(x, y, z, resource=self.resource)
+        # Reverse engineerring FDC
+        elif self.config['field_distortion_model'] == 'comsol':
+            z_obs, positions = self.field_distortion_comsol(x, y, z, resource=self.resource)
         else:
             z_obs, positions = z, np.array([x, y]).T
 
@@ -132,7 +135,7 @@ class S2(Pulse):
                                               config['electron_lifetime_liquid'])
         cy = config['electron_extraction_yield'] * electron_lifetime_correction
 
-        # Remove electrons in insensitive volumne
+        # Remove electrons in insensitive volume
         if config['enable_field_dependencies']['survival_probability_map']:
             survival_probability = resource.field_dependencies_map(z_obs, positions, map_name='survival_probability_map')
             cy *= survival_probability
@@ -143,8 +146,8 @@ class S2(Pulse):
         return n_electron
 
     @staticmethod
-    def inverse_field_distortion(x, y, z, resource):
-        """For 1T the pattern map is a data driven one so we need to reverse engineer field distortion
+    def inverse_field_distortion_correction(x, y, z, resource):
+        """For 1T the pattern map is a data driven one so we need to reverse engineer field distortion correction
         into the simulated positions
         :param x: 1d array of float
         :param y: 1d array of float
@@ -167,7 +170,25 @@ class S2(Pulse):
 
         positions = np.array([x_obs, y_obs]).T 
         return z_obs, positions
-
+    
+    @staticmethod
+    def field_distortion_comsol(x, y, z, resource):
+        """Field distortion from the COMSOL simulation for the given electrode configuration:
+        :param x: 1d array of float
+        :param y: 1d array of float
+        :param z: 1d array of float
+        :param resource: instance of resource class
+        returns z: 1d array, postions 2d array 
+        """
+        positions = np.array([np.sqrt(x**2 + y**2), z]).T
+        theta = np.arctan2(y, x)
+        r_obs = resource.fd_comsol(positions, map_name='r_distortion_map')
+        x_obs = r_obs * np.cos(theta)
+        y_obs = r_obs * np.sin(theta)
+        
+        positions = np.array([x_obs, y_obs]).T 
+        return z, positions
+    
     @staticmethod
     @njit
     def _luminescence_timings_simple(n, dG, E0, r, dr, rr, alpha, uE, p, n_photons):
@@ -269,7 +290,7 @@ class S2(Pulse):
         :param n_electron:1 d array of ints
         :param drift_time_mean: 1d array of floats
         :param drift_time_spread: 1d array of floats
-        :param sc_gain: secondairy scintallation gain       
+        :param sc_gain: secondary scintillation gain       
         :param timings: empty array with length sum(n_electron)
         :param gains: empty array with length sum(n_electron)
         :param electron_trapping_time: configuration values

@@ -331,6 +331,14 @@ class RawData(object):
                 tb[f't_first_{quantum}'] = np.nan
                 tb[f't_last_{quantum}'] = np.nan
                 tb[f't_sigma_{quantum}'] = np.nan
+                
+        if peak_type == 's2' and self.config['field_distortion_model'] in ['comsol', 'inverse_fdc']:
+            _, xy_tmp = self.pulses['s2'].field_distortion_comsol(instruction['x'], instruction['y'], instruction['z'], self.resource)
+            tb['x_mean_electron'] = np.mean(xy_tmp.T[0])
+            tb['y_mean_electron'] = np.mean(xy_tmp.T[1])
+        else:
+            tb['x_mean_electron'] = np.nan
+            tb['y_mean_electron'] = np.nan
         
         # Endtime is the end of the last pulse
         if np.isnan(tb['t_last_photon']):

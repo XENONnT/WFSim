@@ -235,8 +235,11 @@ class Resource:
                 liquid_level = min(liquid_level_available, key=lambda x: abs(x - liquid_level))
                 self.s2_luminescence = s2_luminescence_map[s2_luminescence_map['ll'] == liquid_level]
 
-            if config.get('field_distortion_on', False):
+            if config.get('field_distortion_model', "none") == "inverse_fdc":
                 self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
+
+            if config.get('field_distortion_model', "none") == "comsol":
+                self.fd_comsol = make_map(config['field_distortion_comsol_map'], fmt='json.gz', method='RectBivariateSpline')
 
             # Gas gap warping map
             if config.get('enable_gas_gap_warping', False):
@@ -283,7 +286,7 @@ class Resource:
         log.debug(f'{self.__class__.__name__} fully initialized')
 
 
-def make_map(map_file, fmt='text', method='WeightedNearestNeighbors'):
+def make_map(map_file, fmt='text', method='WeightedNearestNeighbors', name_map='map'):
     """Fetch and make an instance of InterpolatingMap based on map_file
     Alternatively map_file can be a list of ["constant dummy", constant: int, shape: list]
     return an instance of  DummyMap"""
