@@ -73,7 +73,7 @@ class Resource:
         if config['detector'] == 'XENON1T':
             files.update({
                 'photon_area_distribution': 'XENON1T_spe_distributions.csv',
-                's1_light_yield_map': 'XENON1T_s1_xyz_ly_kr83m_SR1_pax-680_fdc-3d_v0.json',
+                's1_lce_correction_map': 'XENON1T_s1_xyz_ly_kr83m_SR1_pax-680_fdc-3d_v0.json',
                 's1_pattern_map': 'XENON1T_s1_xyz_patterns_interp_corrected_MCv2.1.0.json.gz',
                 's2_correction_map': 'XENON1T_s2_xy_ly_SR1_v2.2.json',
                 's2_pattern_map': 'XENON1T_s2_xy_patterns_top_corrected_MCv2.1.0.json.gz',
@@ -87,7 +87,7 @@ class Resource:
             files.update({
                 'photon_area_distribution': 'XENONnT_spe_distributions_20210305.csv',
                 's1_pattern_map': 'XENONnT_s1_xyz_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
-                's1_light_yield_map': 'XENONnT_s1_xyz_LCE_corrected_qes_MCva43fa9b_wires.json.gz',
+                's1_lce_correction_map': 'XENONnT_s1_xyz_LCE_corrected_qes_MCva43fa9b_wires.json.gz',
                 's2_pattern_map': 'XENONnT_s2_xy_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
                 's2_correction_map': 'XENONnT_s2_xy_correction_corrected_qes_MCva43fa9b_wires.json.gz',
                 'photon_ap_cdfs': 'XENONnT_pmt_afterpulse_config_012605.json.gz',
@@ -207,7 +207,7 @@ class Resource:
 
         if config.get('detector', 'XENONnT') == 'XENON1T':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='json.gz')
-            self.s1_light_yield_map = make_map(files['s1_light_yield_map'], fmt='json')
+            self.s1_lce_correction_map = make_map(files['s1_lce_correction_map'], fmt='json')
             self.s2_correction_map = make_map(files['s2_correction_map'], fmt='json')
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='json.gz')
             self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
@@ -226,7 +226,7 @@ class Resource:
 
         elif config.get('detector', 'XENONnT') == 'XENONnT':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
-            self.s1_light_yield_map = make_map(files['s1_light_yield_map'])
+            self.s1_lce_correction_map = make_map(files['s1_lce_correction_map'])
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='pkl')
             self.s2_correction_map = make_map(files['s2_correction_map'])
 

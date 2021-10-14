@@ -75,7 +75,7 @@ class S1(Pulse):
         positions = np.array([x, y, z]).T  # For map interpolation
         n_photon_hits = self.get_n_photons(n_photons=n_photons,
                                            positions=positions,
-                                           s1_light_yield_map=self.resource.s1_light_yield_map,
+                                           s1_lce_correction_map=self.resource.s1_lce_correction_map,
                                            config=self.config)
 
         # The new way interpolation is written always require a list
@@ -111,15 +111,15 @@ class S1(Pulse):
         super().__call__()
 
     @staticmethod
-    def get_n_photons(n_photons, positions, s1_light_yield_map, config):
+    def get_n_photons(n_photons, positions, s1_lce_correction_map, config):
         """Calculates number of detected photons based on number of photons in total and the positions
         :param n_photons: 1d array of ints with number of emitted S1 photons:
         :param positions: 2d array with xyz positions of interactions
-        :param s1_light_yield_map: interpolator instance of s1 light yield map
+        :param s1_lce_correction_map: interpolator instance of s1 light yield map
         :param config: dict wfsim config 
         
         return array with number photons"""
-        ly = s1_light_yield_map(positions)
+        ly = s1_lce_correction_map(positions)
         ly /= 1 + config['p_double_pe_emision']
         ly *= config['s1_detection_efficiency']
         n_photon_hits = np.random.binomial(n=n_photons, p=ly)
