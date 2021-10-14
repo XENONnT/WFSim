@@ -35,7 +35,7 @@ def test_load_nt():
         "url_base": "https://raw.githubusercontent.com/XENONnT/WFSim/9e6ecfab13a314a83eec9844ba40811bc4a2dc36/files",
         "photon_area_distribution": "XENONnT_spe_distributions_single_channel.csv",
         "s1_pattern_map": ["constant dummy", 14e-5, [494,]],
-        "s1_light_yield_map": ["constant dummy", 1, []],
+        "s1_lce_correction_map": ["constant dummy", 1, []],
         "s2_pattern_map": ["constant dummy", 30e-5, [494,]],
         "s2_correction_map": ["constant dummy", 1, []],
         "field_dependencies_map": ["constant dummy", 1, []],
