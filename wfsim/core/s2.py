@@ -86,7 +86,7 @@ class S2(Pulse):
             drift_velocity_liquid *= 1e-4  # cm/ns
         else:
             drift_velocity_liquid = config['drift_velocity_liquid']
-
+            
         if config['enable_field_dependencies']['diffusion_longitudinal_map']:
             diffusion_constant_longitudinal = resource.field_dependencies_map(z_obs, positions, map_name='diffusion_longitudinal_map')  # cm²/s
             diffusion_constant_longitudinal *= 1e-9  # cm²/ns
@@ -373,17 +373,34 @@ class S2(Pulse):
         :param config: dict of the wfsim config
         :param resource: instance of the resource class
         """
-        drift_time_gate = config['drift_time_gate']
-        drift_velocity_liquid = config['drift_velocity_liquid']
-        diffusion_constant_transverse = getattr(config, 'diffusion_constant_transverse', 0)
-
         assert all(z < 0), 'All S2 in liquid should have z < 0'
+        
+        if config['enable_field_dependencies']['drift_speed_map']:
+            drift_velocity_liquid = resource.field_dependencies_map(z, xy, map_name='drift_speed_map')  # mm/µs
+            drift_velocity_liquid *= 1e-4  # cm/ns
+        else:
+            drift_velocity_liquid = config['drift_velocity_liquid']
+            
+        if config['enable_field_dependencies']['diffusion_transverse_map']:
+            diffusion_constant_radial = resource.field_dependencies_map(z, xy, map_name='diffusion_radial_map')  # cm²/s
+            diffusion_constant_azimuthal = resource.field_dependencies_map(z, xy, map_name='diffusion_azimuthal_map') # cm²/s
+            diffusion_constant_radial *= 1e-9  # cm²/ns
+            diffusion_constant_azimuthal *= 1e-9  # cm²/ns
+        else:
+            diffusion_constant_transverse = getattr(config, 'diffusion_constant_transverse', 0)
+            diffusion_constant_radial = diffusion_constant_transverse
+            diffusion_constant_azimuthal = diffusion_constant_transverse
 
-        drift_time_mean = - z / drift_velocity_liquid + drift_time_gate  # Add gate time for consistancy?
-        hdiff_stdev = np.sqrt(2 * diffusion_constant_transverse * drift_time_mean)
-
-        hdiff = np.random.normal(0, 1, (np.sum(n_electron), 2)) * \
-            np.repeat(hdiff_stdev, n_electron, axis=0).reshape((-1, 1))
+        drift_time_mean = - z / drift_velocity_liquid
+        hdiff_stdev_radial = np.sqrt(2 * diffusion_constant_radial * drift_time_mean)
+        hdiff_stdev_azimuthal = np.sqrt(2 * diffusion_constant_azimuthal * drift_time_mean)
+        
+        hdiff_radial = np.random.normal(0, 1, np.sum(n_electron)) * np.repeat(hdiff_stdev_radial, n_electron, axis=0)
+        hdiff_azimuthal = np.random.normal(0, 1, np.sum(n_electron)) * np.repeat(hdiff_stdev_azimuthal, n_electron, axis=0)
+        hdiff = np.column_stack([hdiff_radial, hdiff_azimuthal])
+        theta = np.arctan2(xy[:,1], xy[:,0])
+        matrix = np.array([[np.cos(theta), np.sin(theta)], [-np.sin(theta), np.cos(theta)]]).T
+        hdiff = np.vstack([(matrix[i] @ np.split(hdiff, np.cumsum(n_electron))[:-1][i].T).T for i in range(len(matrix))])
         # Should we also output this xy position in truth?
         xy_multi = np.repeat(xy, n_electron, axis=0) + hdiff  # One entry xy per electron
         # Remove points outside tpc, and the pattern will be the average inside tpc

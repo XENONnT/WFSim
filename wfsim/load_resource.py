@@ -249,7 +249,7 @@ class Resource:
             # Field dependencies 
             # This config entry a dictionary of 5 items
             if any(config['enable_field_dependencies'].values()):
-                field_dependencies_map = make_map(files['field_dependencies_map'], fmt='json.gz')
+                field_dependencies_map = make_map(files['field_dependencies_map'], fmt='json.gz', method='RectBivariateSpline')
 
                 def rz_map(z, xy, **kwargs):
                     r = np.sqrt(xy[:, 0]**2 + xy[:, 1]**2)
