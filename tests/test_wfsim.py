@@ -115,23 +115,6 @@ def test_sim_nT_advanced():
         st = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000', _config_overlap={},)
         st.set_config(dict(gain_model_mc=("to_pe_placeholder", True),
                            gain_model=("to_pe_placeholder", True),
-                           hit_min_amplitude='pmt_commissioning_initial',
-                           s1_lce_correction_map=["constant dummy", 1, []],
-                          ))
-        st.set_config(dict(nchunk=1, event_rate=1, chunk_size=2,))
-
-        log.debug(f'Getting raw-records')
-        rr = st.get_array(run_id, 'raw_records')
-        log.debug(f'Getting peaks')
-        p = st.get_array(run_id, 'peaks')
-        _sanity_check(rr, p)
-        log.info(f'All done')
-
-    with tempfile.TemporaryDirectory() as tempdir:
-        log.debug(f'Working in {tempdir}')
-        st = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000', _config_overlap={},)
-        st.set_config(dict(gain_model_mc=("to_pe_placeholder", True),
-                           gain_model=("to_pe_placeholder", True),
                            hit_min_amplitude='pmt_commissioning_initial'
                           ))
         st.set_config(dict(nchunk=1, event_rate=1, chunk_size=2,))
@@ -170,7 +153,6 @@ def test_sim_mc_chain():
                            gain_model=("to_pe_placeholder", True),
                            gain_model_nv=("adc_nv", True),
                            hit_min_amplitude='pmt_commissioning_initial',
-                           s1_lce_correction_map=["constant dummy", 1, []],
                           ))
 
         epix_config = {'cut_by_eventid': True, 'debug': True, 'source_rate': 0, 'micro_separation_time': 10.,
@@ -188,13 +170,14 @@ def test_sim_mc_chain():
             fax_config_override=dict(
                 s1_model_type='nest',
                 url_base='https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/master/sim_files',
+                s1_lce_correction_map=["constant dummy", 1, []],
                 enable_electron_afterpulses=False),
             epix_config=epix_config,
             neutron_veto=True,
             fax_config_nveto='fax_config_nt_nveto.json',
             fax_config_override_nveto=dict(enable_noise=False,
                                            enable_pmt_afterpulses=False,
-                                           enable_electron_afterpulses=False),
+                                           enable_electron_afterpulses=False,),
             targets=('tpc', 'nveto'),
             baseline_samples_nv=("nv_baseline_constant", 26, True),
         ))
