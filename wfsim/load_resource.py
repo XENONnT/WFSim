@@ -286,7 +286,7 @@ class Resource:
         log.debug(f'{self.__class__.__name__} fully initialized')
 
 
-def make_map(map_file, fmt='text', method='WeightedNearestNeighbors', name_map='map'):
+def make_map(map_file, fmt='text', method='WeightedNearestNeighbors'):
     """Fetch and make an instance of InterpolatingMap based on map_file
     Alternatively map_file can be a list of ["constant dummy", constant: int, shape: list]
     return an instance of  DummyMap"""
