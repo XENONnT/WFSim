@@ -333,7 +333,10 @@ class RawData(object):
                 tb[f't_sigma_{quantum}'] = np.nan
                 
         if peak_type == 's2' and self.config['field_distortion_model'] in ['comsol', 'inverse_fdc']:
-            _, xy_tmp = self.pulses['s2'].field_distortion_comsol(instruction['x'], instruction['y'], instruction['z'], self.resource)
+            if self.config['field_distortion_model'] == 'comsol':
+                _, xy_tmp = self.pulses['s2'].field_distortion_comsol(instruction['x'], instruction['y'], instruction['z'], self.resource)
+            elif self.config['field_distortion_model'] == 'inverse_fdc':
+                _, xy_tmp = self.pulses['s2'].fdc_3d(instruction['x'], instruction['y'], instruction['z'], self.resource)
             tb['x_mean_electron'] = np.mean(xy_tmp.T[0])
             tb['y_mean_electron'] = np.mean(xy_tmp.T[1])
         else:
