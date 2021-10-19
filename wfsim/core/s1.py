@@ -46,6 +46,17 @@ class S1(Pulse):
                      'Creating new nestpy calculator')
             self.nestpy_calc = nestpy.NESTcalc(nestpy.DetectorExample_XENON10())
 
+        # Check if user specified s1 model type exist
+        S1VALIDTYPE = ['', 'simple', 'custom', 'optical_propagation', 'nest']
+        def s1_valid_type(s, c='+ ,'):
+            if len(c) > 0:
+                for k in s.split(c[0]):  
+                    s1_valid_type(k, c[1:])
+            else:
+                assert s in S1VALIDTYPE, f'Model type "{s}" not in {S1VALIDTYPE}'
+
+        s1_valid_type(self.config['s1_model_type'])
+
     def __call__(self, instruction):
         """Main s1 simulation function. Called by RawData for s1 simulation. 
         Generates first number of photons in the s1, then timings and channels.
@@ -67,7 +78,7 @@ class S1(Pulse):
         positions = np.array([x, y, z]).T  # For map interpolation
         n_photon_hits = self.get_n_photons(n_photons=n_photons,
                                            positions=positions,
-                                           s1_light_yield_map=self.resource.s1_light_yield_map,
+                                           s1_lce_correction_map=self.resource.s1_lce_correction_map,
                                            config=self.config)
 
         # The new way interpolation is written always require a list
@@ -103,20 +114,17 @@ class S1(Pulse):
         super().__call__()
 
     @staticmethod
-    def get_n_photons(n_photons, positions, s1_light_yield_map, config):
+    def get_n_photons(n_photons, positions, s1_lce_correction_map, config):
         """Calculates number of detected photons based on number of photons in total and the positions
         :param n_photons: 1d array of ints with number of emitted S1 photons:
         :param positions: 2d array with xyz positions of interactions
-        :param s1_light_yield_map: interpolator instance of s1 light yield map
+        :param s1_lce_correction_map: interpolator instance of s1 light yield map
         :param config: dict wfsim config 
         
         return array with number photons"""
-        if config['detector'] == 'XENONnT':
-            ly = np.squeeze(s1_light_yield_map(positions),
-                            axis=-1)/(1+config['p_double_pe_emision'])
-        elif config['detector'] == 'XENON1T':
-            ly = s1_light_yield_map(positions)
-            ly *= config['s1_detection_efficiency']
+        ly = s1_lce_correction_map(positions)
+        ly /= 1 + config['p_double_pe_emision']
+        ly *= config['s1_detection_efficiency']
         n_photon_hits = np.random.binomial(n=n_photons, p=ly)
         return n_photon_hits
 
