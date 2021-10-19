@@ -1,3 +1,11 @@
+v0.5.8 / 2021-10-19
+===================
+* Change to online cmt version (#234)
+* Update rand instructions (#233)
+* Add link to nestpy for interaction types (#231)
+* Enable data driven maps and minor changes (#230)
+* Make less ele ap instructions (#216)
+
 v0.5.7 / 2021-08-27
 ===================
 * Reinstate optical simulation (#199)
