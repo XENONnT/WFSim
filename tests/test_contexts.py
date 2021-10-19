@@ -17,7 +17,7 @@ def test_nt_context(register=None, context=None):
         return
 
     if context is None:
-        context = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000')
+        context = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000', cmt_version='ONLINE')
     assert isinstance(context, strax.Context), f'{context} is not a context'
 
     if register is not None:
