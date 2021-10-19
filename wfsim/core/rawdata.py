@@ -2,7 +2,7 @@ import logging
 from numba import njit
 import numpy as np
 from strax import exporter
-from tqdm import tqdm
+from strax.utils import tqdm
 from .afterpulse import PhotoIonization_Electron, PhotoElectric_Electron, PMT_Afterpulse
 from .pulse import Pulse
 from .s1 import S1
