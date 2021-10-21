@@ -834,6 +834,8 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                 else:
                     raise RuntimeError("Bug in getting source finished")
 
+        result_nv = None
+
         if 'nveto' in self.config['targets']:
             try:
                 result_nv = next(self.sim_nv_iter)
@@ -850,7 +852,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
 
         exist_tpc_result, exist_nveto_result = False, False
         for data_type in self.provides:
-            if 'nv' in data_type:
+            if 'nv' in data_type and result_nv != None:
                 if len(result_nv[data_type.strip('_nv')]) > 0:
                     exist_nveto_result = True
             else:
