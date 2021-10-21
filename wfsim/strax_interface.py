@@ -856,8 +856,11 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                 if len(result_nv[data_type.strip('_nv')]) > 0:
                     exist_nveto_result = True
             else:
-                if len(result[data_type]) > 0:
-                    exist_tpc_result = True
+                try:
+                    if len(result[data_type]) > 0:
+                        exist_tpc_result = True
+                except KeyError:
+                    pass
         chunk = {}
         for data_type in self.provides:
             if 'nv' in data_type:
