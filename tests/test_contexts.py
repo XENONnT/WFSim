@@ -17,7 +17,7 @@ def test_nt_context(register=None, context=None):
         return
 
     if context is None:
-        context = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000')
+        context = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000', cmt_version='ONLINE')
     assert isinstance(context, strax.Context), f'{context} is not a context'
 
     if register is not None:
@@ -65,4 +65,9 @@ def remove_from_registry(context, endswith):
     for p in list(context._plugin_class_registry.keys()):
         if p.endswith(endswith):
             del context._plugin_class_registry[p]
+        elif ('events_tagged' in context._plugin_class_registry[p].provides or
+              'peak_veto_tags' in context._plugin_class_registry[p].provides):
+            # These plugins are known to mix nv/mv/tpc
+            del context._plugin_class_registry[p]
+    
     return context
