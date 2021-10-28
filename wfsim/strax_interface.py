@@ -460,8 +460,6 @@ class ChunkRawRecords(object):
     strax.Option('seed', default=False, track=False,
                  help="Option for setting the seed of the random number generator used for"
                       "generation of the instructions"),
-    strax.Option('neutron_veto', default=False, track=False,
-                 help="Flag for nVeto optical simulation instead of TPC"),
 )
 class SimulatorPlugin(strax.Plugin):
     depends_on = tuple()
