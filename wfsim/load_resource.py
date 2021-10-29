@@ -240,7 +240,7 @@ class Resource:
                 lymap = deepcopy(self.s1_pattern_map)
                 lymap.data['map'] = np.sum(lymap.data['map'][:][:][:], axis=3, keepdims=True)
                 lymap.__init__(lymap.data)
-                self.s1_light_yield_map = lymap
+                self.s1_lce_correction_map = lymap
 
             # Garfield luminescence timing samples
             if config.get('s2_luminescence_model', False) == 'garfield':
