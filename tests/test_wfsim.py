@@ -113,7 +113,7 @@ def test_sim_nT_advanced():
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
         st = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000',
-                                                 cmt_version='ONLINE',
+                                                 cmt_version='global_ONLINE',
                                                  _config_overlap={},)
         st.set_config(dict(gain_model_mc=("to_pe_placeholder", True),
                            gain_model=("to_pe_placeholder", True),
@@ -151,7 +151,7 @@ def test_sim_mc_chain():
         with open('test.root', mode='wb') as f:
             f.write(url_data)
         st = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000',
-                                                 cmt_version='ONLINE',
+                                                 cmt_version='global_ONLINE',
                                                  _config_overlap={},)
         st.set_config(dict(gain_model_mc=("to_pe_placeholder", True),
                            gain_model=("to_pe_placeholder", True),
