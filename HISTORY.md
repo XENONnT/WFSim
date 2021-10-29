@@ -1,3 +1,20 @@
+v0.5.9 / 2021-10-29
+===================
+* Load MC pattern map if no data-driven LCE map provided (#241)
+* Change LCE map for tests (#243)
+* Typo in n_chunks (#238)
+* Security fix for dask (#240)
+* Remove not used nv option (#237)
+* Pulse instrcutions notebook (#236)
+
+v0.5.8 / 2021-10-19
+===================
+* Change to online cmt version (#234)
+* Update rand instructions (#233)
+* Add a link to nestpy for interaction types (#231)
+* Enable data-driven maps and minor changes (#230)
+* Make less ele ap instructions (#216)
+
 v0.5.7 / 2021-08-27
 ===================
 * Reinstate optical simulation (#199)
@@ -25,7 +42,7 @@ v0.5.5 / 2021-07-07
 v0.5.4 / 2021-06-24
 ===================
 * Get gains from CMT (#172)
-* Not to remove nVeto events whose related TPC events don't exist (#171)
+* Not to remove nVeto events whose related TPC events do not exist (#171)
 * Remove travis for testing in wfsim (#176)
 * Oversize chunk handling (#168)
 * Adding Kr83m notebook (#167)
