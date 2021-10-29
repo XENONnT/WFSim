@@ -211,18 +211,10 @@ class Resource:
 
         if config.get('detector', 'XENONnT') == 'XENON1T':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='json.gz')
+            self.s1_lce_correction_map = make_map(files['s1_lce_correction_map'], fmt='json')
             self.s2_correction_map = make_map(files['s2_correction_map'], fmt='json')
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='json.gz')
             self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
-
-            #if there is a (data driven!) map, load it. If not make it  from the pattern map
-            if files['s1_lce_correction_map']:
-                self.s1_lce_correction_map = make_map(files['s1_lce_correction_map'], fmt='json')
-            else:
-                lymap = deepcopy(self.s1_pattern_map)
-                lymap.data['map'] = np.sum(lymap.data['map'][:][:][:], axis=3, keepdims=True)
-                lymap.__init__(lymap.data)
-                self.s1_light_yield_map = lymap
 
             # Gas gap warping map
             if config.get('enable_gas_gap_warping', False):
@@ -238,9 +230,17 @@ class Resource:
 
         elif config.get('detector', 'XENONnT') == 'XENONnT':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
-            self.s1_lce_correction_map = make_map(files['s1_lce_correction_map'])
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='pkl')
             self.s2_correction_map = make_map(files['s2_correction_map'])
+
+            #if there is a (data driven!) map, load it. If not make it  from the pattern map
+            if files['s1_lce_correction_map']:
+                self.s1_lce_correction_map = make_map(files['s1_lce_correction_map'], fmt='json')
+            else:
+                lymap = deepcopy(self.s1_pattern_map)
+                lymap.data['map'] = np.sum(lymap.data['map'][:][:][:], axis=3, keepdims=True)
+                lymap.__init__(lymap.data)
+                self.s1_light_yield_map = lymap
 
             # Garfield luminescence timing samples
             if config.get('s2_luminescence_model', False) == 'garfield':
