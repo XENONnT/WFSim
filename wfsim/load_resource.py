@@ -139,6 +139,10 @@ class Resource:
             cache files that might not be updated with the latest github commit.
 
         """
+        if not fname:
+            log.warning(f"A file has value False, assuming this is intentional.")
+            return
+
         if fname.startswith('/'):
             log.warning(f"Using local file {fname} for a resource. "
                         f"Do not set this as a default or TravisCI tests will break")
@@ -226,9 +230,17 @@ class Resource:
 
         elif config.get('detector', 'XENONnT') == 'XENONnT':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
-            self.s1_lce_correction_map = make_map(files['s1_lce_correction_map'])
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='pkl')
             self.s2_correction_map = make_map(files['s2_correction_map'])
+
+            #if there is a (data driven!) map, load it. If not make it  from the pattern map
+            if files['s1_lce_correction_map']:
+                self.s1_lce_correction_map = make_map(files['s1_lce_correction_map'])
+            else:
+                lymap = deepcopy(self.s1_pattern_map)
+                lymap.data['map'] = np.sum(lymap.data['map'][:][:][:], axis=3, keepdims=True)
+                lymap.__init__(lymap.data)
+                self.s1_lce_correction_map = lymap
 
             # Garfield luminescence timing samples
             if config.get('s2_luminescence_model', False) == 'garfield':
