@@ -122,7 +122,7 @@ def test_sim_nT_advanced():
         st.set_config(dict(nchunk=1, event_rate=1, chunk_size=2,))
 
         st.set_config({'fax_config_override': dict(s2_luminescence_model='simple',
-                                                   s1_lce_correction_map='XnT_S1_xyz_MLP_v0.1_B2d75n_C2d75n_G0d3p_A4d9p_T0d9n_PMTs1d3n_FSR0d65p_v0d677.json',
+                                                   s1_lce_correction_map='XENONnT_s1_xyz_LCE_corrected_qes_MCva43fa9b_wires.json.gz',
                                                    s1_time_spline='XENONnT_s1_proponly_va43fa9b_wires_20200625.json.gz',
                                                    s1_model_type='optical_propagation+simple',)})
 
