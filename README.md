@@ -5,7 +5,7 @@
 
 [![Readthedocs Badge](https://readthedocs.org/projects/wfsim/badge/?version=latest)](https://wfsim.readthedocs.io/en/latest/?badge=latest)
 [![Coverage Status](https://coveralls.io/repos/github/XENONnT/WFSim/badge.svg?branch=master)](https://coveralls.io/github/XENONnT/WFSim?branch=master)
-[![Pytest](https://github.com/XENONnT/WFSim/workflows/Pytest/badge.svg?branch=master)](https://github.com/XENONnT/WFSim/actions?query=workflow%3APytest)
+[![Test package](https://github.com/XENONnT/WFSim/actions/workflows/pytest.yml/badge.svg?branch=master)](https://github.com/XENONnT/WFSim/actions/workflows/pytest.yml)
 [![CodeFactor](https://www.codefactor.io/repository/github/xenonnt/wfsim/badge)](https://www.codefactor.io/repository/github/xenonnt/wfsim)
 [![PyPI version shields.io](https://img.shields.io/pypi/v/wfsim.svg)](https://pypi.python.org/pypi/wfsim/)
 
