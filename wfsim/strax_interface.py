@@ -437,7 +437,7 @@ class ChunkRawRecords(object):
                  help="Average number of events per second"),
     strax.Option('chunk_size', default=100, track=False,
                  help="Duration of each chunk in seconds"),
-    strax.Option('nchunk', default=10, track=False,
+    strax.Option('n_chunk', default=10, track=False,
                  help="Number of chunks to simulate"),
     strax.Option('fax_file', default=None, track=False,
                  help="Directory with fax instructions"), 
