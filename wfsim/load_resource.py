@@ -139,6 +139,10 @@ class Resource:
             cache files that might not be updated with the latest github commit.
 
         """
+        if not fname:
+            log.warning(f"A file has value False, assuming this is intentional.")
+            return
+
         if fname.startswith('/'):
             log.warning(f"Using local file {fname} for a resource. "
                         f"Do not set this as a default or TravisCI tests will break")
