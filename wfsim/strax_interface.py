@@ -493,6 +493,10 @@ class SimulatorPlugin(strax.Plugin):
         overrides = self.config['fax_config_override']
         if overrides is not None:
             self.config.update(overrides)
+            
+        # backwards compatibility
+        if 'field_distortion_on' in self.config and not 'field_distortion_model' in self.config:
+            self.config.update({'field_distortion_model': "inverse_fdc" if self.config['field_distortion_on'] else "none"})
 
         # Update gains to the nT defaults
         self.to_pe = straxen.get_correction_from_cmt(self.run_id,
