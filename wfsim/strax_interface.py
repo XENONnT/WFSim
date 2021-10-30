@@ -439,7 +439,7 @@ class ChunkRawRecords(object):
                  help="Average number of events per second"),
     strax.Option('chunk_size', default=100, track=False,
                  help="Duration of each chunk in seconds"),
-    strax.Option('nchunk', default=10, track=False,
+    strax.Option('n_chunk', default=10, track=False,
                  help="Number of chunks to simulate"),
     strax.Option('fax_file', default=None, track=False,
                  help="Directory with fax instructions"), 
@@ -462,8 +462,6 @@ class ChunkRawRecords(object):
     strax.Option('seed', default=False, track=False,
                  help="Option for setting the seed of the random number generator used for"
                       "generation of the instructions"),
-    strax.Option('neutron_veto', default=False, track=False,
-                 help="Flag for nVeto optical simulation instead of TPC"),
 )
 class SimulatorPlugin(strax.Plugin):
     depends_on = tuple()
