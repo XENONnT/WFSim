@@ -29,7 +29,7 @@ def test_load_nt():
             "survival_probability_map": True,
             "drift_speed_map": False,
             "diffusion_longitudinal_map": False,
-            "diffusion_transverse_map": false},
+            "diffusion_transverse_map": False},
         "neutron_veto": False,
         "url_base": "https://raw.githubusercontent.com/XENONnT/WFSim/9e6ecfab13a314a83eec9844ba40811bc4a2dc36/files",
         "photon_area_distribution": "XENONnT_spe_distributions_single_channel.csv",
