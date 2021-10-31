@@ -11,7 +11,6 @@ def test_load_1t():
         "enable_electron_afterpulses": True,
         "enable_noise": False,
         "field_distortion_on": True,
-        "neutron_veto": False,
     }
     result = load_config(config)
     return result, config
@@ -30,7 +29,6 @@ def test_load_nt():
             "drift_speed_map": False,
             "diffusion_longitudinal_map": False,
             "diffusion_transverse_map": False},
-        "neutron_veto": False,
         "url_base": "https://raw.githubusercontent.com/XENONnT/WFSim/9e6ecfab13a314a83eec9844ba40811bc4a2dc36/files",
         "photon_area_distribution": "XENONnT_spe_distributions_single_channel.csv",
         "s1_pattern_map": ["constant dummy", 14e-5, [494,]],
