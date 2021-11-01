@@ -8,7 +8,7 @@
 {
     // Configuration flags
     "s1_model_type": "simple",
-    "s2_luminescence_model": "simple",                   # needs the 's2_luminiscence' file
+    "s2_luminescence_model": "simple",
     "enable_gas_gap_warping": false,
     "enable_pmt_afterpulses": false,
     "enable_electron_afterpulses": false,
@@ -18,8 +18,7 @@
         "survival_probability_map": true,
         "drift_speed_map": false,
         "diffusion_longitudinal_map": false,
-        "diffusion_radial_map": false,
-        "diffusion_azimuthal_map": false},
+        "diffusion_transverse_map": false},
 
     // Resource
     "url_base": "https://raw.githubusercontent.com/XENONnT/WFSim/e890b18f3caab9889a166273580b06f56da5ac58/files",
