@@ -3,7 +3,7 @@ strax==1.1.1
 straxen==1.1.2
 
 # File for the requirements of straxen with the automated tests
-awkward==1.5.0
+awkward==1.5.1
 blosc==1.10.4                                   # Strax dependency
 boltons==21.0.0
 datashader==0.13.0
