@@ -104,9 +104,9 @@ class RawData(object):
 
                     if ptype == 1:
                         stop_at_this_group = True
-                        # Group S1 within 100 ns apart, truth info would be summarized within the group
+                        # Group S1 within 0.1 ns apart, truth info would be summarized within the group
                         instb_run = np.split(instb_indx[ibqs[mask]],
-                                             np.where(np.diff(instb_time[ibqs[mask]]) > 100)[0] + 1)
+                                             np.where(np.diff(instb_time[ibqs[mask]]) > 0.1)[0] + 1)
                     elif ptype == 2:
                         stop_at_this_group = True
                         # Group S2 within 2 um apart, truth info would be summarized within the group
