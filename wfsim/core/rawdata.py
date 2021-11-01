@@ -109,9 +109,9 @@ class RawData(object):
                                              np.where(np.diff(instb_time[ibqs[mask]]) > 100)[0] + 1)
                     elif ptype == 2:
                         stop_at_this_group = True
-                        # Group S2 within 2 mm apart, truth info would be summarized within the group
+                        # Group S2 within 2 um apart, truth info would be summarized within the group
                         instb_run = np.split(instb_indx[ibqs[mask]], 
-                                             np.where(np.diff(instb_time[ibqs[mask]]) > int(0.2 / v))[0] + 1)
+                                             np.where(np.diff(instb_time[ibqs[mask]]) > int(0.0002 / v))[0] + 1)
                     else:
                         instb_run = [instb_indx[ibqs[mask]]]
 
