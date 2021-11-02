@@ -1,6 +1,9 @@
 # WFSim
 [The XENON waveform simulator.](https://wfsim.readthedocs.io)
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5617900.svg)](https://doi.org/10.5281/zenodo.5617900)
+
+
 ## Fax in strax
 
 [![Readthedocs Badge](https://readthedocs.org/projects/wfsim/badge/?version=latest)](https://wfsim.readthedocs.io/en/latest/?badge=latest)
