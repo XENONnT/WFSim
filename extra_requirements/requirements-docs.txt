@@ -1,0 +1,7 @@
+# File for the requirements of the documentation
+numpy==1.19.5
+sphinx
+sphinx_rtd_theme
+nbsphinx
+recommonmark
+graphviz
