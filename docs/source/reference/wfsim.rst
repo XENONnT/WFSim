@@ -4,14 +4,6 @@ wfsim package
 Submodules
 ----------
 
-wfsim.core module
------------------
-
-.. automodule:: wfsim.core
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 wfsim.load\_resource module
 ---------------------------
 
@@ -24,14 +16,6 @@ wfsim.pax\_interface module
 ---------------------------
 
 .. automodule:: wfsim.pax_interface
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-wfsim.raw\_optical module
--------------------------
-
-.. automodule:: wfsim.raw_optical
    :members:
    :undoc-members:
    :show-inheritance:
