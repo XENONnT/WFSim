@@ -235,12 +235,13 @@ class Resource:
 
             #if there is a (data driven!) map, load it. If not make it  from the pattern map
             if files['s1_lce_correction_map']:
-                self.s1_lce_correction_map = make_map(files['s1_lce_correction_map'], fmt='json')
+                self.s1_lce_correction_map = make_map(files['s1_lce_correction_map'])
+
             else:
                 lymap = deepcopy(self.s1_pattern_map)
                 lymap.data['map'] = np.sum(lymap.data['map'][:][:][:], axis=3, keepdims=True)
                 lymap.__init__(lymap.data)
-                self.s1_light_yield_map = lymap
+                self.s1_lce_correction_map = lymap
 
             # Garfield luminescence timing samples
             if config.get('s2_luminescence_model', False) == 'garfield':
@@ -284,7 +285,6 @@ class Resource:
 
         elif config.get('detector', 'XENONnT') == 'XENONnT_neutron_veto':
             # Neutron veto PMT QE as function of wavelength
-            if config.get('neutron_veto', False):
                 self.nv_pmt_qe = straxen.get_resource(files['nv_pmt_qe'], fmt='json')
 
         # SPE area distributions
