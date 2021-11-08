@@ -111,6 +111,9 @@ class S2(Pulse):
         sc_gain = resource.s2_correction_map(positions) \
                 * config['s2_secondary_sc_gain'] / (1 + config['p_double_pe_emision'])
 
+        # data driven map contains nan, will be set to 0 here
+        sc_gain[np.isnan(sc_gain)] = 0
+
         return sc_gain
 
     @staticmethod

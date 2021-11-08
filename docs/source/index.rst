@@ -26,6 +26,9 @@ See `the installation guide <https://wfsim.readthedocs.io/en/latest/intro.html>`
     tutorials/Getting_started_wfsim.ipynb
     tutorials/Understanding_WFSim_P1.ipynb
     tutorials/Understanding_WFSim_P2.ipynb
+    tutorials/Advanced_tricks.ipynb
+    tuturials/StorePulseInstructionsAsType.ipynb
+
 
 .. toctree::
     :maxdepth: 1

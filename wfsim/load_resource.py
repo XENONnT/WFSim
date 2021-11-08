@@ -73,7 +73,7 @@ class Resource:
         if config['detector'] == 'XENON1T':
             files.update({
                 'photon_area_distribution': 'XENON1T_spe_distributions.csv',
-                's1_light_yield_map': 'XENON1T_s1_xyz_ly_kr83m_SR1_pax-680_fdc-3d_v0.json',
+                's1_lce_correction_map': 'XENON1T_s1_xyz_ly_kr83m_SR1_pax-680_fdc-3d_v0.json',
                 's1_pattern_map': 'XENON1T_s1_xyz_patterns_interp_corrected_MCv2.1.0.json.gz',
                 's2_correction_map': 'XENON1T_s2_xy_ly_SR1_v2.2.json',
                 's2_pattern_map': 'XENON1T_s2_xy_patterns_top_corrected_MCv2.1.0.json.gz',
@@ -87,6 +87,7 @@ class Resource:
             files.update({
                 'photon_area_distribution': 'XENONnT_spe_distributions_20210305.csv',
                 's1_pattern_map': 'XENONnT_s1_xyz_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
+                's1_lce_correction_map': 'XENONnT_s1_xyz_LCE_corrected_qes_MCva43fa9b_wires.json.gz',
                 's2_pattern_map': 'XENONnT_s2_xy_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
                 's2_correction_map': 'XENONnT_s2_xy_correction_corrected_qes_MCva43fa9b_wires.json.gz',
                 'photon_ap_cdfs': 'XENONnT_pmt_afterpulse_config_012605.json.gz',
@@ -95,15 +96,18 @@ class Resource:
                 'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
                 'noise_file': 'x1t_noise_170203_0850_00_small.npz',
                 'cable_map': 'xenonnt_cable_map.csv',
+                'fdc_3d': 'XnT_3D_FDC_xyt_dummy_all_zeros_v0.1.json.gz',
                 'field_dependencies_map': '',
-                's1_time_spline': '',
+                's1_time_spline': 'XENONnT_s1_proponly_va43fa9b_wires_20200625.json.gz',
              })
+
         elif config['detector'] == 'XENONnT_neutron_veto':
             files.update({
                 'photon_area_distribution': 'XENONnT_spe_distributions_nveto_013071.csv',
                 'nv_pmt_qe': 'nveto_pmt_qe.json',
                 'noise_file': 'xnt_noise_nveto_014901.npz'
             })
+
         else:
             raise ValueError(f"Unsupported detector {config['detector']}")
 
@@ -136,8 +140,17 @@ class Resource:
             cache files that might not be updated with the latest github commit.
 
         """
-        if base.startswith('/'):
+        if not fname:
+            log.warning(f"A file has value False, assuming this is intentional.")
+            return
+
+        if fname.startswith('/'):
             log.warning(f"Using local file {fname} for a resource. "
+                        f"Do not set this as a default or TravisCI tests will break")
+            return fname
+        
+        if base.startswith('/'):
+            log.warning(f"Using local folder {base} for all resources. "
                         f"Do not set this as a default or TravisCI tests will break")
             return osp.join(base, fname)
 
@@ -167,7 +180,9 @@ class Resource:
             # FileNotFoundError, ValueErrors can be raised if we
             # cannot load the requested config
             fpath = downloader.download_single(fname)
-            return fpath
+            log.warning(f"Loading {fname} from mongo downloader")
+            return fname  # Keep the name and let get_resource do its thing
+
         except (FileNotFoundError, ValueError, NameError, AttributeError):
             log.info(f"Mongo downloader not possible or does not have {fname}")
 
@@ -197,7 +212,7 @@ class Resource:
 
         if config.get('detector', 'XENONnT') == 'XENON1T':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='json.gz')
-            self.s1_light_yield_map = make_map(files['s1_light_yield_map'], fmt='json')
+            self.s1_lce_correction_map = make_map(files['s1_lce_correction_map'], fmt='json')
             self.s2_correction_map = make_map(files['s2_correction_map'], fmt='json')
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='json.gz')
             self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
@@ -216,16 +231,17 @@ class Resource:
 
         elif config.get('detector', 'XENONnT') == 'XENONnT':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
-            if isinstance(self.s1_pattern_map, DummyMap):
-                self.s1_light_yield_map = self.s1_pattern_map.reduce_last_dim()
+            self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='pkl')
+            self.s2_correction_map = make_map(files['s2_correction_map'])
+
+            #if there is a (data driven!) map, load it. If not make it  from the pattern map
+            if files['s1_lce_correction_map']:
+                self.s1_lce_correction_map = make_map(files['s1_lce_correction_map'])
             else:
                 lymap = deepcopy(self.s1_pattern_map)
                 lymap.data['map'] = np.sum(lymap.data['map'][:][:][:], axis=3, keepdims=True)
                 lymap.__init__(lymap.data)
-                self.s1_light_yield_map = lymap
-
-            self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='pkl')
-            self.s2_correction_map = make_map(files['s2_correction_map'], fmt='json.gz')
+                self.s1_lce_correction_map = lymap
 
             # Garfield luminescence timing samples
             if config.get('s2_luminescence_model', False) == 'garfield':
@@ -273,7 +289,6 @@ class Resource:
 
         elif config.get('detector', 'XENONnT') == 'XENONnT_neutron_veto':
             # Neutron veto PMT QE as function of wavelength
-            if config.get('neutron_veto', False):
                 self.nv_pmt_qe = straxen.get_resource(files['nv_pmt_qe'], fmt='json')
 
         # SPE area distributions
@@ -288,7 +303,7 @@ class Resource:
         log.debug(f'{self.__class__.__name__} fully initialized')
 
 
-def make_map(map_file, fmt='text', method='WeightedNearestNeighbors'):
+def make_map(map_file, fmt=None, method='WeightedNearestNeighbors'):
     """Fetch and make an instance of InterpolatingMap based on map_file
     Alternatively map_file can be a list of ["constant dummy", constant: int, shape: list]
     return an instance of  DummyMap"""
@@ -299,6 +314,9 @@ def make_map(map_file, fmt='text', method='WeightedNearestNeighbors'):
         return DummyMap(map_file[1], map_file[2])
 
     elif isinstance(map_file, str):
+        if fmt is None:
+            fmt = parse_extension(map_file)
+
         log.debug(f'Initialize map interpolator for file {map_file}')
         map_data = straxen.get_resource(map_file, fmt=fmt)
         return straxen.InterpolatingMap(map_data, method=method)
@@ -328,3 +346,19 @@ class DummyMap:
         shape[-1] = 1
 
         return DummyMap(const, shape)
+
+
+##
+# Copy from https://github.com/XENONnT/private_nt_aux_files
+##
+def parse_extension(name):
+    """Get the extention from a file name. If zipped or tarred, can contain a dot"""
+    split_name = name.split('.')
+    if len(split_name) == 2:
+        fmt = split_name[-1]
+    elif len(split_name) > 2 and 'gz' in name:
+        fmt = '.'.join(split_name[-2:])
+    else:
+        fmt = split_name[-1]
+    log.warning(f'Using {fmt} for unspecified {name}')
+    return fmt

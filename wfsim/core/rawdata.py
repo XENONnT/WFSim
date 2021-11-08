@@ -2,7 +2,7 @@ import logging
 from numba import njit
 import numpy as np
 from strax import exporter
-from tqdm import tqdm
+from strax.utils import tqdm
 from .afterpulse import PhotoIonization_Electron, PhotoElectric_Electron, PMT_Afterpulse
 from .pulse import Pulse
 from .s1 import S1
@@ -183,8 +183,10 @@ class RawData(object):
         # Make new instructions for electron afterpulses, if requested
         if primary_pulse in ['s1', 's2']:
             if self.config.get('enable_electron_afterpulses', True):
-                yield self.pulses['pi_el'].generate_instruction(
-                    self.pulses[primary_pulse], instruction)
+                if primary_pulse in ['s2']:  # Our pi model is valid for only S2s
+                    yield self.pulses['pi_el'].generate_instruction(
+                        self.pulses[primary_pulse], instruction)
+            if self.config.get('enable_gate_afterpulses', False):
                 if primary_pulse in ['s2']:  # Only add gate ap to s2
                     yield self.pulses['pe_el'].generate_instruction(
                         self.pulses[primary_pulse], instruction)

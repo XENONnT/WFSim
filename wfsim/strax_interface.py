@@ -5,10 +5,11 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
 import uproot
-
+import typing as ty
 import strax
 import straxen
 import wfsim
+from strax.utils import tqdm
 
 export, __all__ = strax.exporter()
 logging.basicConfig(handlers=[logging.StreamHandler()])
@@ -59,28 +60,111 @@ def rand_instructions(c):
     """Random instruction generator function. This will be called by wfsim if you do not specify 
     specific instructions.
     :params c: wfsim configuration dict"""
-    n = c['nevents'] = c['event_rate'] * c['chunk_size'] * c['nchunk']
-    c['total_time'] = c['chunk_size'] * c['nchunk']
+    log.warn('rand_instructions is deprecated, please use wfsim.random_instructions')
+    if 'drift_field' not in c:
+        log.warn('drift field not specified!')
+    # Do the conversion for now, don't break everything all at once
+    return _rand_instructions(event_rate=c.get('event_rate', 10),
+                              chunk_size=c.get('chunk_size', 5),
+                              n_chunk=c.get('n_chunk', 2),
+                              energy_range=[1, 100],  # keV
+                              drift_field=c.get('drift_field', 100),  # V/cm
+                              tpc_radius=c.get('tpc_radius', straxen.tpc_r),
+                              tpc_length=c.get('tpc_length', straxen.tpc_z),
+                              nest_inst_types=[7]
+                              )
 
-    instructions = np.zeros(2 * n, dtype=instruction_dtype)
-    uniform_times = c['total_time'] * (np.arange(n) + 1.) / n
-    instructions['time'] = np.repeat(uniform_times, 2) * int(1e9)
-    instructions['event_number'] = np.digitize(instructions['time'],
-                                               1e9 * np.arange(c['nchunk']) * c['chunk_size']) - 1
-    instructions['type'] = np.tile([1, 2], n)
-    instructions['recoil'] = np.repeat(7, n * 2)  # Use nest ids for  ER
 
-    r = np.sqrt(np.random.uniform(0, c['tpc_radius']**2, n))
-    t = np.random.uniform(-np.pi, np.pi, n)
-    instructions['x'] = np.repeat(r * np.cos(t), 2)
-    instructions['y'] = np.repeat(r * np.sin(t), 2)
-    instructions['z'] = np.repeat(np.random.uniform(-c['tpc_length'], 0, n), 2)
+def random_instructions(**kwargs) -> np.ndarray:
+    """
+    Generate instructions to run WFSim
+    :param event_rate: # events per second
+    :param chunk_size: the size of each chunk
+    :param n_chunk: the number of chunks
+    :param drift_field:
+    :param energy_range: the energy range (in keV) of the recoil type
+    :param tpc_length: the max depth of the detector
+    :param tpc_radius: the max radius of the detector
+    :param nest_inst_types: the nestpy type of the interaction see:
+        github.com/NESTCollaboration/nestpy/blob/8eb79414e5f834eb6cf6ddba5d6c433c6b0cbc70/src/nestpy/helpers.py#L27
+    :return: Instruction array that can be used for simulation in wfsim
+    """
+    return _rand_instructions(**kwargs)
 
-    nphotons = np.random.uniform(2000, 2050, n)
-    nelectrons = 10 ** (np.random.uniform(3, 4, n))
-    instructions['amp'] = np.vstack([nphotons, nelectrons]).T.flatten().astype(int)
 
-    return instructions
+def _rand_instructions(
+        event_rate: int,
+        chunk_size: int,
+        n_chunk: int,
+        drift_field: float,
+        energy_range: ty.Union[tuple, list, np.ndarray],
+        tpc_length: float = straxen.tpc_z,
+        tpc_radius: float = straxen.tpc_r,
+        nest_inst_types: ty.Union[ty.List[int], ty.Tuple[ty.List], np.ndarray, None] = None,
+) -> np.ndarray:
+    import nestpy
+    if nest_inst_types is None:
+        nest_inst_types = [7]
+
+    n_events = event_rate * chunk_size * n_chunk
+    total_time = chunk_size * n_chunk
+
+    inst = np.zeros(2 * n_events, dtype=instruction_dtype)
+    inst[:] = -1
+
+    uniform_times = total_time * (np.arange(n_events) + 0.5) / n_events
+
+    inst['time'] = np.repeat(uniform_times, 2) * int(1e9)
+    inst['event_number'] = np.digitize(inst['time'],
+                                       1e9 * np.arange(n_chunk) *
+                                       chunk_size) - 1
+    inst['type'] = np.tile([1, 2], n_events)
+
+    r = np.sqrt(np.random.uniform(0, tpc_radius ** 2, n_events))
+    t = np.random.uniform(-np.pi, np.pi, n_events)
+    inst['x'] = np.repeat(r * np.cos(t), 2)
+    inst['y'] = np.repeat(r * np.sin(t), 2)
+    inst['z'] = np.repeat(np.random.uniform(-tpc_length, 0, n_events), 2)
+
+    # Here we'll define our XENON-like detector
+    nest_calc = nestpy.NESTcalc(nestpy.VDetector())
+    nucleus_A = 131.293
+    nucleus_Z = 54.
+    lxe_density = 2.862  # g/cm^3   #SR1 Value
+
+    energy = np.random.uniform(*energy_range, n_events)
+    quanta = []
+    exciton = []
+    recoil = []
+    e_dep = []
+    for energy_deposit in tqdm(energy, desc='generating instructions from nest'):
+        interaction_type = np.random.choice(nest_inst_types)
+        interaction = nestpy.INTERACTION_TYPE(interaction_type)
+        y = nest_calc.GetYields(interaction,
+                                energy_deposit,
+                                lxe_density,
+                                drift_field,
+                                nucleus_A,
+                                nucleus_Z,
+                                )
+        q = nest_calc.GetQuanta(y, lxe_density)
+        quanta.append(q.photons)
+        quanta.append(q.electrons)
+        exciton.append(q.excitons)
+        exciton.append(0)
+        # both S1 and S2
+        recoil += [interaction_type, interaction_type]
+        e_dep += [energy_deposit, energy_deposit]
+
+    inst['amp'] = quanta
+    inst['local_field'] = drift_field
+    inst['n_excitons'] = exciton
+    inst['recoil'] = recoil
+    inst['e_dep'] = e_dep
+    for field in inst.dtype.names:
+        if np.any(inst[field] == -1):
+            log.warn(f'{field} is not (fully) filled')
+    return inst
 
 
 def _read_optical_nveto(config, events, mask):
@@ -353,7 +437,7 @@ class ChunkRawRecords(object):
                  help="Average number of events per second"),
     strax.Option('chunk_size', default=100, track=False,
                  help="Duration of each chunk in seconds"),
-    strax.Option('nchunk', default=10, track=False,
+    strax.Option('n_chunk', default=10, track=False,
                  help="Number of chunks to simulate"),
     strax.Option('fax_file', default=None, track=False,
                  help="Directory with fax instructions"), 
@@ -376,8 +460,6 @@ class ChunkRawRecords(object):
     strax.Option('seed', default=False, track=False,
                  help="Option for setting the seed of the random number generator used for"
                       "generation of the instructions"),
-    strax.Option('neutron_veto', default=False, track=False,
-                 help="Flag for nVeto optical simulation instead of TPC"),
 )
 class SimulatorPlugin(strax.Plugin):
     depends_on = tuple()
@@ -432,9 +514,14 @@ class SimulatorPlugin(strax.Plugin):
         # Update some values stored in CMT
         if self.config['fax_config_override_from_cmt'] is not None:
             for fax_field, cmt_option in self.config['fax_config_override_from_cmt'].items():
+                if (fax_field in ['fdc_3d', 's1_light_yield_map']
+                    and self.config.get('default_reconstruction_algorithm', False)):
+                    cmt_option = tuple(['suffix',
+                                        self.config['default_reconstruction_algorithm'],
+                                        *cmt_option])
+
                 cmt_value = straxen.get_correction_from_cmt(self.run_id, cmt_option)
-                if fax_field in self.config:
-                    log.warning(f'Replacing {fax_field} with CMT option {cmt_option} to {cmt_value}')
+                log.warning(f'Replacing {fax_field} with CMT option {cmt_option} to {cmt_value}')
                 self.config[fax_field] = cmt_value
 
     def _setup(self):
