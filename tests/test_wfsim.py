@@ -177,7 +177,6 @@ def test_sim_mc_chain():
                 s1_lce_correction_map=["constant dummy", 1, []],
                 enable_electron_afterpulses=False),
             epix_config=epix_config,
-            neutron_veto=True,
             fax_config_nveto='fax_config_nt_nveto.json',
             fax_config_override_nveto=dict(enable_noise=False,
                                            enable_pmt_afterpulses=False,
