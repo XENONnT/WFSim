@@ -24,9 +24,9 @@ _cached_wavelength_to_qe_arr = {}
 instruction_dtype = [(('Waveform simulator event number.', 'event_number'), np.int32),
                      (('Quanta type (S1 photons or S2 electrons)', 'type'), np.int8),
                      (('Time of the interaction [ns]', 'time'), np.int64),
-                     (('X position of the cluster[cm]', 'x'), np.float32),
-                     (('Y position of the cluster[cm]', 'y'), np.float32),
-                     (('Z position of the cluster[cm]', 'z'), np.float32),
+                     (('X position of the cluster [cm]', 'x'), np.float32),
+                     (('Y position of the cluster [cm]', 'y'), np.float32),
+                     (('Z position of the cluster [cm]', 'z'), np.float32),
                      (('Number of quanta', 'amp'), np.int32),
                      (('Recoil type of interaction.', 'recoil'), np.int8),
                      (('Energy deposit of interaction', 'e_dep'), np.float32),
@@ -50,6 +50,8 @@ truth_extra_dtype = [
     (('Arrival time of the last photon [ns]', 't_last_photon'), np.float64),
     (('Mean time of the photons [ns]', 't_mean_photon'), np.float64),
     (('Standard deviation of photon arrival times [ns]', 't_sigma_photon'), np.float64),
+    (('X field-distorted mean position of the electrons [cm]', 'x_mean_electron'), np.float32),
+    (('Y field-distorted mean position of the electrons [cm]', 'y_mean_electron'), np.float32),
     (('Arrival time of the first electron [ns]', 't_first_electron'), np.float64),
     (('Arrival time of the last electron [ns]', 't_last_electron'), np.float64),
     (('Mean time of the electrons [ns]', 't_mean_electron'), np.float64),
@@ -489,6 +491,10 @@ class SimulatorPlugin(strax.Plugin):
         overrides = self.config['fax_config_override']
         if overrides is not None:
             self.config.update(overrides)
+            
+        # backwards compatibility
+        if 'field_distortion_on' in self.config and not 'field_distortion_model' in self.config:
+            self.config.update({'field_distortion_model': "inverse_fdc" if self.config['field_distortion_on'] else "none"})
 
         # Update gains to the nT defaults
         self.to_pe = straxen.get_correction_from_cmt(self.run_id,
