@@ -1,4 +1,4 @@
-__version__ = "0.5.9"
+__version__ = "0.5.9.fix_nv_fix_truth"
 
 from .core.afterpulse import *
 from .core.pulse import *
