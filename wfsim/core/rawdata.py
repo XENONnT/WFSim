@@ -354,7 +354,7 @@ class RawData(object):
             set(self.config['channels_bottom']).difference(getattr(pulse, 'turned_off_pmts', [])))
         tb['n_photon_bottom'] = (
             np.sum(np.isin(channels, channels_bottom)))
-        tb['n_pe_bot'] = tb['n_photon_bottom'] + n_dpe_bot
+        tb['n_pe_bottom'] = tb['n_photon_bottom'] + n_dpe_bot
 
         # Summarize the instruction cluster in one row of the truth file
         for field in instruction.dtype.names:
