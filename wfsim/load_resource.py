@@ -236,6 +236,7 @@ class Resource:
             #if there is a (data driven!) map, load it. If not make it  from the pattern map
             if files['s1_lce_correction_map']:
                 self.s1_lce_correction_map = make_map(files['s1_lce_correction_map'])
+
             else:
                 lymap = deepcopy(self.s1_pattern_map)
                 lymap.data['map'] = np.sum(lymap.data['map'][:][:][:], axis=3, keepdims=True)
