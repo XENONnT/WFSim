@@ -222,7 +222,7 @@ class Resource:
 
             # Photon After Pulses
             if config.get('enable_pmt_afterpulses', False):
-                self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'])
+                self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
 
             # Electron After Pulses
             if config.get('enable_electron_afterpulses', False):
@@ -272,7 +272,7 @@ class Resource:
 
             # Photon After Pulses
             if config.get('enable_pmt_afterpulses', False):
-                self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='pkl.gz')
+                self.uniform_to_pmt_ap = straxen.get_resource(files['photon_ap_cdfs'], fmt='json.gz')
 
             # S1 photon timing splines
             if config.get('s1_time_spline', False):
