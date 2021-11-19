@@ -343,19 +343,18 @@ class RawData(object):
                 * self.config['sample_duration']
 
         channels = getattr(pulse, '_photon_channels', [])
-        if self.config.get('exclude_dpe_in_truth', False):
-            n_dpe = n_dpe_bot = 0
-        else:
-            n_dpe = getattr(pulse, '_n_double_pe', 0)
-            n_dpe_bot = getattr(pulse, '_n_double_pe_bot', 0)
-        tb['n_photon'] += n_dpe
+
+        n_dpe = getattr(pulse, '_n_double_pe', 0)
+        n_dpe_bot = getattr(pulse, '_n_double_pe_bot', 0)
+            
         tb['n_photon'] -= np.sum(np.isin(channels, getattr(pulse, 'turned_off_pmts', [])))
+        tb['n_pe'] += tb['n_photon']+n_dpe
         # this turned_off guy, check how this works with a config['turned_off_guys']
         channels_bottom = list(
             set(self.config['channels_bottom']).difference(getattr(pulse, 'turned_off_pmts', [])))
         tb['n_photon_bottom'] = (
-            np.sum(np.isin(channels, channels_bottom))
-            + n_dpe_bot)
+            np.sum(np.isin(channels, channels_bottom)))
+        tb['n_pe_bottom'] = tb['n_photon_bottom'] + n_dpe_bot
 
         # Summarize the instruction cluster in one row of the truth file
         for field in instruction.dtype.names:
