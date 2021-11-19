@@ -1,11 +1,11 @@
 import logging
 from numba import njit
 import numpy as np
+from scipy.stats import skewnorm
 from strax import exporter
 from .pulse import Pulse
 from .. import units
 from ..load_resource import DummyMap
-
 
 export, __all__ = exporter()
 logging.basicConfig(handlers=[logging.StreamHandler()])
@@ -441,7 +441,9 @@ class S2(Pulse):
             return _photon_timings, _photon_channels
 
         aft = config['s2_mean_area_fraction_top']
-        aft_random = config.get('randomize_fraction_of_s2_top_array_photons', 0)
+        aft_random = config.get('randomize_fraction_of_s2_top_array_photons', 0.0118)
+        aft_skewness = config.get('s2_aft_skewness', -1.433)
+
         channels = np.arange(config['n_tpc_pmts']).astype(np.int64)
         top_index = np.arange(config['n_top_pmts'])
         bottom_index = np.array(config['channels_bottom'])
@@ -469,7 +471,9 @@ class S2(Pulse):
             pat = pattern[unique_i]  # [pmt]
 
             if aft > 0:  # Redistribute pattern with user specified aft
-                _aft = aft * (1 + np.random.normal(0, aft_random))
+                _aft = aft * (1 + skewnorm.rvs(loc=0,
+                                               scale=aft_random,
+                                               a=aft_skewness))
                 _aft = np.clip(_aft, 0, 1)
                 pat[top_index] = pat[top_index] / pat[top_index].sum() * _aft
                 pat[bottom_index] = pat[bottom_index] / pat[bottom_index].sum() * (1 - _aft)

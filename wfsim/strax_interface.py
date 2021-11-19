@@ -434,32 +434,32 @@ class ChunkRawRecords(object):
 
 
 @strax.takes_config(
-    strax.Option('detector', default='XENONnT', track=True),
-    strax.Option('event_rate', default=1000, track=False,
+    strax.Option('detector', default='XENONnT', track=True, infer_type=False),
+    strax.Option('event_rate', default=1000, track=False, infer_type=False,
                  help="Average number of events per second"),
-    strax.Option('chunk_size', default=100, track=False,
+    strax.Option('chunk_size', default=100, track=False, infer_type=False,
                  help="Duration of each chunk in seconds"),
-    strax.Option('n_chunk', default=10, track=False,
+    strax.Option('n_chunk', default=10, track=False, infer_type=False,
                  help="Number of chunks to simulate"),
-    strax.Option('fax_file', default=None, track=False,
+    strax.Option('fax_file', default=None, track=False, infer_type=False,
                  help="Directory with fax instructions"), 
     strax.Option('fax_config', default='fax_config_nt_design.json'),
-    strax.Option('fax_config_override', default=None,
+    strax.Option('fax_config_override', default=None, infer_type=False,
                  help="Dictionary with configuration option overrides"),
-    strax.Option('fax_config_override_from_cmt', default=None,
+    strax.Option('fax_config_override_from_cmt', default=None, infer_type=False,
                  help="Dictionary of fax parameter names (key) mapped to CMT config names (value)"
                       "where the fax parameter values will be replaced by CMT"),
-    strax.Option('gain_model_mc', default=('to_pe_per_run', 'to_pe_nt.npy'),
+    strax.Option('gain_model_mc', default=('to_pe_per_run', 'to_pe_nt.npy'), infer_type=False,
                  help='PMT gain model. Specify as (model_type, model_config).'),
     strax.Option('channel_map', track=False, type=immutabledict,
                  help="immutabledict mapping subdetector to (min, max) "
                       "channel number. Provided by context"),
-    strax.Option('n_tpc_pmts', track=False,
+    strax.Option('n_tpc_pmts', track=False, infer_type=False,
                  help="Number of pmts in tpc. Provided by context"),
-    strax.Option('n_top_pmts', track=False,
+    strax.Option('n_top_pmts', track=False, infer_type=False,
                  help="Number of pmts in top array. Provided by context"),
-    strax.Option('right_raw_extension', default=100000),
-    strax.Option('seed', default=False, track=False,
+    strax.Option('right_raw_extension', default=100000, infer_type=False),
+    strax.Option('seed', default=False, track=False, infer_type=False,
                  help="Option for setting the seed of the random number generator used for"
                       "generation of the instructions"),
 )
@@ -652,17 +652,17 @@ class RawRecordsFromFaxOpticalNT(RawRecordsFromFaxNT):
     
 @export
 @strax.takes_config(
-    strax.Option('epix_config', track=False, default={},
+    strax.Option('epix_config', track=False, default={}, infer_type=False,
                  help='Dict with epix configuration'),
-    strax.Option('entry_start', default=0, track=False,),
-    strax.Option('entry_stop', default=None, track=False,
+    strax.Option('entry_start', default=0, track=False, infer_type=False,),
+    strax.Option('entry_stop', default=None, track=False, infer_type=False,
                  help='G4 id event number to stop at. If -1 process the entire file'),
-    strax.Option('fax_config_nveto', default=None, track=True,),
-    strax.Option('fax_config_override_nveto', default=None, track=True,
+    strax.Option('fax_config_nveto', default=None, track=True, infer_type=False,),
+    strax.Option('fax_config_override_nveto', default=None, track=True, infer_type=False,
                  help='Dictionary with configuration option overrides'),
-    strax.Option('gain_model_nv', track=True,
+    strax.Option('gain_model_nv', track=True, infer_type=False,
                  help='nveto gain model, provided by context'),
-    strax.Option('targets', default=('tpc',), track=False,
+    strax.Option('targets', default=('tpc',), track=False, infer_type=False,
                  help='tuple with what data to simulate (tpc, nveto or both)')
 )
 class RawRecordsFromMcChain(SimulatorPlugin):
