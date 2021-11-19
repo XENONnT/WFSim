@@ -341,11 +341,9 @@ class RawData(object):
                 * self.config['sample_duration']
 
         channels = getattr(pulse, '_photon_channels', [])
-        if self.config.get('exclude_dpe_in_truth', False):
-            n_dpe = n_dpe_bot = 0
-        else:
-            n_dpe = getattr(pulse, '_n_double_pe', 0)
-            n_dpe_bot = getattr(pulse, '_n_double_pe_bot', 0)
+
+        n_dpe = getattr(pulse, '_n_double_pe', 0)
+        n_dpe_bot = getattr(pulse, '_n_double_pe_bot', 0)
             
         tb['n_photon'] -= np.sum(np.isin(channels, getattr(pulse, 'turned_off_pmts', [])))
         tb['n_pe'] += tb['n_photon']+n_dpe
