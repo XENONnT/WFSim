@@ -1,3 +1,15 @@
+v0.5.10 / 2021-11-19
+====================
+* Add n_pe to truth (#246)
+* Fix nVeto dtypes handling in McChain (#262)
+* Add infer_type=False to all strax.Options (#265)
+* Bump straxen (#267)
+* Skewed Gaussian for S2 AFT (#260) 
+* Add zenodo badge (#259) 
+* Field distortion and transverse diffusion map (#235)
+* Remove deprecated config options (#247) 
+* Run with latest strax(en) (#245)
+
 v0.5.9 / 2021-10-29
 ===================
 * Load MC pattern map if no data-driven LCE map provided (#241)
