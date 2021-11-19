@@ -857,8 +857,9 @@ class RawRecordsFromMcChain(SimulatorPlugin):
         exist_tpc_result, exist_nveto_result = False, False
         for data_type in self.provides:
             if 'nv' in data_type:
-                if len(result_nv[data_type.strip('_nv')]) > 0:
-                    exist_nveto_result = True
+                if 'nveto' in self.config['targets']:
+                    if len(result_nv[data_type.strip('_nv')]) > 0:
+                        exist_nveto_result = True
             else:
                 if len(result[data_type]) > 0:
                     exist_tpc_result = True
