@@ -1,11 +1,11 @@
 import logging
 from numba import njit
 import numpy as np
+from scipy.stats import skewnorm
 from strax import exporter
 from .pulse import Pulse
 from .. import units
 from ..load_resource import DummyMap
-
 
 export, __all__ = exporter()
 logging.basicConfig(handlers=[logging.StreamHandler()])
@@ -16,7 +16,7 @@ log.setLevel('WARNING')
 @export
 class S2(Pulse):
     """
-    Given temperal inputs as well as number of electrons
+    Given temporal inputs as well as number of electrons
     Random generate photon timing and channel distribution.
     """
 
@@ -35,8 +35,11 @@ class S2(Pulse):
             np.array(v).reshape(-1) for v in zip(*instruction)]
         
         # Reverse engineerring FDC
-        if self.config['field_distortion_on']:
-            z_obs, positions = self.inverse_field_distortion(x, y, z, resource=self.resource)
+        if self.config['field_distortion_model'] == 'inverse_fdc':
+            z_obs, positions = self.inverse_field_distortion_correction(x, y, z, resource=self.resource)
+        # Reverse engineerring FDC
+        elif self.config['field_distortion_model'] == 'comsol':
+            z_obs, positions = self.field_distortion_comsol(x, y, z, resource=self.resource)
         else:
             z_obs, positions = z, np.array([x, y]).T
 
@@ -83,7 +86,7 @@ class S2(Pulse):
             drift_velocity_liquid *= 1e-4  # cm/ns
         else:
             drift_velocity_liquid = config['drift_velocity_liquid']
-
+            
         if config['enable_field_dependencies']['diffusion_longitudinal_map']:
             diffusion_constant_longitudinal = resource.field_dependencies_map(z_obs, positions, map_name='diffusion_longitudinal_map')  # cm²/s
             diffusion_constant_longitudinal *= 1e-9  # cm²/ns
@@ -135,7 +138,7 @@ class S2(Pulse):
                                               config['electron_lifetime_liquid'])
         cy = config['electron_extraction_yield'] * electron_lifetime_correction
 
-        # Remove electrons in insensitive volumne
+        # Remove electrons in insensitive volume
         if config['enable_field_dependencies']['survival_probability_map']:
             survival_probability = resource.field_dependencies_map(z_obs, positions, map_name='survival_probability_map')
             cy *= survival_probability
@@ -146,8 +149,8 @@ class S2(Pulse):
         return n_electron
 
     @staticmethod
-    def inverse_field_distortion(x, y, z, resource):
-        """For 1T the pattern map is a data driven one so we need to reverse engineer field distortion
+    def inverse_field_distortion_correction(x, y, z, resource):
+        """For 1T the pattern map is a data driven one so we need to reverse engineer field distortion correction
         into the simulated positions
         :param x: 1d array of float
         :param y: 1d array of float
@@ -170,7 +173,25 @@ class S2(Pulse):
 
         positions = np.array([x_obs, y_obs]).T 
         return z_obs, positions
-
+    
+    @staticmethod
+    def field_distortion_comsol(x, y, z, resource):
+        """Field distortion from the COMSOL simulation for the given electrode configuration:
+        :param x: 1d array of float
+        :param y: 1d array of float
+        :param z: 1d array of float
+        :param resource: instance of resource class
+        returns z: 1d array, postions 2d array 
+        """
+        positions = np.array([np.sqrt(x**2 + y**2), z]).T
+        theta = np.arctan2(y, x)
+        r_obs = resource.fd_comsol(positions, map_name='r_distortion_map')
+        x_obs = r_obs * np.cos(theta)
+        y_obs = r_obs * np.sin(theta)
+        
+        positions = np.array([x_obs, y_obs]).T 
+        return z, positions
+    
     @staticmethod
     @njit
     def _luminescence_timings_simple(n, dG, E0, r, dr, rr, alpha, uE, p, n_photons):
@@ -272,7 +293,7 @@ class S2(Pulse):
         :param n_electron:1 d array of ints
         :param drift_time_mean: 1d array of floats
         :param drift_time_spread: 1d array of floats
-        :param sc_gain: secondairy scintallation gain       
+        :param sc_gain: secondary scintillation gain       
         :param timings: empty array with length sum(n_electron)
         :param gains: empty array with length sum(n_electron)
         :param electron_trapping_time: configuration values
@@ -355,17 +376,34 @@ class S2(Pulse):
         :param config: dict of the wfsim config
         :param resource: instance of the resource class
         """
-        drift_time_gate = config['drift_time_gate']
-        drift_velocity_liquid = config['drift_velocity_liquid']
-        diffusion_constant_transverse = getattr(config, 'diffusion_constant_transverse', 0)
-
         assert all(z < 0), 'All S2 in liquid should have z < 0'
+        
+        if config['enable_field_dependencies']['drift_speed_map']:
+            drift_velocity_liquid = resource.field_dependencies_map(z, xy, map_name='drift_speed_map')  # mm/µs
+            drift_velocity_liquid *= 1e-4  # cm/ns
+        else:
+            drift_velocity_liquid = config['drift_velocity_liquid']
+            
+        if config['enable_field_dependencies']['diffusion_transverse_map']:
+            diffusion_constant_radial = resource.field_dependencies_map(z, xy, map_name='diffusion_radial_map')  # cm²/s
+            diffusion_constant_azimuthal = resource.field_dependencies_map(z, xy, map_name='diffusion_azimuthal_map') # cm²/s
+            diffusion_constant_radial *= 1e-9  # cm²/ns
+            diffusion_constant_azimuthal *= 1e-9  # cm²/ns
+        else:
+            diffusion_constant_transverse = getattr(config, 'diffusion_constant_transverse', 0)
+            diffusion_constant_radial = diffusion_constant_transverse
+            diffusion_constant_azimuthal = diffusion_constant_transverse
 
-        drift_time_mean = - z / drift_velocity_liquid + drift_time_gate  # Add gate time for consistancy?
-        hdiff_stdev = np.sqrt(2 * diffusion_constant_transverse * drift_time_mean)
-
-        hdiff = np.random.normal(0, 1, (np.sum(n_electron), 2)) * \
-            np.repeat(hdiff_stdev, n_electron, axis=0).reshape((-1, 1))
+        drift_time_mean = - z / drift_velocity_liquid
+        hdiff_stdev_radial = np.sqrt(2 * diffusion_constant_radial * drift_time_mean)
+        hdiff_stdev_azimuthal = np.sqrt(2 * diffusion_constant_azimuthal * drift_time_mean)
+        
+        hdiff_radial = np.random.normal(0, 1, np.sum(n_electron)) * np.repeat(hdiff_stdev_radial, n_electron, axis=0)
+        hdiff_azimuthal = np.random.normal(0, 1, np.sum(n_electron)) * np.repeat(hdiff_stdev_azimuthal, n_electron, axis=0)
+        hdiff = np.column_stack([hdiff_radial, hdiff_azimuthal])
+        theta = np.arctan2(xy[:,1], xy[:,0])
+        matrix = np.array([[np.cos(theta), np.sin(theta)], [-np.sin(theta), np.cos(theta)]]).T
+        hdiff = np.vstack([(matrix[i] @ np.split(hdiff, np.cumsum(n_electron))[:-1][i].T).T for i in range(len(matrix))])
         # Should we also output this xy position in truth?
         xy_multi = np.repeat(xy, n_electron, axis=0) + hdiff  # One entry xy per electron
         # Remove points outside tpc, and the pattern will be the average inside tpc
@@ -403,7 +441,9 @@ class S2(Pulse):
             return _photon_timings, _photon_channels
 
         aft = config['s2_mean_area_fraction_top']
-        aft_random = config.get('randomize_fraction_of_s2_top_array_photons', 0)
+        aft_random = config.get('randomize_fraction_of_s2_top_array_photons', 0.0118)
+        aft_skewness = config.get('s2_aft_skewness', -1.433)
+
         channels = np.arange(config['n_tpc_pmts']).astype(np.int64)
         top_index = np.arange(config['n_top_pmts'])
         bottom_index = np.array(config['channels_bottom'])
@@ -431,7 +471,9 @@ class S2(Pulse):
             pat = pattern[unique_i]  # [pmt]
 
             if aft > 0:  # Redistribute pattern with user specified aft
-                _aft = aft * (1 + np.random.normal(0, aft_random))
+                _aft = aft * (1 + skewnorm.rvs(loc=0,
+                                               scale=aft_random,
+                                               a=aft_skewness))
                 _aft = np.clip(_aft, 0, 1)
                 pat[top_index] = pat[top_index] / pat[top_index].sum() * _aft
                 pat[bottom_index] = pat[bottom_index] / pat[bottom_index].sum() * (1 - _aft)

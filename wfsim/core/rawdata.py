@@ -331,6 +331,8 @@ class RawData(object):
                 tb[f't_first_{quantum}'] = np.nan
                 tb[f't_last_{quantum}'] = np.nan
                 tb[f't_sigma_{quantum}'] = np.nan
+                
+        self.get_mean_xy_electron(peak_type, instruction, tb)
         
         # Endtime is the end of the last pulse
         if np.isnan(tb['t_last_photon']):
@@ -367,6 +369,19 @@ class RawData(object):
 
         # Signal this row is now filled, so it won't be overwritten
         tb['fill'] = True
+        
+    def get_mean_xy_electron(self, peak_type, instruction, tb):
+        
+        if peak_type == 's2' and self.config.get('field_distortion_model', "none") in ['comsol', 'inverse_fdc']:
+            if self.config.get('field_distortion_model', "none") == 'comsol':
+                _, xy_tmp = self.pulses['s2'].field_distortion_comsol(instruction['x'], instruction['y'], instruction['z'], self.resource)
+            elif self.config.get('field_distortion_model', "none") == 'inverse_fdc':
+                _, xy_tmp = self.pulses['s2'].inverse_field_distortion_correction(instruction['x'], instruction['y'], instruction['z'], self.resource)
+            tb['x_mean_electron'] = np.mean(xy_tmp.T[0])
+            tb['y_mean_electron'] = np.mean(xy_tmp.T[1])
+        else:
+            tb['x_mean_electron'] = np.nan
+            tb['y_mean_electron'] = np.nan
 
     @staticmethod
     @njit

@@ -24,9 +24,9 @@ _cached_wavelength_to_qe_arr = {}
 instruction_dtype = [(('Waveform simulator event number.', 'event_number'), np.int32),
                      (('Quanta type (S1 photons or S2 electrons)', 'type'), np.int8),
                      (('Time of the interaction [ns]', 'time'), np.int64),
-                     (('X position of the cluster[cm]', 'x'), np.float32),
-                     (('Y position of the cluster[cm]', 'y'), np.float32),
-                     (('Z position of the cluster[cm]', 'z'), np.float32),
+                     (('X position of the cluster [cm]', 'x'), np.float32),
+                     (('Y position of the cluster [cm]', 'y'), np.float32),
+                     (('Z position of the cluster [cm]', 'z'), np.float32),
                      (('Number of quanta', 'amp'), np.int32),
                      (('Recoil type of interaction.', 'recoil'), np.int8),
                      (('Energy deposit of interaction', 'e_dep'), np.float32),
@@ -52,6 +52,8 @@ truth_extra_dtype = [
     (('Arrival time of the last photon [ns]', 't_last_photon'), np.float64),
     (('Mean time of the photons [ns]', 't_mean_photon'), np.float64),
     (('Standard deviation of photon arrival times [ns]', 't_sigma_photon'), np.float64),
+    (('X field-distorted mean position of the electrons [cm]', 'x_mean_electron'), np.float32),
+    (('Y field-distorted mean position of the electrons [cm]', 'y_mean_electron'), np.float32),
     (('Arrival time of the first electron [ns]', 't_first_electron'), np.float64),
     (('Arrival time of the last electron [ns]', 't_last_electron'), np.float64),
     (('Mean time of the electrons [ns]', 't_mean_electron'), np.float64),
@@ -434,32 +436,32 @@ class ChunkRawRecords(object):
 
 
 @strax.takes_config(
-    strax.Option('detector', default='XENONnT', track=True),
-    strax.Option('event_rate', default=1000, track=False,
+    strax.Option('detector', default='XENONnT', track=True, infer_type=False),
+    strax.Option('event_rate', default=1000, track=False, infer_type=False,
                  help="Average number of events per second"),
-    strax.Option('chunk_size', default=100, track=False,
+    strax.Option('chunk_size', default=100, track=False, infer_type=False,
                  help="Duration of each chunk in seconds"),
-    strax.Option('n_chunk', default=10, track=False,
+    strax.Option('n_chunk', default=10, track=False, infer_type=False,
                  help="Number of chunks to simulate"),
-    strax.Option('fax_file', default=None, track=False,
+    strax.Option('fax_file', default=None, track=False, infer_type=False,
                  help="Directory with fax instructions"), 
     strax.Option('fax_config', default='fax_config_nt_design.json'),
-    strax.Option('fax_config_override', default=None,
+    strax.Option('fax_config_override', default=None, infer_type=False,
                  help="Dictionary with configuration option overrides"),
-    strax.Option('fax_config_override_from_cmt', default=None,
+    strax.Option('fax_config_override_from_cmt', default=None, infer_type=False,
                  help="Dictionary of fax parameter names (key) mapped to CMT config names (value)"
                       "where the fax parameter values will be replaced by CMT"),
-    strax.Option('gain_model_mc', default=('to_pe_per_run', 'to_pe_nt.npy'),
+    strax.Option('gain_model_mc', default=('to_pe_per_run', 'to_pe_nt.npy'), infer_type=False,
                  help='PMT gain model. Specify as (model_type, model_config).'),
     strax.Option('channel_map', track=False, type=immutabledict,
                  help="immutabledict mapping subdetector to (min, max) "
                       "channel number. Provided by context"),
-    strax.Option('n_tpc_pmts', track=False,
+    strax.Option('n_tpc_pmts', track=False, infer_type=False,
                  help="Number of pmts in tpc. Provided by context"),
-    strax.Option('n_top_pmts', track=False,
+    strax.Option('n_top_pmts', track=False, infer_type=False,
                  help="Number of pmts in top array. Provided by context"),
-    strax.Option('right_raw_extension', default=100000),
-    strax.Option('seed', default=False, track=False,
+    strax.Option('right_raw_extension', default=100000, infer_type=False),
+    strax.Option('seed', default=False, track=False, infer_type=False,
                  help="Option for setting the seed of the random number generator used for"
                       "generation of the instructions"),
 )
@@ -491,6 +493,10 @@ class SimulatorPlugin(strax.Plugin):
         overrides = self.config['fax_config_override']
         if overrides is not None:
             self.config.update(overrides)
+            
+        # backwards compatibility
+        if 'field_distortion_on' in self.config and not 'field_distortion_model' in self.config:
+            self.config.update({'field_distortion_model': "inverse_fdc" if self.config['field_distortion_on'] else "none"})
 
         # Update gains to the nT defaults
         self.to_pe = straxen.get_correction_from_cmt(self.run_id,
@@ -648,17 +654,17 @@ class RawRecordsFromFaxOpticalNT(RawRecordsFromFaxNT):
     
 @export
 @strax.takes_config(
-    strax.Option('epix_config', track=False, default={},
+    strax.Option('epix_config', track=False, default={}, infer_type=False,
                  help='Dict with epix configuration'),
-    strax.Option('entry_start', default=0, track=False,),
-    strax.Option('entry_stop', default=None, track=False,
+    strax.Option('entry_start', default=0, track=False, infer_type=False,),
+    strax.Option('entry_stop', default=None, track=False, infer_type=False,
                  help='G4 id event number to stop at. If -1 process the entire file'),
-    strax.Option('fax_config_nveto', default=None, track=True,),
-    strax.Option('fax_config_override_nveto', default=None, track=True,
+    strax.Option('fax_config_nveto', default=None, track=True, infer_type=False,),
+    strax.Option('fax_config_override_nveto', default=None, track=True, infer_type=False,
                  help='Dictionary with configuration option overrides'),
-    strax.Option('gain_model_nv', track=True,
+    strax.Option('gain_model_nv', track=True, infer_type=False,
                  help='nveto gain model, provided by context'),
-    strax.Option('targets', default=('tpc',), track=False,
+    strax.Option('targets', default=('tpc',), track=False, infer_type=False,
                  help='tuple with what data to simulate (tpc, nveto or both)')
 )
 class RawRecordsFromMcChain(SimulatorPlugin):

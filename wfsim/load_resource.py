@@ -236,6 +236,7 @@ class Resource:
             #if there is a (data driven!) map, load it. If not make it  from the pattern map
             if files['s1_lce_correction_map']:
                 self.s1_lce_correction_map = make_map(files['s1_lce_correction_map'])
+
             else:
                 lymap = deepcopy(self.s1_pattern_map)
                 lymap.data['map'] = np.sum(lymap.data['map'][:][:][:], axis=3, keepdims=True)
@@ -251,8 +252,11 @@ class Resource:
                 liquid_level = min(liquid_level_available, key=lambda x: abs(x - liquid_level))
                 self.s2_luminescence = s2_luminescence_map[s2_luminescence_map['ll'] == liquid_level]
 
-            if config.get('field_distortion_on', False):
+            if config.get('field_distortion_model', "none") == "inverse_fdc":
                 self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
+
+            if config.get('field_distortion_model', "none") == "comsol":
+                self.fd_comsol = make_map(config['field_distortion_comsol_map'], fmt='json.gz', method='RectBivariateSpline')
 
             # Gas gap warping map
             if config.get('enable_gas_gap_warping', False):
@@ -262,7 +266,7 @@ class Resource:
             # Field dependencies 
             # This config entry a dictionary of 5 items
             if any(config['enable_field_dependencies'].values()):
-                field_dependencies_map = make_map(files['field_dependencies_map'], fmt='json.gz')
+                field_dependencies_map = make_map(files['field_dependencies_map'], fmt='json.gz', method='RectBivariateSpline')
 
                 def rz_map(z, xy, **kwargs):
                     r = np.sqrt(xy[:, 0]**2 + xy[:, 1]**2)
@@ -284,7 +288,6 @@ class Resource:
 
         elif config.get('detector', 'XENONnT') == 'XENONnT_neutron_veto':
             # Neutron veto PMT QE as function of wavelength
-            if config.get('neutron_veto', False):
                 self.nv_pmt_qe = straxen.get_resource(files['nv_pmt_qe'], fmt='json')
 
         # SPE area distributions
