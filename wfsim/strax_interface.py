@@ -730,6 +730,18 @@ class RawRecordsFromMcChain(SimulatorPlugin):
         self.g4id = np.unique(np.concatenate(self.g4id))
         self.set_timing()
 
+    def remove_offset(self, g4_index, times):
+        """Function to remove time offset for TPC only simulations"""
+        
+        new_times = times.copy()
+        idx_vals = np.unique(g4_index)
+        
+        for idx in idx_vals:
+            time_off = np.min(times[g4_index == idx])
+            new_times[g4_index == idx] -= time_off
+            
+        return new_times
+
     def set_timing(self,):
         """Set timing information in such a way to synchronize instructions for the TPC and nVeto"""
 
@@ -753,6 +765,12 @@ class RawRecordsFromMcChain(SimulatorPlugin):
         if 'tpc' in self.config['targets']:
             i_timings = np.searchsorted(np.arange(self.config['entry_start'], self.config['entry_stop']),
                                         self.instructions_epix['g4id'])
+
+            if 'nveto' not in self.config['targets']:
+                log.warning("nVeto not simulated. Remove time offset for epix instructions")
+                self.instructions_epix['time'] = self.remove_offset(self.instructions_epix['g4id'],
+                                                                    self.instructions_epix['time'])
+            
             self.instructions_epix['time'] += timings[i_timings]
 
             extra_long = self.instructions_epix['time'] > max_time
