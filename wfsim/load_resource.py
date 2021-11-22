@@ -193,6 +193,7 @@ class Resource:
 
     def __init__(self, config=None):
         files = self.config_to_file(config)
+        pmt_mask = np.array(config['gains']) > 0  # Converted from to pe (from cmt by default)
         log.debug('Getting\n' + '\n'.join([f'{k}: {v}' for k, v in files.items()]))
 
         for k, v in files.items():
@@ -231,17 +232,27 @@ class Resource:
         elif config.get('detector', 'XENONnT') == 'XENONnT':
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='pkl')
-            self.s2_correction_map = make_map(files['s2_correction_map'])
 
-            #if there is a (data driven!) map, load it. If not make it  from the pattern map
+            # if there is a (data driven!) map, load it. If not make it  from the pattern map
             if files['s1_lce_correction_map']:
                 self.s1_lce_correction_map = make_map(files['s1_lce_correction_map'])
-
             else:
                 lymap = deepcopy(self.s1_pattern_map)
-                lymap.data['map'] = np.sum(lymap.data['map'][:][:][:], axis=3, keepdims=True)
+                lymap.data['map'] = np.sum(lymap.data['map'][:][:][:], axis=3, keepdims=True, where=pmt_mask)
                 lymap.__init__(lymap.data)
                 self.s1_lce_correction_map = lymap
+
+            # if there is a (data driven!) map, load it. If not make it  from the pattern map
+            if files['s2_correction_map']:
+                self.s2_correction_map = make_map(files['s2_correction_map'])
+            else:
+                s2cmap = deepcopy(self.s2_pattern_map)
+                # Lower the LCE by removing contribution from dead PMTs
+                s2cmap.data['map'] = np.sum(s2cmap.data['map'][:][:], axis=2, keepdims=True, where=pmt_mask)
+                # Scale by median value
+                s2cmap.data['map'] = s2cmap.data['map'] / np.median(s2cmap.data['map'][s2cmap.data['map'] > 0])
+                s2cmap.__init__(s2cmap.data)
+                self.s2_correction_map = s2cmap
 
             # Garfield luminescence timing samples
             if config.get('s2_luminescence_model', False) == 'garfield':

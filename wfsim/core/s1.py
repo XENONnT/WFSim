@@ -125,12 +125,11 @@ class S1(Pulse):
         ly = s1_lce_correction_map(positions)
         # depending on if you use the data driven or mc pattern map for light yield 
         #the shape of n_photon_hits will change. Mc needs a squeeze
-        if len(ly.shape)!=1:
-            ly=np.squeeze(ly,axis=-1)
+        if len(ly.shape) != 1:
+            ly = np.squeeze(ly, axis=-1)
         ly /= 1 + config['p_double_pe_emision']
         ly *= config['s1_detection_efficiency']
-        
-        
+
         n_photon_hits = np.random.binomial(n=n_photons, p=ly)
         
         return n_photon_hits
