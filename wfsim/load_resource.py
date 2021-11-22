@@ -193,7 +193,6 @@ class Resource:
 
     def __init__(self, config=None):
         files = self.config_to_file(config)
-        pmt_mask = np.array(config['gains']) > 0  # Converted from to pe (from cmt by default)
         log.debug('Getting\n' + '\n'.join([f'{k}: {v}' for k, v in files.items()]))
 
         for k, v in files.items():
@@ -230,6 +229,8 @@ class Resource:
                 self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
 
         elif config.get('detector', 'XENONnT') == 'XENONnT':
+            pmt_mask = np.array(config['gains']) > 0  # Converted from to pe (from cmt by default)
+
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='pkl')
 
