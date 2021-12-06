@@ -69,7 +69,7 @@ class Pulse(object):
             if '_photon_gains' not in self.__dict__:
 
                 _channel_photon_gains = self.config['gains'][channel] \
-                    * self.uniform_to_pe_arr(np.random.random(len(_channel_photon_timings)))
+                    * self.uniform_to_pe_arr(np.random.random(len(_channel_photon_timings)), channel)
 
                 # Add some double photoelectron emission by adding another sampled gain
                 n_double_pe = np.random.binomial(len(_channel_photon_timings),
@@ -78,12 +78,9 @@ class Pulse(object):
                 if channel in self.config['channels_bottom']:
                     self._n_double_pe_bot += n_double_pe
 
-                if self.config['detector'] == 'XENON1T':
-                    _channel_photon_gains[:n_double_pe] += self.config['gains'][channel] \
-                        * self.uniform_to_pe_arr(np.random.random(n_double_pe), channel)
-                else:
-                    _channel_photon_gains[:n_double_pe] += self.config['gains'][channel] \
-                        * self.uniform_to_pe_arr(np.random.random(n_double_pe))
+                _channel_photon_gains[:n_double_pe] += self.config['gains'][channel] \
+                    * self.uniform_to_pe_arr(np.random.random(n_double_pe), channel)
+
             else:
                 _channel_photon_gains = np.array(self._photon_gains[self._photon_channels == channel])
 
