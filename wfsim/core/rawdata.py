@@ -342,19 +342,10 @@ class RawData(object):
                 (self.config['samples_before_pulse_center'] + self.config['samples_after_pulse_center'] + 1) \
                 * self.config['sample_duration']
 
-        channels = getattr(pulse, '_photon_channels', [])
-
-        n_dpe = getattr(pulse, '_n_double_pe', 0)
-        n_dpe_bot = getattr(pulse, '_n_double_pe_bot', 0)
-            
-        tb['n_photon'] -= np.sum(np.isin(channels, getattr(pulse, 'turned_off_pmts', [])))
-        tb['n_pe'] += tb['n_photon']+n_dpe
-        # this turned_off guy, check how this works with a config['turned_off_guys']
-        channels_bottom = list(
-            set(self.config['channels_bottom']).difference(getattr(pulse, 'turned_off_pmts', [])))
-        tb['n_photon_bottom'] = (
-            np.sum(np.isin(channels, channels_bottom)))
-        tb['n_pe_bottom'] = tb['n_photon_bottom'] + n_dpe_bot
+        # Copy single valued fields directly from pulse class
+        for field in ['n_pe', 'n_pe_trigger', 'n_photon', 'n_photon_trigger', 'raw_area']:
+            for suffix in ['', '_bottom']:
+                tb[field+suffix] = getattr(pulse, '_' + field + suffix, 0)
 
         # Summarize the instruction cluster in one row of the truth file
         for field in instruction.dtype.names:
