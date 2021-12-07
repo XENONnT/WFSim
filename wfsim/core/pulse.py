@@ -61,6 +61,7 @@ class Pulse(object):
         self._n_photon_trigger = self._n_photon_trigger_bottom = 0
         self._n_pe_trigger = self._n_pe_trigger_bottom = 0
         self._raw_area = self._raw_area_bottom = 0
+        self._raw_area_trigger = self._raw_area_trigger_bottom = 0
 
         counts_start = 0  # Secondary loop index for assigning channel
         for channel, counts in zip(*np.unique(self._photon_channels, return_counts=True)):

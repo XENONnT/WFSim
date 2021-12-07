@@ -343,7 +343,7 @@ class RawData(object):
                 * self.config['sample_duration']
 
         # Copy single valued fields directly from pulse class
-        for field in ['n_pe', 'n_pe_trigger', 'n_photon', 'n_photon_trigger', 'raw_area']:
+        for field in ['n_pe', 'n_pe_trigger', 'n_photon', 'n_photon_trigger', 'raw_area', 'raw_area_trigger']:
             for suffix in ['', '_bottom']:
                 tb[field+suffix] = getattr(pulse, '_' + field + suffix, 0)
 
