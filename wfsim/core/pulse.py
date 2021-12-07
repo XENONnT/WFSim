@@ -230,13 +230,15 @@ class Pulse(object):
         above_threshold = photon_gains * self.current_max[reminder] * self.current_2_adc > threshold
         trigger_photon = np.sum(above_threshold)
         trigger_dpe = np.sum(above_threshold[:n_double_pe])
-        raw_area = np.sum(photon_gains[above_threshold]) / self.config['gains'][channel]
+        raw_area = np.sum(photon_gains) / self.config['gains'][channel]
+        trigger_raw_area = np.sum(photon_gains[above_threshold]) / self.config['gains'][channel]
 
         self._n_photon += len(photon_timings)
         self._n_pe += len(photon_timings) + n_double_pe
         self._n_photon_trigger += trigger_photon
         self._n_pe_trigger += trigger_photon + trigger_dpe
         self._raw_area += raw_area
+        self._raw_area_trigger += trigger_raw_area
 
         if channel in self.config['channels_bottom']:
             self._n_photon_bottom += len(photon_timings)
@@ -244,6 +246,7 @@ class Pulse(object):
             self._n_photon_trigger_bottom += trigger_photon
             self._n_pe_trigger_bottom += trigger_photon + trigger_dpe
             self._raw_area_bottom += raw_area
+            self._raw_area_trigger_bottom += trigger_raw_area
 
     def clear_pulse_cache(self):
         self._pulses = []
