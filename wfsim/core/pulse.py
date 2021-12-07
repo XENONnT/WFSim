@@ -216,8 +216,8 @@ class Pulse(object):
                   dt,
                   channel,
                   n_double_pe,
-                 ):
-
+                  ):
+        """Add required information to the fields used for the truth information"""
         if channel in self.config['turned_off_pmts']:
             return
 
