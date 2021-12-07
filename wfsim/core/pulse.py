@@ -293,17 +293,6 @@ class Pulse(object):
             pmt_current_templates[reminder] * gain_total
 
     @staticmethod
-    def hit_above_threshold(photon_timings,
-                            photon_gains,
-                            dt,
-                            pmt_current_templates,
-                            config,):
-
-        reminder = int(photon_timings % dt)
-
-
-
-    @staticmethod
     def singlet_triplet_delays(size, singlet_ratio, config, phase):
         """
         Given the amount of the excimer, return time between excimer decay
