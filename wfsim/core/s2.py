@@ -447,7 +447,7 @@ class S2(Pulse):
             return _photon_timings, _photon_channels
 
         aft = config['s2_mean_area_fraction_top']
-        aft_random = config.get('randomize_fraction_of_s2_top_array_photons', 0.0118)
+        aft_sigma = config.get('s2_aft_sigma', 0.0118)
         aft_skewness = config.get('s2_aft_skewness', -1.433)
 
         channels = np.arange(config['n_tpc_pmts']).astype(np.int64)
@@ -478,7 +478,7 @@ class S2(Pulse):
 
             if aft > 0:  # Redistribute pattern with user specified aft
                 _aft = aft * (1 + skewnorm.rvs(loc=0,
-                                               scale=aft_random,
+                                               scale=aft_sigma,
                                                a=aft_skewness))
                 _aft = np.clip(_aft, 0, 1)
                 pat[top_index] = pat[top_index] / pat[top_index].sum() * _aft
