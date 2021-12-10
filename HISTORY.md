@@ -1,3 +1,9 @@
+v0.5.12 / 2021-12-10
+====================
+* Rename s2_aft_sigma config (#284)
+* SPE spec bug fix, adding trigger truth (#283)
+* Pin pymongo (#282)
+
 v0.5.11 / 2021-11-24
 ====================
 * Recompute lce on the run (#269)
