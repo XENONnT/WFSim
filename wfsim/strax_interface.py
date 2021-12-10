@@ -43,11 +43,19 @@ optical_extra_dtype = [(('first optical input index', '_first'), np.int32),
 
 truth_extra_dtype = [
     (('End time of the interaction [ns]', 'endtime'), np.int64),
-    (('Number of simulated electrons', 'n_electron'), np.float64),
-    (('Number of detected photons', 'n_photon'), np.float64),
-    (('Number of detected photoelectrons(n_photons+dpe)', 'n_pe'), np.float64),
-    (('number of photons detected in bottom array', 'n_photon_bottom'), np.float64),
-    (('number of photoelectrons detected in bottom array', 'n_pe_bottom'), np.float64),
+    (('Number of simulated electrons', 'n_electron'), np.int32),
+    (('Number of photons reaching PMT', 'n_photon'), np.int32),
+    (('Number of photons + dpe passing', 'n_pe'), np.int32),
+    (('Number of photons passing trigger', 'n_photon_trigger'), np.int32),
+    (('Number of photons + dpe passing trigger', 'n_pe_trigger'), np.int32),
+    (('Raw area in pe', 'raw_area'), np.float64),
+    (('Raw area in pe passing trigger', 'raw_area_trigger'), np.float64),
+    (('Number of photons reaching PMT (bottom)', 'n_photon_bottom'), np.int32),
+    (('Number of photons + dpe passing (bottom)', 'n_pe_bottom'), np.int32),
+    (('Number of photons passing trigger (bottom)', 'n_photon_trigger_bottom'), np.int32),
+    (('Number of photons + dpe passing trigger (bottom)', 'n_pe_trigger_bottom'), np.int32),
+    (('Raw area in pe (bottom)', 'raw_area_bottom'), np.float64),
+    (('Raw area in pe passing trigger (bottom)', 'raw_area_trigger_bottom'), np.float64),
     (('Arrival time of the first photon [ns]', 't_first_photon'), np.float64),
     (('Arrival time of the last photon [ns]', 't_last_photon'), np.float64),
     (('Mean time of the photons [ns]', 't_mean_photon'), np.float64),
@@ -522,7 +530,7 @@ class SimulatorPlugin(strax.Plugin):
         # Update some values stored in CMT
         if self.config['fax_config_override_from_cmt'] is not None:
             for fax_field, cmt_option in self.config['fax_config_override_from_cmt'].items():
-                if (fax_field in ['fdc_3d', 's1_light_yield_map']
+                if (fax_field in ['fdc_3d', 's1_lce_correction_map']
                     and self.config.get('default_reconstruction_algorithm', False)):
                     cmt_option = tuple(['suffix',
                                         self.config['default_reconstruction_algorithm'],

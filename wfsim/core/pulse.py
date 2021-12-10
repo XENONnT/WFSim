@@ -29,7 +29,11 @@ class Pulse(object):
         self.init_pmt_current_templates()
         self.init_spe_scaling_factor_distributions()
         self.config['turned_off_pmts'] = np.arange(len(config['gains']))[np.array(config['gains']) == 0]
-        
+        self.current_max = np.max(np.array(self._pmt_current_templates), axis=1)
+        self.current_2_adc = self.config['pmt_circuit_load_resistor'] \
+            * self.config['external_amplification'] \
+            / (self.config['digitizer_voltage_range'] / 2 ** (self.config['digitizer_bits']))
+
         self.clear_pulse_cache()
 
     def __call__(self, *args):
@@ -52,7 +56,12 @@ class Pulse(object):
                                                      len(self._photon_timings)).astype(np.int64)
 
         dt = self.config.get('sample_duration', 10)  # Getting dt from the lib just once
-        self._n_double_pe = self._n_double_pe_bot = 0  # For truth aft output
+        self._n_photon = self._n_photon_bottom = 0  # For truth output
+        self._n_pe = self._n_pe_bottom = 0
+        self._n_photon_trigger = self._n_photon_trigger_bottom = 0
+        self._n_pe_trigger = self._n_pe_trigger_bottom = 0
+        self._raw_area = self._raw_area_bottom = 0
+        self._raw_area_trigger = self._raw_area_trigger_bottom = 0
 
         counts_start = 0  # Secondary loop index for assigning channel
         for channel, counts in zip(*np.unique(self._photon_channels, return_counts=True)):
@@ -69,23 +78,26 @@ class Pulse(object):
             if '_photon_gains' not in self.__dict__:
 
                 _channel_photon_gains = self.config['gains'][channel] \
-                    * self.uniform_to_pe_arr(np.random.random(len(_channel_photon_timings)))
+                    * self.uniform_to_pe_arr(np.random.random(len(_channel_photon_timings)), channel)
 
                 # Add some double photoelectron emission by adding another sampled gain
                 n_double_pe = np.random.binomial(len(_channel_photon_timings),
                                                  p=self.config['p_double_pe_emision'])
-                self._n_double_pe += n_double_pe
-                if channel in self.config['channels_bottom']:
-                    self._n_double_pe_bot += n_double_pe
 
-                if self.config['detector'] == 'XENON1T':
-                    _channel_photon_gains[:n_double_pe] += self.config['gains'][channel] \
-                        * self.uniform_to_pe_arr(np.random.random(n_double_pe), channel)
-                else:
-                    _channel_photon_gains[:n_double_pe] += self.config['gains'][channel] \
-                        * self.uniform_to_pe_arr(np.random.random(n_double_pe))
+                _channel_photon_gains[:n_double_pe] += self.config['gains'][channel] \
+                    * self.uniform_to_pe_arr(np.random.random(n_double_pe), channel)
+
             else:
+                n_double_pe = 0
                 _channel_photon_gains = np.array(self._photon_gains[self._photon_channels == channel])
+
+            # += truth per channel to internal truth fields
+            self.add_truth(
+                _channel_photon_timings,
+                _channel_photon_gains,
+                dt,
+                channel,
+                n_double_pe,)
 
             # Build a simulated waveform, length depends on min and max of photon timings
             min_timing, max_timing = np.min(
@@ -198,6 +210,51 @@ class Pulse(object):
     def uniform_to_pe_arr(self, p, channel=0):
         indices = (p * 2000).astype(np.int64) + 1
         return self.__uniform_to_pe_arr[channel, indices]
+
+    def add_truth(self,
+                  photon_timings,
+                  photon_gains,
+                  dt,
+                  channel,
+                  n_double_pe,
+                  ):
+        """Add required information to the fields used for the truth information"""
+        if channel in self.config['turned_off_pmts']:
+            return
+
+        if str(channel) in self.config.get('special_thresholds', {}):
+            threshold = self.config['special_thresholds'][str(channel)] - 0.5
+        else:
+            threshold = self.config['zle_threshold'] - 0.5
+        # Figure out if we were above threshold
+        # - Current max is the highest value in the SPE pulse model given a
+        #   remainder [0-9] ns (offset from 10 ns sample time).
+        #   The SPE pulse model sums up to 0.1 (pe/ns), and the peak is ~0.03 (pe/ns)
+        # - Multiply this by the sampled gain of each photon, we get (electron/ns)
+        # - The current_2_adc take into account n_electron -> current -> voltage
+        #   -> amplification -> digitization, converting the electron/ns to adc value.
+        remainder = (photon_timings % dt).astype(int)
+        max_amplitude_adc = photon_gains * self.current_max[remainder] * self.current_2_adc
+        above_threshold = max_amplitude_adc > threshold
+        trigger_photon = np.sum(above_threshold)
+        trigger_dpe = np.sum(above_threshold[:n_double_pe])
+        raw_area = np.sum(photon_gains) / self.config['gains'][channel]
+        trigger_raw_area = np.sum(photon_gains[above_threshold]) / self.config['gains'][channel]
+
+        self._n_photon += len(photon_timings)
+        self._n_pe += len(photon_timings) + n_double_pe
+        self._n_photon_trigger += trigger_photon
+        self._n_pe_trigger += trigger_photon + trigger_dpe
+        self._raw_area += raw_area
+        self._raw_area_trigger += trigger_raw_area
+
+        if channel in self.config['channels_bottom']:
+            self._n_photon_bottom += len(photon_timings)
+            self._n_pe_bottom += len(photon_timings) + n_double_pe
+            self._n_photon_trigger_bottom += trigger_photon
+            self._n_pe_trigger_bottom += trigger_photon + trigger_dpe
+            self._raw_area_bottom += raw_area
+            self._raw_area_trigger_bottom += trigger_raw_area
 
     def clear_pulse_cache(self):
         self._pulses = []
