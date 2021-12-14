@@ -226,9 +226,16 @@ class Pulse(object):
             threshold = self.config['special_thresholds'][str(channel)] - 0.5
         else:
             threshold = self.config['zle_threshold'] - 0.5
-
-        reminder = (photon_timings % dt).astype(int)
-        above_threshold = photon_gains * self.current_max[reminder] * self.current_2_adc > threshold
+        # Figure out if we were above threshold
+        # - Current max is the highest value in the SPE pulse model given a
+        #   remainder [0-9] ns (offset from 10 ns sample time).
+        #   The SPE pulse model sums up to 0.1 (pe/ns), and the peak is ~0.03 (pe/ns)
+        # - Multiply this by the sampled gain of each photon, we get (electron/ns)
+        # - The current_2_adc take into account n_electron -> current -> voltage
+        #   -> amplification -> digitization, converting the electron/ns to adc value.
+        remainder = (photon_timings % dt).astype(int)
+        max_amplitude_adc = photon_gains * self.current_max[remainder] * self.current_2_adc
+        above_threshold = max_amplitude_adc > threshold
         trigger_photon = np.sum(above_threshold)
         trigger_dpe = np.sum(above_threshold[:n_double_pe])
         raw_area = np.sum(photon_gains) / self.config['gains'][channel]
