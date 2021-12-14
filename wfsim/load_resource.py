@@ -266,7 +266,7 @@ class Resource:
 
             if config.get('field_distortion_model', "none") == "inverse_fdc":
                 self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
-                self.fdc_3d.scale_coordinates([1., 1., - self.config['drift_velocity_liquid']])
+                self.fdc_3d.scale_coordinates([1., 1., - config['drift_velocity_liquid']])
 
             if config.get('field_distortion_model', "none") == "comsol":
                 self.fd_comsol = make_map(config['field_distortion_comsol_map'], fmt='json.gz', method='RectBivariateSpline')
