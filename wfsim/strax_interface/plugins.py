@@ -234,10 +234,10 @@ def _read_optical_nveto(config, events, mask):
 
 @export
 def read_optical(config):
-    """Function will be executed when wfsim in run in optical mode. This function expects c['fax_file'] 
+    """Function will be executed when wfsim in run in optical mode. This function expects c['instructions_file'] 
     to be a root file from optical mc
     :params config: wfsim configuration dict"""
-    data = uproot.open(config['fax_file'])
+    data = uproot.open(config['instructions_file'])
     try:
         events = data.get('events')
     except AttributeError:
@@ -453,7 +453,7 @@ class ChunkRawRecords(object):
                  help="Duration of each chunk in seconds"),
     strax.Option('n_chunk', default=10, track=False, infer_type=False,
                  help="Number of chunks to simulate"),
-    strax.Option('fax_file', default=None, track=False, infer_type=False,
+    strax.Option('instructions_file', default=None, track=False, infer_type=False,
                  help="Directory with fax instructions"), 
     strax.Option('gain_model_mc', default=('to_pe_per_run', 'to_pe_nt.npy'), infer_type=False,
                  help='PMT gain model. Specify as (model_type, model_config).'),
@@ -494,48 +494,34 @@ class SimulatorPlugin(strax.Plugin):
         self._setup()
 
     def set_config(self,):
-        self.config.update(straxen.get_resource(self.config['fax_config'], fmt='json'))
-        overrides = self.config['fax_config_override']
-        if overrides is not None:
-            self.config.update(overrides)
-            
         # backwards compatibility
-        if 'field_distortion_on' in self.config and not 'field_distortion_model' in self.config:
-            self.config.update({'field_distortion_model': "inverse_fdc" if self.config['field_distortion_on'] else "none"})
+        config = {k: v.replace('fax_', '') for k,v in self.config.items()}
+
+        if 'field_distortion_on' in config and not 'field_distortion_model' in config:
+            config.update({'field_distortion_model': "inverse_fdc" if config['field_distortion_on'] else "none"})
 
         # Update gains to the nT defaults
         self.to_pe = straxen.get_correction_from_cmt(self.run_id,
-                               self.config['gain_model_mc'])
+                               config['gain_model_mc'])
 
-        adc_2_current = (self.config['digitizer_voltage_range']
-                         / 2 ** (self.config['digitizer_bits'])
-                         / self.config['pmt_circuit_load_resistor'])
+        adc_2_current = (config['digitizer_voltage_range']
+                         / 2 ** (config['digitizer_bits'])
+                         / config['pmt_circuit_load_resistor'])
 
-        self.config['gains'] = np.divide(adc_2_current,
+        config['gains'] = np.divide(adc_2_current,
                                          self.to_pe,
                                          out=np.zeros_like(self.to_pe),
                                          where=self.to_pe != 0)
 
-        if self.config['seed']:
-            np.random.seed(self.config['seed'])
+        if config['seed']:
+            np.random.seed(config['seed'])
 
         # We hash the config to load resources. Channel map is immutable and cannot be hashed
-        self.config['channel_map'] = dict(self.config['channel_map'])
-        self.config['channel_map']['sum_signal'] = 800
-        self.config['channels_bottom'] = np.arange(self.config['n_top_pmts'], self.config['n_tpc_pmts'])
+        config['channel_map'] = dict(config['channel_map'])
+        config['channel_map']['sum_signal'] = 800
+        config['channels_bottom'] = np.arange(config['n_top_pmts'], config['n_tpc_pmts'])
 
-        # Update some values stored in CMT
-        if self.config['fax_config_override_from_cmt'] is not None:
-            for fax_field, cmt_option in self.config['fax_config_override_from_cmt'].items():
-                if (fax_field in ['fdc_3d', 's1_lce_correction_map']
-                    and self.config.get('default_reconstruction_algorithm', False)):
-                    cmt_option = tuple(['suffix',
-                                        self.config['default_reconstruction_algorithm'],
-                                        *cmt_option])
-
-                cmt_value = straxen.get_correction_from_cmt(self.run_id, cmt_option)
-                log.warning(f'Replacing {fax_field} with CMT option {cmt_option} to {cmt_value}')
-                self.config[fax_field] = cmt_value
+        self.fax_config = config
 
     def _setup(self):
         # Set in inheriting class
@@ -594,19 +580,19 @@ class RawRecordsFromFaxNT(SimulatorPlugin):
         self.sim_iter = self.sim(self.instructions)
 
     def get_instructions(self):
-        if self.config['fax_file']:
-            assert not self.config['fax_file'].endswith('root'), 'None optical g4 input is deprecated use EPIX instead'
-            assert self.config['fax_file'].endswith('csv'), 'Only csv input is supported'
-            self.instructions = instruction_from_csv(self.config['fax_file'])
+        if self.config['instructions_file']:
+            assert not self.config['instructions_file'].endswith('root'), 'None optical g4 input is deprecated use EPIX instead'
+            assert self.config['instructions_file'].endswith('csv'), 'Only csv input is supported'
+            self.instructions = instruction_from_csv(self.config['instructions_file'])
         else:
-            self.instructions = rand_instructions(self.config)
+            self.instructions = rand_instructions(self.fax_config)
 
     def check_instructions(self):
         # Let below cathode S1 instructions pass but remove S2 instructions
-        m = (self.instructions['z'] < - self.config['tpc_length']) & (self.instructions['type'] == 2)
+        m = (self.instructions['z'] < - self.fax_config['tpc_length']) & (self.instructions['type'] == 2)
         self.instructions = self.instructions[~m]
 
-        assert np.all(self.instructions['x']**2 + self.instructions['y']**2 < self.config['tpc_radius']**2), \
+        assert np.all(self.instructions['x']**2 + self.instructions['y']**2 < self.fax_config['tpc_radius']**2), \
             "Interation is outside the TPC"
         assert np.all(self.instructions['z'] < 0.25), \
             "Interation is outside the TPC"
@@ -643,7 +629,7 @@ class RawRecordsFromFax1T(RawRecordsFromFaxNT):
 class RawRecordsFromFaxOpticalNT(RawRecordsFromFaxNT):
     
     def _setup(self):
-        self.sim = ChunkRawRecords(self.config,
+        self.sim = ChunkRawRecords(self.fax_config,
                                    rawdata_generator=wfsim.RawDataOptical,
                                    channels=self.channels,
                                    timings=self.timings,)
@@ -653,8 +639,8 @@ class RawRecordsFromFaxOpticalNT(RawRecordsFromFaxNT):
         
         
     def get_instructions(self):
-        assert self.config['fax_file'].endswith('.root'), 'You need to supply a root file for optical simulation!'
-        self.instructions, self.channels, self.timings = read_optical(self.config)
+        assert self.config['instructions_file'].endswith('.root'), 'You need to supply a root file for optical simulation!'
+        self.instructions, self.channels, self.timings = read_optical(self.fax_config)
         
     
 @export
@@ -680,7 +666,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
         super().set_config()
 
         if 'nveto' in self.config['targets']:
-            self.config_nveto = deepcopy(self.config)
+            self.config_nveto = deepcopy(self.fax_config)
             self.config_nveto.update(straxen.get_resource(self.config_nveto['fax_config_nveto'], fmt='json'))
             self.config_nveto['detector'] = 'XENONnT_neutron_veto'
             self.config_nveto['channel_map'] = dict(self.config_nveto['channel_map'])
@@ -714,7 +700,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                 'detector': self.config['detector'],
                 'entry_start': self.config['entry_start'],
                 'entry_stop': self.config['entry_stop'],
-                'input_file': self.config['fax_file']})
+                'input_file': self.config['instructions_file']})
             self.instructions_epix = epix.run_epix.main(
                 epix.run_epix.setup(epix_config),
                 return_wfsim_instructions=True)
