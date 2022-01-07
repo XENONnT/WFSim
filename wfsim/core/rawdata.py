@@ -40,7 +40,7 @@ class RawData(object):
             truth_buffer = []
 
         save_full_truth = self.config.get('save_full_truth', True)
-        print(f"save_full_truth : {save_full_truth}")
+        log.debug(f"save_full_truth : {save_full_truth}")
         
         # Pre-load some constents from config
         v = self.config['drift_velocity_liquid']
