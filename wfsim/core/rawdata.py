@@ -39,6 +39,9 @@ class RawData(object):
         if truth_buffer is None:
             truth_buffer = []
 
+        save_full_truth = self.config.get('save_full_truth', True)
+        log.debug(f"save_full_truth : {save_full_truth}")
+        
         # Pre-load some constents from config
         v = self.config['drift_velocity_liquid']
         rext = self.config['right_raw_extension']
@@ -104,14 +107,20 @@ class RawData(object):
 
                     if ptype == 1:
                         stop_at_this_group = True
-                        # Group S1 within 100 ns apart, truth info would be summarized within the group
-                        instb_run = np.split(instb_indx[ibqs[mask]],
-                                             np.where(np.diff(instb_time[ibqs[mask]]) > 100)[0] + 1)
+                        if save_full_truth:
+                            instb_run = np.split(instb_indx[ibqs[mask]], len(instb_indx[ibqs[mask]]))
+                        else:
+                            # Group S1 within 100 ns apart, truth info would be summarized within the group
+                            instb_run = np.split(instb_indx[ibqs[mask]],
+                                                 np.where(np.diff(instb_time[ibqs[mask]]) > 100)[0] + 1)
                     elif ptype == 2:
                         stop_at_this_group = True
-                        # Group S2 within 2 mm apart, truth info would be summarized within the group
-                        instb_run = np.split(instb_indx[ibqs[mask]], 
-                                             np.where(np.diff(instb_time[ibqs[mask]]) > int(0.2 / v))[0] + 1)
+                        if save_full_truth:
+                            instb_run = np.split(instb_indx[ibqs[mask]], len(instb_indx[ibqs[mask]]))
+                        else:
+                            # Group S2 within 2 mm apart, truth info would be summarized within the group
+                            instb_run = np.split(instb_indx[ibqs[mask]],
+                                                 np.where(np.diff(instb_time[ibqs[mask]]) > int(0.2 / v))[0] + 1)
                     else:
                         instb_run = [instb_indx[ibqs[mask]]]
 
