@@ -1,3 +1,10 @@
+v0.5.13 / 2022-01-17
+====================
+* Save full truth output (#288)
+* Bump strax(en) (#303)
+* Use straxen#833 (#286)
+* Integrated testing and requirements (#304, #289, #290, #291, #293, #294 #295, #296, #297)
+
 v0.5.12 / 2021-12-10
 ====================
 * Rename s2_aft_sigma config (#284)
