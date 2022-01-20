@@ -281,8 +281,8 @@ class S2(Pulse):
         rotation_mat = np.array(((np.cos(tilt), -np.sin(tilt)), (np.sin(tilt), np.cos(tilt))))
 
         jagged = lambda relative_y: (relative_y + pitch / 2) % pitch - pitch / 2
-        distance = jagged(np.matmul(xy, rotation_mat)[:, 1])  # shortest distance from any wire
-
+        distance = np.random.uniform(-0.01,0.01, len(xy))
+        
         index_row = [np.argmin(np.abs(d - resource.s2_luminescence['x'])) for d in distance]
         index_row = np.repeat(index_row, n_photons).astype(np.int64)
         index_col = np.random.randint(0, resource.s2_luminescence['t'].shape[1], np.sum(n_photons), np.int64)
