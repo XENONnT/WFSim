@@ -275,18 +275,13 @@ class S2(Pulse):
         assert 's2_luminescence' in resource.__dict__, 's2_luminescence model not found'
         assert len(n_photons) == len(xy), 'Input number of n_electron should have same length as positions'
         assert len(resource.s2_luminescence['t'].shape) == 2, 'Timing data is expected to have D2'
-
-        tilt = config.get('anode_xaxis_angle', np.pi / 4)
-        pitch = config.get('anode_pitch', 0.5)
-        rotation_mat = np.array(((np.cos(tilt), -np.sin(tilt)), (np.sin(tilt), np.cos(tilt))))
-
-        jagged = lambda relative_y: (relative_y + pitch / 2) % pitch - pitch / 2
+        
         distance = np.random.uniform(-0.01,0.01, len(xy))
         
         index_row = [np.argmin(np.abs(d - resource.s2_luminescence['x'])) for d in distance]
         index_row = np.repeat(index_row, n_photons).astype(np.int64)
         index_col = np.random.randint(0, resource.s2_luminescence['t'].shape[1], np.sum(n_photons), np.int64)
-
+        
         avgt = np.average(resource.s2_luminescence['t']).astype(int)
         return resource.s2_luminescence['t'][index_row, index_col].astype(np.int64) - avgt
 
