@@ -256,7 +256,7 @@ class S2(Pulse):
                                                pressure, n_photons)
 
     @staticmethod
-    def luminescence_timings_garfield(xy, n_photons, config, resource):
+    def luminescence_timings_garfield(xy, n_photons, config, resource, confxy):
         """
         Luminescence time distribution computation according to garfield scintillation maps
         :param xy: 1d array with positions
@@ -270,13 +270,14 @@ class S2(Pulse):
         assert len(n_photons) == len(xy), 'Input number of n_electron should have same length as positions'
         assert len(resource.s2_luminescence['t'].shape) == 2, 'Timing data is expected to have D2'
 
-        # tilt = config.get('anode_xaxis_angle', np.pi / 4)
-        # pitch = config.get('anode_pitch', 0.5)
-        # rotation_mat = np.array(((np.cos(tilt), -np.sin(tilt)), (np.sin(tilt), np.cos(tilt))))
-        #
-        # jagged = lambda relative_y: (relative_y + pitch / 2) % pitch - pitch / 2
-        # distance = jagged(np.matmul(xy, rotation_mat)[:, 1])  # shortest distance from any wire
-        distance = np.random.uniform(-0.01, 0.01, len(xy))
+        if confxy:
+            distance = np.random.uniform(-0.01, 0.01, len(xy))
+        else:
+            tilt = config.get('anode_xaxis_angle', np.pi / 4)
+            pitch = config.get('anode_pitch', 0.5)
+            rotation_mat = np.array(((np.cos(tilt), -np.sin(tilt)), (np.sin(tilt), np.cos(tilt))))
+            jagged = lambda relative_y: (relative_y + pitch / 2) % pitch - pitch / 2
+            distance = jagged(np.matmul(xy, rotation_mat)[:, 1])  # shortest distance from any wire
 
         index_row = [np.argmin(np.abs(d - resource.s2_luminescence['x'])) for d in distance]
         index_row = np.repeat(index_row, n_photons).astype(np.int64)
@@ -315,7 +316,6 @@ class S2(Pulse):
                 gains[i_electron] = sc_gain[i]
                 i_electron += 1
 
-        return timings, gains
 
     @staticmethod
     def photon_timings(t, n_electron, z, xy, sc_gain, config, resource, phase):
@@ -360,7 +360,7 @@ class S2(Pulse):
         _photon_timings = S2._get_photon_times(xy, n_photons_per_xy,
                                                _photon_channels, config, phase, resource)
         # repeat for n photons per electron # Should this be before adding delays?
-        _photon_timings += np.repeat(electron_timings, n_photons_per_ele)
+        _photon_timings += np.repeat(_electron_timings, n_photons_per_ele)
 
         # Remove photon with channel -1
         mask = _photon_channels != -1
@@ -382,15 +382,16 @@ class S2(Pulse):
         :param resource: instance of the resource class
         """
         # Luminescence Timings
-        if config['s2_luminescence_model'] == 'simple':
+        if 'simple' in config['s2_luminescence_model']:
             photon_timings = S2.luminescence_timings_simple(xy, n_photons_per_xy,
                                                              config=config,
                                                              resource=resource)
-        elif config['s2_luminescence_model'] == 'garfield':
-            photon_timings = S2.luminescence_timings_garfield(
-                xy, n_photons_per_xy,
-                config=config,
-                resource=resource)
+        elif 'garfield' in config['s2_luminescence_model']:
+            confxy = True if 'confine distance' in config['s2_luminescence_model'] else False
+            photon_timings = S2.luminescence_timings_garfield(xy, n_photons_per_xy,
+                                                              config=config,
+                                                              resource=resource,
+                                                              confxy=confxy)
         else:
             raise KeyError(f"{config['s2_luminescence_model']} is not valid! Use 'simple' or 'garfield'")
 

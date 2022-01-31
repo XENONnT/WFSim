@@ -257,7 +257,8 @@ class Resource:
                 self.s2_correction_map = s2cmap
 
             # Garfield luminescence timing samples
-            if config.get('s2_luminescence_model', False) == 'garfield':
+            # if config.get('s2_luminescence_model', False) == 'garfield':
+            if 'garfield' in config.get('s2_luminescence_model', ''):
                 s2_luminescence_map = straxen.get_resource(files['s2_luminescence'], fmt='npy_pickle')['arr_0']
                 # Get directly the map for the simulated level
                 liquid_level_available = np.unique(s2_luminescence_map['ll'])  # available levels (cm)
