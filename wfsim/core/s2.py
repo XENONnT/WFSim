@@ -270,8 +270,8 @@ class S2(Pulse):
         assert len(n_photons) == len(xy), 'Input number of n_electron should have same length as positions'
         assert len(resource.s2_luminescence['t'].shape) == 2, 'Timing data is expected to have D2'
 
-        if confxy:
-            distance = np.random.uniform(-0.01, 0.01, len(xy))
+        if type(confxy)==float:
+            distance = np.random.uniform(-confxy, confxy, len(xy))
         else:
             tilt = config.get('anode_xaxis_angle', np.pi / 4)
             pitch = config.get('anode_pitch', 0.5)
@@ -387,7 +387,11 @@ class S2(Pulse):
                                                              config=config,
                                                              resource=resource)
         elif 'garfield' in config['s2_luminescence_model']:
-            confxy = True if 'confine distance' in config['s2_luminescence_model'] else False
+            # check to see if xy distance in Garfield needs to be confined
+            if 'confxy=' in config['s2_luminescence_model']:
+                confxy = float(config['s2_luminescence_model'].split('=')[1].split(' ')[0])
+            else: confxy = None
+            # confxy = True if 'confxy=' in config['s2_luminescence_model'] else False
             photon_timings = S2.luminescence_timings_garfield(xy, n_photons_per_xy,
                                                               config=config,
                                                               resource=resource,
