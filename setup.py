@@ -13,7 +13,7 @@ with open('HISTORY.md') as file:
 
 setuptools.setup(
     name='wfsim',
-    version='0.5.12',
+    version='0.5.13',
     description='XENONnT Waveform simulator',
     author='Wfsim contributors, the XENON collaboration',
     url='https://github.com/XENONnT/wfsim',
@@ -41,7 +41,7 @@ setuptools.setup(
     package_dir={'extra_requirements': 'extra_requirements'},
     package_data={'extra_requirements': ['requirements-tests.txt']},
     classifiers=[
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: BSD License',
         'Natural Language :: English',
         'Programming Language :: Python :: 3.6',
