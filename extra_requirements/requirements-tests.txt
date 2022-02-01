@@ -33,7 +33,7 @@ scikit-learn==1.0.2
 scipy==1.7.3                                    # Strax dependency
 tensorflow==2.7.0
 tqdm==4.62.2
-xarray==0.20.1
+xarray==0.21.0
 utilix==0.6.5
 zstd==1.5.0.4                                   # Strax dependency
 uproot==4.1.1
