@@ -26,7 +26,7 @@ setuptools.setup(
                               'flake8',
                               'pytest-cov',
                               ],
-    python_requires=">=3.6",
+    python_requires=">=3.8",
     extras_require={
         'docs': [
             'sphinx',
@@ -44,8 +44,6 @@ setuptools.setup(
         'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: BSD License',
         'Natural Language :: English',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Intended Audience :: Science/Research',
