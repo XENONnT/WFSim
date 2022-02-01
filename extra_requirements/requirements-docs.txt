@@ -1,5 +1,5 @@
 # File for the requirements of the documentation
-numpy==1.19.5
+numpy==1.22.1
 sphinx
 sphinx_rtd_theme
 nbsphinx
