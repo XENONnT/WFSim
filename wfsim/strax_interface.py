@@ -72,9 +72,9 @@ def rand_instructions(c):
     """Random instruction generator function. This will be called by wfsim if you do not specify 
     specific instructions.
     :params c: wfsim configuration dict"""
-    log.warn('rand_instructions is deprecated, please use wfsim.random_instructions')
+    log.warning('rand_instructions is deprecated, please use wfsim.random_instructions')
     if 'drift_field' not in c:
-        log.warn('drift field not specified!')
+        log.warning('drift field not specified!')
     # Do the conversion for now, don't break everything all at once
     return _rand_instructions(event_rate=c.get('event_rate', 10),
                               chunk_size=c.get('chunk_size', 5),
@@ -175,7 +175,7 @@ def _rand_instructions(
     inst['e_dep'] = e_dep
     for field in inst.dtype.names:
         if np.any(inst[field] == -1):
-            log.warn(f'{field} is not (fully) filled')
+            log.warning(f'{field} is not (fully) filled')
     return inst
 
 
