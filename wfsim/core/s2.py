@@ -2,6 +2,7 @@ import logging
 from numba import njit
 import numpy as np
 from scipy.stats import skewnorm
+from scipy import interpolate
 from strax import exporter
 from .pulse import Pulse
 from .. import units
@@ -34,10 +35,10 @@ class S2(Pulse):
         _, _, t, x, y, z, n_electron, recoil_type, *rest = [
             np.array(v).reshape(-1) for v in zip(*instruction)]
         
-        # Reverse engineerring FDC
+        # Reverse engineering FDC
         if self.config['field_distortion_model'] == 'inverse_fdc':
             z_obs, positions = self.inverse_field_distortion_correction(x, y, z, resource=self.resource)
-        # Reverse engineerring FDC
+        # Reverse engineering FDC
         elif self.config['field_distortion_model'] == 'comsol':
             z_obs, positions = self.field_distortion_comsol(x, y, z, resource=self.resource)
         else:
@@ -53,20 +54,13 @@ class S2(Pulse):
                                              config=self.config,
                                              resource=self.resource)
 
-        # Second generate photon timing and channel
-        self._electron_timings, self._photon_timings, self._instruction = self.photon_timings(t, n_electron, z_obs,
-                                                                                              positions, sc_gain,
-                                                                                              config=self.config,
-                                                                                              resource=self.resource,
-                                                                                              phase=self.phase)
-
-        self._photon_channels, self._photon_timings = self.photon_channels(n_electron=n_electron,
-                                                                           z_obs=z_obs,
-                                                                           positions=positions,
-                                                                           _photon_timings=self._photon_timings,
-                                                                           _instruction=self._instruction,
+        # Second generate photon timing
+        self._electron_timings, self._photon_timings, self._photon_channels  = self.photon_timings(t, n_electron, z_obs,
+                                                                           positions, sc_gain,
                                                                            config=self.config,
-                                                                           resource=self.resource)
+                                                                           resource=self.resource,
+                                                                           phase=self.phase)
+
         super().__call__()
 
     @staticmethod
@@ -262,7 +256,7 @@ class S2(Pulse):
                                                pressure, n_photons)
 
     @staticmethod
-    def luminescence_timings_garfield(xy, n_photons, config, resource):
+    def luminescence_timings_garfield(xy, n_photons, config, resource, confxy):
         """
         Luminescence time distribution computation according to garfield scintillation maps
         :param xy: 1d array with positions
@@ -275,9 +269,16 @@ class S2(Pulse):
         assert 's2_luminescence' in resource.__dict__, 's2_luminescence model not found'
         assert len(n_photons) == len(xy), 'Input number of n_electron should have same length as positions'
         assert len(resource.s2_luminescence['t'].shape) == 2, 'Timing data is expected to have D2'
-        
-        distance = np.random.uniform(-0.01,0.01, len(xy))
-        
+
+        if type(confxy)==float:
+            distance = np.random.uniform(-confxy, confxy, len(xy))
+        else:
+            tilt = config.get('anode_xaxis_angle', np.pi / 4)
+            pitch = config.get('anode_pitch', 0.5)
+            rotation_mat = np.array(((np.cos(tilt), -np.sin(tilt)), (np.sin(tilt), np.cos(tilt))))
+            jagged = lambda relative_y: (relative_y + pitch / 2) % pitch - pitch / 2
+            distance = jagged(np.matmul(xy, rotation_mat)[:, 1])  # shortest distance from any wire
+
         index_row = [np.argmin(np.abs(d - resource.s2_luminescence['x'])) for d in distance]
         index_row = np.repeat(index_row, n_photons).astype(np.int64)
         index_col = np.random.randint(0, resource.s2_luminescence['t'].shape[1], np.sum(n_photons), np.int64)
@@ -288,7 +289,7 @@ class S2(Pulse):
     @staticmethod
     @njit
     def electron_timings(t, n_electron, drift_time_mean, drift_time_spread, sc_gain, timings, gains,
-            electron_trapping_time):
+                         electron_trapping_time):
         """Calculate arrival times of the electrons. Data is written to the timings and gains arrays
         :param t: 1d array of ints
         :param n_electron:1 d array of ints
@@ -315,9 +316,11 @@ class S2(Pulse):
                 gains[i_electron] = sc_gain[i]
                 i_electron += 1
 
+
     @staticmethod
     def photon_timings(t, n_electron, z, xy, sc_gain, config, resource, phase):
-        """Generates photon timings for S2s. Returns a list of photon timings and instructions repeated for original electron
+        """Generates photon timings for S2s.
+        Returns a list of photon timings and instructions repeated for original electron
         
         :param t: 1d float array arrival time of the electrons
         :param n_electron: 1d float array number of electrons to simulate
@@ -327,42 +330,100 @@ class S2(Pulse):
         :param config: dict of the wfsim config
         :param resource: instance of the resource class
         :param phase: string, "gas" """
-        # First generate electron timings
+        # Get electron timings
+        drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z, xy, config, resource)
         _electron_timings = np.zeros(np.sum(n_electron), np.int64)
         _electron_gains = np.zeros(np.sum(n_electron), np.float64)
-        drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z, xy, config, resource)
-        S2.electron_timings(t, n_electron, drift_time_mean, drift_time_spread, sc_gain, 
-            _electron_timings, _electron_gains, 
-            config['electron_trapping_time'])
-
+        S2.electron_timings(t, n_electron, drift_time_mean, drift_time_spread, sc_gain,
+                            _electron_timings, _electron_gains, config['electron_trapping_time'])
         if len(_electron_timings) < 1:
             return np.zeros(0, np.int64), np.zeros(0, np.int64), np.zeros(0)
 
+        # Populate with photons per e/ per position
         n_photons_per_ele = np.random.poisson(_electron_gains)
         n_photons_per_ele += np.random.normal(0, config.get('s2_gain_spread', 0), len(n_photons_per_ele)).astype(np.int64)
         n_photons_per_ele[n_photons_per_ele < 0] = 0
+        #
         n_photons_per_xy = np.cumsum(np.pad(n_photons_per_ele, [1, 0]))[np.cumsum(n_electron)]
         n_photons_per_xy = np.diff(np.pad(n_photons_per_xy, [1, 0]))
 
-        if config['s2_luminescence_model'] == 'simple':
-            _photon_timings = S2.luminescence_timings_simple(xy, n_photons_per_xy,
+        _instruction = np.repeat(np.arange(len(xy)), n_photons_per_xy)
+        # Get photon channels
+        _photon_channels = S2.photon_channels(n_electron=n_electron,
+                                              z_obs=z,
+                                              positions=xy,
+                                              _instruction=_instruction,
+                                              config=config,
+                                              resource=resource) #if not len(_photon_timings)==0 else []
+
+        # Get photon timings including delays
+        _photon_timings = S2._get_photon_times(xy, n_photons_per_xy,
+                                               _photon_channels, config, phase, resource)
+        # repeat for n photons per electron # Should this be before adding delays?
+        _photon_timings += np.repeat(_electron_timings, n_photons_per_ele)
+
+        # Remove photon with channel -1
+        mask = _photon_channels != -1
+        _photon_channels = _photon_channels[mask]
+        _photon_timings = _photon_timings[mask]
+
+        sorted_index = np.argsort(_photon_channels)
+        _photon_channels = _photon_channels[sorted_index]
+        _photon_timings = _photon_timings[sorted_index]
+        return _electron_timings, _photon_timings, _photon_channels
+
+    @staticmethod
+    def _get_photon_times(xy, n_photons_per_xy, channels, config, phase, resource):
+        """ Get photon times and add delays based on models
+        :param xy: 1d float array, xy positions of s2
+        :n_photons_per_xy:
+        :channels:
+        :param config: dict of the wfsim config
+        :param resource: instance of the resource class
+        """
+        # Luminescence Timings
+        if 'simple' in config['s2_luminescence_model']:
+            photon_timings = S2.luminescence_timings_simple(xy, n_photons_per_xy,
                                                              config=config,
                                                              resource=resource)
-        elif config['s2_luminescence_model'] == 'garfield':
-            _photon_timings = S2.luminescence_timings_garfield(
-                xy, n_photons_per_xy,
-                config=config,
-                resource=resource)
+        elif 'garfield' in config['s2_luminescence_model']:
+            # check to see if xy distance in Garfield needs to be confined
+            if 'confxy=' in config['s2_luminescence_model']:
+                confxy = float(config['s2_luminescence_model'].split('=')[1].split(' ')[0])
+            else: confxy = None
+            # confxy = True if 'confxy=' in config['s2_luminescence_model'] else False
+            photon_timings = S2.luminescence_timings_garfield(xy, n_photons_per_xy,
+                                                              config=config,
+                                                              resource=resource,
+                                                              confxy=confxy)
+        else:
+            raise KeyError(f"{config['s2_luminescence_model']} is not valid! Use 'simple' or 'garfield'")
 
-        _photon_timings += np.repeat(_electron_timings, n_photons_per_ele)
-        _instruction = np.repeat(np.arange(len(xy)), n_photons_per_xy)
+        # Emission Delay
+        photon_timings += Pulse.singlet_triplet_delays(len(photon_timings), config['singlet_fraction_gas'], config, phase)
 
-        _photon_timings += Pulse.singlet_triplet_delays(
-            len(_photon_timings), config['singlet_fraction_gas'], config, phase)
-
-        _photon_timings += np.random.normal(0, config['s2_time_spread'], len(_photon_timings)).astype(np.int64)
-
-        return _electron_timings, _photon_timings, _instruction
+        # Optical Propagation Delay
+        if "optical_propagation" in config['s2_time_model']:
+            # sample from inverse cdf of G4 distribution
+            bottom_index = channels > config['n_top_pmts']
+            top_index = ~bottom_index
+            spline = resource.s2_optical_propagation_spline
+            for section, indices in zip(['top', 'bottom'], [top_index, bottom_index]):
+                splines = np.array(spline[section])
+                bins = np.linspace(0, np.max(splines), 300)
+                hist, edges = np.histogram(splines, bins)
+                cum_values = np.cumsum(hist) / len(splines)
+                cdf = interpolate.interp1d(cum_values, edges[1:], fill_value="extrapolate")
+                r = np.random.rand(len(photon_timings[indices]))
+                delay = cdf(r)
+                photon_timings[indices] += delay.astype(np.int64)
+        elif "zero_delay" in config['s2_time_model']:
+            # no optical propagation delay
+            photon_timings += np.zeros_like(photon_timings, dtype=np.int64)
+        else:
+            # simple/existing delay
+            photon_timings += np.random.normal(0, config['s2_time_spread'], len(photon_timings)).astype(np.int64)
+        return photon_timings
 
     @staticmethod
     def s2_pattern_map_diffuse(n_electron, z, xy, config, resource):
@@ -408,7 +469,7 @@ class S2(Pulse):
         # Should we also output this xy position in truth?
         xy_multi = np.repeat(xy, n_electron, axis=0) + hdiff  # One entry xy per electron
         # Remove points outside tpc, and the pattern will be the average inside tpc
-        # Should be done natually with the s2 pattern map, however, there's some bug there so we apply this hard cut
+        # Should be done naturally with the s2 pattern map, however, there's some bug there so we apply this hard cut
         mask = np.sum(xy_multi ** 2, axis=1) <= config['tpc_radius'] ** 2
 
         if isinstance(resource.s2_pattern_map, DummyMap):
@@ -426,21 +487,15 @@ class S2(Pulse):
         return pattern
 
     @staticmethod
-    def photon_channels(n_electron, z_obs, positions, _photon_timings, _instruction, config, resource):
+    def photon_channels(n_electron, z_obs, positions, _instruction, config, resource):
         """Set the _photon_channels property list of length same as _photon_timings
-
         :param n_electron: a 1d int array
         :param z_obs: a 1d float array
         :param positions: a 2d float array of shape [n interaction, 2] for the xy coordinate
-        :param _photon_timings: 1d int array of photon timings,
         :param _instruction: array of instructions with dtype wfsim.instructions_dtype
         :param config: dict wfsim config
         :param resource: instance of resource class
         """
-        if len(_photon_timings) == 0:
-            _photon_channels = []
-            return _photon_timings, _photon_channels
-
         aft = config['s2_mean_area_fraction_top']
         aft_sigma = config.get('s2_aft_sigma', 0.0118)
         aft_skewness = config.get('s2_aft_skewness', -1.433)
@@ -453,6 +508,7 @@ class S2(Pulse):
             pattern = S2.s2_pattern_map_diffuse(n_electron, z_obs, positions, config, resource)  # [position, pmt]
         else:
             pattern = resource.s2_pattern_map(positions)  # [position, pmt]
+
         if pattern.shape[1] - 1 not in bottom_index:
             pattern = np.pad(pattern, [[0, 0], [0, len(bottom_index)]], 
                              'constant', constant_values=1)
@@ -491,15 +547,7 @@ class S2(Pulse):
             _buffer_photon_channels.append(_photon_channels)
         
         _photon_channels = np.concatenate(_buffer_photon_channels)
-        # Remove photon with channel -1
-        mask = _photon_channels != -1
-        _photon_channels = _photon_channels[mask]
-        _photon_timings = _photon_timings[mask]
-        
-        sorted_index = np.argsort(_photon_channels)
-
-        return _photon_channels[sorted_index], _photon_timings[sorted_index]
-
+        return _photon_channels
 
 @export
 class PhotoIonization_Electron(S2):
