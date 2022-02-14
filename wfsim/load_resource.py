@@ -259,7 +259,7 @@ class Resource:
             # Garfield luminescence timing samples
             # if config.get('s2_luminescence_model', False) == 'garfield':
             if 'garfield' in config.get('s2_luminescence_model', ''):
-                s2_luminescence_map = straxen.get_resource(files['s2_luminescence'], fmt='npy_pickle')['arr_0']
+                s2_luminescence_map = straxen.get_resource(files['s2_luminescence'], fmt='npy')
                 # Get directly the map for the simulated level
                 liquid_level_available = np.unique(s2_luminescence_map['ll'])  # available levels (cm)
                 liquid_level = config['gate_to_anode_distance'] - config['elr_gas_gap_length']  # cm
