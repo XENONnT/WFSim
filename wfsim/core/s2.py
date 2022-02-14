@@ -268,23 +268,30 @@ class S2(Pulse):
         """
         assert 's2_luminescence' in resource.__dict__, 's2_luminescence model not found'
         assert len(n_photons) == len(xy), 'Input number of n_electron should have same length as positions'
-        assert len(resource.s2_luminescence['t'].shape) == 2, 'Timing data is expected to have D2'
+#         assert len(resource.s2_luminescence['t'].shape) == 2, 'Timing data is expected to have D2'
 
-        if type(confxy)==float:
-            distance = np.random.uniform(-confxy, confxy, len(xy))
-        else:
-            tilt = config.get('anode_xaxis_angle', np.pi / 4)
-            pitch = config.get('anode_pitch', 0.5)
-            rotation_mat = np.array(((np.cos(tilt), -np.sin(tilt)), (np.sin(tilt), np.cos(tilt))))
-            jagged = lambda relative_y: (relative_y + pitch / 2) % pitch - pitch / 2
-            distance = jagged(np.matmul(xy, rotation_mat)[:, 1])  # shortest distance from any wire
-
-        index_row = [np.argmin(np.abs(d - resource.s2_luminescence['x'])) for d in distance]
-        index_row = np.repeat(index_row, n_photons).astype(np.int64)
-        index_col = np.random.randint(0, resource.s2_luminescence['t'].shape[1], np.sum(n_photons), np.int64)
+#         if type(confxy)==float:
+#             distance = np.random.uniform(-confxy, confxy, len(xy))
+#         else:
+#             tilt = config.get('anode_xaxis_angle', np.pi / 4)
+#             pitch = config.get('anode_pitch', 0.5)
+#             rotation_mat = np.array(((np.cos(tilt), -np.sin(tilt)), (np.sin(tilt), np.cos(tilt))))
+#             jagged = lambda relative_y: (relative_y + pitch / 2) % pitch - pitch / 2
+#             distance = jagged(np.matmul(xy, rotation_mat)[:, 1])  # shortest distance from any wire
         
-        avgt = np.average(resource.s2_luminescence['t']).astype(int)
-        return resource.s2_luminescence['t'][index_row, index_col].astype(np.int64) - avgt
+        
+#         index_row = [np.argmin(np.abs(d - resource.s2_luminescence['x'])) for d in distance]
+        #This is just for testing!!! Later we want to 
+        index_row = np.repeat(np.digitize(config['anode_sag'], np.arange(16)/10)-1,len(xy))
+        index_row = np.repeat(index_row, n_photons).astype(np.int64)
+        #For the "index" of the inverse-cdf's x-axis, this is a float because I will interpolate
+        index_col_sample = np.random.uniform(0, resource.s2_luminescence['timing_inv_cdf'].shape[1], np.sum(n_photons))
+        index_col = np.digitize(index_col_sample, np.arange(resource.s2_luminescence['timing_inv_cdf'].shape[1]-1))-1
+        
+        return (resource.s2_luminescence['timing_inv_cdf'][index_row, index_col+1]-resource.s2_luminescence['timing_inv_cdf'][index_row, index_col])*(index_col_sample-index_col)+resource.s2_luminescence['timing_inv_cdf'][index_row, index_col]
+        
+#         avgt = np.average(resource.s2_luminescence['t']).astype(int)
+#         return resource.s2_luminescence['t'][index_row, index_col].astype(np.int64) - avgt
 
     @staticmethod
     @njit
