@@ -261,10 +261,10 @@ class Resource:
             if 'garfield' in config.get('s2_luminescence_model', ''):
                 s2_luminescence_map = straxen.get_resource(files['s2_luminescence'], fmt='npy')
                 # Get directly the map for the simulated level
-                liquid_level_available = np.unique(s2_luminescence_map['ll'])  # available levels (cm)
-                liquid_level = config['gate_to_anode_distance'] - config['elr_gas_gap_length']  # cm
-                liquid_level = min(liquid_level_available, key=lambda x: abs(x - liquid_level))
-                self.s2_luminescence = s2_luminescence_map[s2_luminescence_map['ll'] == liquid_level]
+#                 liquid_level_available = np.unique(s2_luminescence_map['ll'])  # available levels (cm)
+#                 liquid_level = config['gate_to_anode_distance'] - config['elr_gas_gap_length']  # cm
+#                 liquid_level = min(liquid_level_available, key=lambda x: abs(x - liquid_level))
+                self.s2_luminescence = s2_luminescence_map #s2_luminescence_map[s2_luminescence_map['ll'] == liquid_level]
 
             if config.get('field_distortion_model', "none") == "inverse_fdc":
                 self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
