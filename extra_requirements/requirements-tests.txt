@@ -1,6 +1,6 @@
 # Test compatibility with these most often:
-strax==1.1.6
-straxen==1.2.7
+strax==1.1.7
+straxen==1.2.8
 
 # File for the requirements of straxen with the automated tests
 awkward==1.7.0
@@ -18,8 +18,7 @@ holoviews==1.14.5
 ipywidgets==7.6.4
 hypothesis==6.36.1
 jupyter-client==7.1.2                          # for ipywidgets
-keras==2.8.0; python_version<="3.9"             # Tensorflow dependency
-keras==2.8.0rc1; python_version=="3.10"         # Tensorflow dependency
+keras==2.8.0                                   # Tensorflow dependency
 matplotlib==3.5.1
 multihist==0.6.5
 nestpy==1.5.0; python_version<="3.9"
