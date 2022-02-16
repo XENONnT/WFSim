@@ -54,7 +54,7 @@ jobs:
         uses: actions/checkout@v2
       - name: Install requirements for tests and latest strax
         run: |
-            pip install-r git+https://github.com/NESTCollaboration/nestpy.git@v1.5.0
+            pip install -r git+https://github.com/NESTCollaboration/nestpy.git@v1.5.0
             pip install -r extra_requirements/requirements-tests.txt
       # Secrets and required files
       - name: patch utilix file
