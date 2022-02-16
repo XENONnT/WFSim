@@ -157,7 +157,7 @@ class Pulse(object):
         samples = np.linspace(-samples_before * sample_duration,
                               + samples_after * sample_duration,
                               1 + samples_before + samples_after)
-        self._template_length = np.int(len(samples) - 1)
+        self._template_length = np.int64(len(samples) - 1)
 
         templates = []
         for r in np.arange(0, sample_duration, pmt_pulse_time_rounding):
