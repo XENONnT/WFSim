@@ -408,21 +408,21 @@ class S2(Pulse):
             bottom_index = channels > config['n_top_pmts']
             top_index = ~bottom_index
             spline = resource.s2_optical_propagation_spline
+            bins = np.linspace(0, 313, 1000) # do not change it unless you know the binning in data
             for section, indices in zip(['top', 'bottom'], [top_index, bottom_index]):
                 splines = np.array(spline[section])
-                bins = np.linspace(0, np.max(splines), 300)
-                hist, edges = np.histogram(splines, bins)
-                cum_values = np.cumsum(hist) / len(splines)
-                cdf = interpolate.interp1d(cum_values, edges[1:], fill_value="extrapolate")
+                cdf = interpolate.interp1d(splines, bins[:-1], fill_value="extrapolate")
                 r = np.random.rand(len(photon_timings[indices]))
                 delay = cdf(r)
                 photon_timings[indices] += delay.astype(np.int64)
         elif "zero_delay" in config['s2_time_model']:
             # no optical propagation delay
             photon_timings += np.zeros_like(photon_timings, dtype=np.int64)
-        else:
+        elif "s2_time_spread around zero" in config['s2_time_model']:
             # simple/existing delay
             photon_timings += np.random.normal(0, config['s2_time_spread'], len(photon_timings)).astype(np.int64)
+        else:
+            raise KeyError(f"{config['s2_time_model']} is not in any of the valid s2 time models")
         return photon_timings
 
     @staticmethod
