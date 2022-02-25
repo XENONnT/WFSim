@@ -297,12 +297,12 @@ class Peak(StrictModel):
     #: e.g. range_area_decile[5] = range of 50% area = distance (in time) between point
     #: of 25% area and 75% area (with boundary samples added fractionally).
     #: First element (0) is always zero, last element (10) is the full range of the peak.
-    range_area_decile = np.zeros(11, dtype=np.float)
+    range_area_decile = np.zeros(11, dtype=np.float64)
 
     #: Time (ns) from the area decile point to the area midpoint.
     #: If you want to know the time until some other point (say the sum waveform maximum),
     #: just add the difference between that point and the area midpoint.
-    area_decile_from_midpoint = np.zeros(11, dtype=np.float)
+    area_decile_from_midpoint = np.zeros(11, dtype=np.float64)
 
     @property
     def range_50p_area(self):
@@ -673,7 +673,7 @@ class Event(StrictModel):
     lone_hits_per_channel = np.array([], dtype=np.int16)
 
     #: Was channel flagged as suspicious?
-    is_channel_suspicious = np.array([], dtype=np.bool)
+    is_channel_suspicious = np.array([], dtype=np.bool_)
 
     #: Number of hits rejected per channel in the suspicious channel algorithm
     n_hits_rejected = np.array([], dtype=np.int16)
@@ -704,7 +704,7 @@ class Event(StrictModel):
         self.n_pulses_per_channel = np.zeros(n_channels, dtype=np.int16)
         self.noise_pulses_in = np.zeros(n_channels, dtype=np.int16)
         self.n_hits_rejected = np.zeros(n_channels, dtype=np.int16)
-        self.is_channel_suspicious = np.zeros(n_channels, dtype=np.bool)
+        self.is_channel_suspicious = np.zeros(n_channels, dtype=np.bool_)
         self.lone_hits_per_channel_before = np.zeros(n_channels, dtype=np.int16)
         self.lone_hits_per_channel = np.zeros(n_channels, dtype=np.int16)
 
