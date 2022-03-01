@@ -16,7 +16,7 @@ epix==0.2.2
 flake8==4.0.1
 holoviews==1.14.5
 ipywidgets==7.6.4
-hypothesis==6.38.0
+hypothesis==6.39.0
 jupyter-client==7.1.2                          # for ipywidgets
 keras==2.8.0                                   # Tensorflow dependency
 matplotlib==3.5.1
