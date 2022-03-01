@@ -27,7 +27,7 @@ npshmex==0.2.1                                  # Strax dependency
 numba==0.55.1                                   # Strax dependency
 numpy==1.21.5
 nestpy==1.5.0
-pandas==1.4.0                                   # Strax dependency
+pandas==1.4.1                                   # Strax dependency
 psutil==5.9.0                                   # Strax dependency
 pytest==7.0.1
 pytest-cov==3.0.0
