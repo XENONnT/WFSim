@@ -39,4 +39,4 @@ tqdm==4.63.0
 xarray==0.20.1
 utilix==0.6.6
 zstd==1.5.0.4                                   # Strax dependency
-uproot==4.1.1
+uproot==4.2.0
