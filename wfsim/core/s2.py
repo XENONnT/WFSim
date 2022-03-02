@@ -282,7 +282,7 @@ class S2(Pulse):
         
 #         index_row = [np.argmin(np.abs(d - resource.s2_luminescence['x'])) for d in distance]
         #This is just for testing!!! Later we want to 
-        index_row = np.repeat(np.digitize(config['anode_sag'], np.arange(16)/10)-1,len(xy))
+        index_row = np.repeat(np.digitize(config['anode_sag'], resource.s2_luminescence['anode_sag'])-1,len(xy))
         index_row = np.repeat(index_row, n_photons).astype(np.int64)
         #For the "index" of the inverse-cdf's x-axis, this is a float because I will interpolate
         index_col_sample = np.random.uniform(0, resource.s2_luminescence['timing_inv_cdf'].shape[1], np.sum(n_photons))
