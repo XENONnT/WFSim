@@ -230,7 +230,8 @@ class PMT_Afterpulse(Pulse):
             _photon_amplitude = np.hstack(_photon_amplitude)
             _photon_gains = np.array(config['gains'])[_photon_channels] * _photon_amplitude
 
-            return _photon_timings, _photon_channels, _photon_gains
+            sorted_index = np.argsort(_photon_channels)
+            return _photon_timings[sorted_index], _photon_channels[sorted_index], _photon_gains[sorted_index]
 
         else:
             return np.zeros(0, np.int64), np.zeros(0, np.int64), np.zeros(0)
