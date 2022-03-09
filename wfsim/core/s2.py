@@ -256,13 +256,14 @@ class S2(Pulse):
                                                pressure, n_photons)
 
     @staticmethod
-    def luminescence_timings_garfield(xy, n_photons, config, resource, confxy):
+    def luminescence_timings_garfield(xy, n_photons, config, resource, confine_position=None):
         """
         Luminescence time distribution computation according to garfield scintillation maps
         :param xy: 1d array with positions
         :param n_photons: 1d array with ints for number of xy positions
         :param config: dict wfsim config
         :param resource: instance of wfsim resource
+        :param confine_position: if float, confine extraction region +/- this position around anode wires
 
         returns 2d array with ints for photon timings of input param 'shape'
         """
@@ -270,8 +271,8 @@ class S2(Pulse):
         assert len(n_photons) == len(xy), 'Input number of n_electron should have same length as positions'
         assert len(resource.s2_luminescence['t'].shape) == 2, 'Timing data is expected to have D2'
 
-        if type(confxy)==float:
-            distance = np.random.uniform(-confxy, confxy, len(xy))
+        if type(confine_position)==float:
+            distance = np.random.uniform(-confine_position, confine_position, len(xy))
         else:
             tilt = config.get('anode_xaxis_angle', np.pi / 4)
             pitch = config.get('anode_pitch', 0.5)
@@ -387,15 +388,20 @@ class S2(Pulse):
                                                              config=config,
                                                              resource=resource)
         elif 'garfield' in config['s2_luminescence_model']:
-            # check to see if xy distance in Garfield needs to be confined
-            if 'confxy=' in config['s2_luminescence_model']:
-                confxy = float(config['s2_luminescence_model'].split('=')[1].split(' ')[0])
-            else: confxy = None
-            # confxy = True if 'confxy=' in config['s2_luminescence_model'] else False
+            # check to see if extraction region in Garfield needs to be confined
+            if 'confine_position=' in config['s2_luminescence_model']:
+                try:
+                    confine_position = float(config['s2_luminescence_model'].split('=')[1].split(' ')[0])
+                except ValueError:
+                    # if the default is 'None'
+                    confine_position = None
+            else:
+                confine_position = None
+            # confine_position = True if 'confine_position=' in config['s2_luminescence_model'] else False
             photon_timings = S2.luminescence_timings_garfield(xy, n_photons_per_xy,
                                                               config=config,
                                                               resource=resource,
-                                                              confxy=confxy)
+                                                              confine_position=confine_position)
         else:
             raise KeyError(f"{config['s2_luminescence_model']} is not valid! Use 'simple' or 'garfield'")
 
