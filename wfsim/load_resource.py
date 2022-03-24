@@ -89,7 +89,8 @@ class Resource:
                 's1_pattern_map': 'XENONnT_s1_xyz_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
                 's1_lce_correction_map': 'XENONnT_s1_xyz_LCE_corrected_qes_MCva43fa9b_wires.json.gz',
                 's2_pattern_map': 'XENONnT_s2_xy_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
-                's2_correction_map': 'XENONnT_s2_xy_correction_corrected_qes_MCva43fa9b_wires.json.gz',
+                's2_correction_map': 'XENONnT_s2_xy_map_v0_20210130.json',
+                'se_gain_map': 'XENONnT_se_xy_map_v1_mlp.json',
                 'photon_ap_cdfs': 'XENONnT_pmt_afterpulse_config_012605.json.gz',
                 's2_luminescence': 'XENONnT_GARFIELD_B1d5n_C30n_G1n_A6d5p_T1d5n_PMTs1d5n_FSR0d95n.npz',
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
@@ -234,6 +235,8 @@ class Resource:
 
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='pkl')
+            
+            self.se_gain_map = make_map(files['se_gain_map'])
 
             # if there is a (data driven!) map, load it. If not make it  from the pattern map
             if files['s1_lce_correction_map']:
