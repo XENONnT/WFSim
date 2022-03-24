@@ -389,9 +389,9 @@ class S2(Pulse):
         if config['enable_field_dependencies']['drift_speed_map']:
             drift_velocity_liquid = resource.field_dependencies_map(z, xy, map_name='drift_speed_map')  # mm/µs
             drift_velocity_liquid *= 1e-4  # cm/ns
+            drift_velocity_liquid *= resource.drift_velocity_scaling
         else:
             drift_velocity_liquid = config['drift_velocity_liquid']
-            
         if config['enable_field_dependencies']['diffusion_transverse_map']:
             diffusion_constant_radial = resource.field_dependencies_map(z, xy, map_name='diffusion_radial_map')  # cm²/s
             diffusion_constant_azimuthal = resource.field_dependencies_map(z, xy, map_name='diffusion_azimuthal_map') # cm²/s
