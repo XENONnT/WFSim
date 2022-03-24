@@ -43,15 +43,16 @@ class S2(Pulse):
         else:
             z_obs, positions = z, np.array([x, y]).T
 
+        n_electron = self.get_electron_yield(n_electron=n_electron,
+                                             positions= np.array([x, y]).T, # maps are in R_true, so orginal position should be here
+                                             z_obs=z, # maps are in Z_true, so orginal position should be here
+                                             config=self.config,
+                                             resource=self.resource)
+
         sc_gain = self.get_s2_light_yield(positions=positions,
                                           config=self.config,
                                           resource=self.resource)
 
-        n_electron = self.get_electron_yield(n_electron=n_electron,
-                                             positions=positions,
-                                             z_obs=z_obs,
-                                             config=self.config,
-                                             resource=self.resource)
 
         # Second generate photon timing and channel
         self._electron_timings, self._photon_timings, self._instruction = self.photon_timings(t, n_electron, z_obs,
@@ -139,18 +140,19 @@ class S2(Pulse):
         # Average drift time of the electrons
         drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z_obs, positions, config, resource)
 
-        # Absorb electrons during the drift
+        # Absorb electrons during the drift, clipping to avoid artefacts of maps
+        drift_time_mean=np.clip(drift_time_mean, a_min=0, a_max=np.inf)
         electron_lifetime_correction = np.exp(- 1 * drift_time_mean /
                                               config['electron_lifetime_liquid'])
         cy = config['electron_extraction_yield'] * electron_lifetime_correction
 
         # Remove electrons in insensitive volume
         if config['enable_field_dependencies']['survival_probability_map']:
-            survival_probability = resource.field_dependencies_map(z_obs, positions, map_name='survival_probability_map')
-            cy *= survival_probability
-
-        # why are there cy greater than 1? We should check this
-        cy = np.clip(cy, a_min = 0, a_max = 1)
+            p_surv = resource.field_dependencies_map(z_obs, positions, map_name='survival_probability_map')
+            if np.any(p_surv<0) or np.any(p_surv>1):
+                # FIXME: this is necessary due to map artefacts, such as negative or values >1
+                p_surv=np.clip(p_surv, a_min = 0, a_max = 1)
+            cy *= p_surv
         n_electron = np.random.binomial(n=n_electron, p=cy)
         return n_electron
 
