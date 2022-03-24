@@ -71,6 +71,27 @@ class S2(Pulse):
         super().__call__()
 
     @staticmethod
+    def get_avg_drift_velocity(z, xy, config, resource):
+        """Calculate s2 drift time mean and spread
+
+        :param positions: 1d array of z (floats)
+        :param xy: 2d array of xy positions (floats)
+        :param config: dict with wfsim config
+        :param resource: instance of the resource class
+
+        returns array of floats corresponding to average drift velocities from given point to the gate
+        """
+        drift_v_LXe=None
+        if config['enable_field_dependencies']['drift_speed_map']:
+            drift_v_LXe = resource.field_dependencies_map(z, xy, map_name='drift_speed_map')  # mm/µs
+            drift_v_LXe *= 1e-4  # cm/ns
+            drift_v_LXe *= resource.drift_velocity_scaling
+            drift_v_LXe
+        else:
+            drift_v_LXe=config['drift_velocity_liquid']
+        return(drift_v_LXe)
+
+    @staticmethod
     def get_s2_drift_time_params(z_obs, positions, config, resource):
         """Calculate s2 drift time mean and spread
 
@@ -81,13 +102,7 @@ class S2(Pulse):
 
         returns two arrays of floats (mean drift time, drift time spread) 
         """
-
-        if config['enable_field_dependencies']['drift_speed_map']:
-            drift_velocity_liquid = resource.field_dependencies_map(z_obs, positions, map_name='drift_speed_map')  # mm/µs
-            drift_velocity_liquid *= 1e-4  # cm/ns
-        else:
-            drift_velocity_liquid = config['drift_velocity_liquid']
-            
+        drift_velocity_liquid = S2.get_avg_drift_velocity(z_obs, positions, config, resource)
         if config['enable_field_dependencies']['diffusion_longitudinal_map']:
             diffusion_constant_longitudinal = resource.field_dependencies_map(z_obs, positions, map_name='diffusion_longitudinal_map')  # cm²/s
             diffusion_constant_longitudinal *= 1e-9  # cm²/ns
@@ -385,13 +400,8 @@ class S2(Pulse):
         :param resource: instance of the resource class
         """
         assert all(z < 0), 'All S2 in liquid should have z < 0'
-        
-        if config['enable_field_dependencies']['drift_speed_map']:
-            drift_velocity_liquid = resource.field_dependencies_map(z, xy, map_name='drift_speed_map')  # mm/µs
-            drift_velocity_liquid *= 1e-4  # cm/ns
-            drift_velocity_liquid *= resource.drift_velocity_scaling
-        else:
-            drift_velocity_liquid = config['drift_velocity_liquid']
+        drift_velocity_liquid=S2.get_avg_drift_velocity(z, xy, config, resource)
+
         if config['enable_field_dependencies']['diffusion_transverse_map']:
             diffusion_constant_radial = resource.field_dependencies_map(z, xy, map_name='diffusion_radial_map')  # cm²/s
             diffusion_constant_azimuthal = resource.field_dependencies_map(z, xy, map_name='diffusion_azimuthal_map') # cm²/s
