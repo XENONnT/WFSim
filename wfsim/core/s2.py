@@ -54,12 +54,38 @@ class S2(Pulse):
                                              config=self.config,
                                              resource=self.resource)
 
+        n_photon_per_xy, n_photon_per_ele, self._electron_timings = self.get_n_photon(t=t,
+                                                                                      n_electron=n_electron,
+                                                                                      z_obs=z_obs,
+                                                                                      positions=positions,
+                                                                                      sc_gain=sc_gain, 
+                                                                                      config=self.config,
+                                                                                      resource=self.resource)
+
+        self._instruction = np.repeat(np.arange(len(xy)), n_photons_per_xy)
+        self._photon_channels = self.photon_channels(n_electron=n_electron,
+                                                     z_obs=z_obs,
+                                                     positions=positions,
+                                                     _instruction=self._instruction,
+                                                     config=self.config,
+                                                     resource=self.resource)
+
         # Second generate photon timing
-        self._electron_timings, self._photon_timings, self._photon_channels  = self.photon_timings(t, n_electron, z_obs,
-                                                                           positions, sc_gain,
-                                                                           config=self.config,
-                                                                           resource=self.resource,
-                                                                           phase=self.phase)
+        self._photon_timings = self.photon_timings(positions=positions, 
+                                                   n_photons_per_xy=n_photons_per_xy,
+                                                   _electron_timings=self._electron_timings,
+                                                   n_photon_per_ele=n_photon_per_ele,
+                                                   _photon_channels=self._photon_channels,
+                                                   phase=self.phase
+                                                   config=self.config,
+                                                   resource=self.resource,)
+
+        # Sorting times according to the channel, as non-explicit sorting
+        # is performed later and this breaks timing of individual channels/arrays
+        sortind = np.argsort(self._photon_channels)
+
+        self._photon_channels = self._photon_channels[sortind]
+        self._photon_timings = self._photon_timings[sortind]
 
         super().__call__()
 
@@ -336,20 +362,19 @@ class S2(Pulse):
         return prop_time.astype(np.int64)
 
     @staticmethod
-    def photon_timings(t, n_electron, z, xy, sc_gain, config, resource, phase):
+    def get_n_photons(t, n_electron, z_obs, positions, sc_gain, config, resource):
         """Generates photon timings for S2s.
         Returns a list of photon timings and instructions repeated for original electron
         
-        :param t: 1d float array arrival time of the electrons
+        :param t: 1d int array time of s2
         :param n_electron: 1d float array number of electrons to simulate
-        :param z: float array. Z positions of s2
-        :param xy: 1d float array, xy positions of s2
+        :param z_obs: float array. Z positions of s2
+        :param positions: 2d float array, xy positions of s2
         :param sc_gain: float, secondary s2 gain
         :param config: dict of the wfsim config
-        :param resource: instance of the resource class
-        :param phase: string, "gas" """
+        :param resource: instance of the resource class """
         # Get electron timings
-        drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z, xy, config, resource)
+        drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z_obs, positions, config, resource)
         _electron_timings = np.zeros(np.sum(n_electron), np.int64)
         _electron_gains = np.zeros(np.sum(n_electron), np.float64)
         S2.electron_timings(t, n_electron, drift_time_mean, drift_time_spread, sc_gain,
@@ -365,45 +390,27 @@ class S2(Pulse):
         n_photons_per_xy = np.cumsum(np.pad(n_photons_per_ele, [1, 0]))[np.cumsum(n_electron)]
         n_photons_per_xy = np.diff(np.pad(n_photons_per_xy, [1, 0]))
 
-        _instruction = np.repeat(np.arange(len(xy)), n_photons_per_xy)
-        # Get photon channels
-        _photon_channels = S2.photon_channels(n_electron=n_electron,
-                                              z_obs=z,
-                                              positions=xy,
-                                              _instruction=_instruction,
-                                              config=config,
-                                              resource=resource) #if not len(_photon_timings)==0 else []
-
-        # Get photon timings including delays
-        _photon_timings = S2._get_photon_times(xy, n_photons_per_xy,
-                                               _photon_channels, config, phase, resource)
-        # repeat for n photons per electron # Should this be before adding delays?
-        _photon_timings += np.repeat(_electron_timings, n_photons_per_ele)
-
-        # Remove photon with channel -1
-        mask = _photon_channels != -1
-        _photon_channels = _photon_channels[mask]
-        _photon_timings = _photon_timings[mask]
-
-        sorted_index = np.argsort(_photon_channels)
-        _photon_channels = _photon_channels[sorted_index]
-        _photon_timings = _photon_timings[sorted_index]
-        return _electron_timings, _photon_timings, _photon_channels
+        return n_photons_per_xy, n_photons_per_ele, _electron_timings
 
     @staticmethod
-    def _get_photon_times(xy, n_photons_per_xy, channels, config, phase, resource):
-        """ Get photon times and add delays based on models
-        :param xy: 1d float array, xy positions of s2
-        :n_photons_per_xy:
-        :channels:
+    def photon_timings(positions, n_photons_per_xy, _electron_timings, n_photon_per_ele, _photon_channels, config, phase, resource):
+        """Get photon times and add delays based on models
+
+        :param positions: 2d float array, xy positions of s2
+        :param n_photons_per_xy: number of photons for each xy position
+        :param _electron_timings: electron timings
+        :param n_photons_per_ele: number of photons for each electron
+        :param _photon_channels: channel of each photon
         :param config: dict of the wfsim config
+        :param phase: gas
         :param resource: instance of the resource class
         """
+
         # Luminescence Timings
         if 'simple' in config['s2_luminescence_model']:
-            photon_timings = S2.luminescence_timings_simple(xy, n_photons_per_xy,
-                                                            config=config,
-                                                            resource=resource)
+            _photon_timings = S2.luminescence_timings_simple(positions, n_photons_per_xy,
+                                                             config=config,
+                                                             resource=resource)
         elif 'garfield' in config['s2_luminescence_model']:
             # check to see if extraction region in Garfield needs to be confined
             if 'confine_position=' in config['s2_luminescence_model']:
@@ -415,29 +422,33 @@ class S2(Pulse):
             else:
                 confine_position = None
             # confine_position = True if 'confine_position=' in config['s2_luminescence_model'] else False
-            photon_timings = S2.luminescence_timings_garfield(xy, n_photons_per_xy,
-                                                              config=config,
-                                                              resource=resource,
-                                                              confine_position=confine_position)
+            _photon_timings = S2.luminescence_timings_garfield(positions, n_photons_per_xy,
+                                                               config=config,
+                                                               resource=resource,
+                                                               confine_position=confine_position)
         else:
             raise KeyError(f"{config['s2_luminescence_model']} is not valid! Use 'simple' or 'garfield'")
 
         # Emission Delay
-        photon_timings += Pulse.singlet_triplet_delays(len(photon_timings), config['singlet_fraction_gas'], config, phase)
+        _photon_timings += Pulse.singlet_triplet_delays(len(_photon_timings), config['singlet_fraction_gas'], config, phase)
 
         # Optical Propagation Delay
         if "optical_propagation" in config['s2_time_model']:
             # optical propagation splitting top and bottom
-            photon_timings += S2.optical_propagation(channels, config, resource.s2_optical_propagation_spline)
+            _photon_timings += S2.optical_propagation(channels, config, resource.s2_optical_propagation_spline)
         elif "zero_delay" in config['s2_time_model']:
             # no optical propagation delay
-            photon_timings += np.zeros_like(photon_timings, dtype=np.int64)
+            _photon_timings += np.zeros_like(_photon_timings, dtype=np.int64)
         elif "s2_time_spread around zero" in config['s2_time_model']:
             # simple/existing delay
-            photon_timings += np.random.normal(0, config['s2_time_spread'], len(photon_timings)).astype(np.int64)
+            _photon_timings += np.random.normal(0, config['s2_time_spread'], len(_photon_timings)).astype(np.int64)
         else:
             raise KeyError(f"{config['s2_time_model']} is not in any of the valid s2 time models")
-        return photon_timings
+
+        # repeat for n photons per electron # Should this be before adding delays?
+        _photon_timings += np.repeat(_electron_timings, n_photons_per_ele)
+
+        return _photon_timings
 
     @staticmethod
     def s2_pattern_map_diffuse(n_electron, z, xy, config, resource):
@@ -559,6 +570,6 @@ class S2(Pulse):
                     replace=True)
 
             _buffer_photon_channels.append(_photon_channels)
-        
+
         _photon_channels = np.concatenate(_buffer_photon_channels)
         return _photon_channels
