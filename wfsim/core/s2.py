@@ -111,8 +111,8 @@ class S2(Pulse):
 
         drift_time_mean = - z_obs / \
             drift_velocity_liquid + config['drift_time_gate']
-        _drift_time_mean = np.clip(drift_time_mean, 0, np.inf)
-        drift_time_spread = np.sqrt(2 * diffusion_constant_longitudinal * _drift_time_mean)
+        drift_time_mean = np.clip(drift_time_mean, 0, np.inf)
+        drift_time_spread = np.sqrt(2 * diffusion_constant_longitudinal * drift_time_mean)
         drift_time_spread /= drift_velocity_liquid
         return drift_time_mean, drift_time_spread
 
