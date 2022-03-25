@@ -17,6 +17,7 @@ flake8==4.0.1
 holoviews==1.14.5
 ipywidgets==7.6.4
 hypothesis==6.39.0
+jinja2==3.0.3                                  # Holoviews dependency
 jupyter-client==7.1.2                          # for ipywidgets
 keras==2.8.0                                   # Tensorflow dependency
 matplotlib==3.5.1
