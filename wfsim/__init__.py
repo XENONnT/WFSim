@@ -1,4 +1,4 @@
-__version__ = "0.5.12"
+__version__ = "0.5.13"
 
 from .core.afterpulse import *
 from .core.pulse import *
