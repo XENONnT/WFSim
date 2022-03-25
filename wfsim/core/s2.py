@@ -27,6 +27,50 @@ class S2(Pulse):
         self.phase = 'gas'  # To distinguish singlet/triplet time delay.
         self.luminescence_switch_threshold = 100  # When to use simplified model (NOT IN USE)
 
+    @staticmethod
+    def inverse_field_distortion_correction(x, y, z, resource):
+        """For 1T the pattern map is a data driven one so we need to reverse engineer field distortion correction
+        into the simulated positions
+        :param x: 1d array of float
+        :param y: 1d array of float
+        :param z: 1d array of float
+        :param resource: instance of resource class
+        returns z: 1d array, postions 2d array 
+        """
+        positions = np.array([x, y, z]).T
+        for i_iter in range(6):  # 6 iterations seems to work
+            dr = resource.fdc_3d(positions)
+            if i_iter > 0:
+                dr = 0.5 * dr + 0.5 * dr_pre  # Average between iter
+            dr_pre = dr
+
+            r_obs = np.sqrt(x**2 + y**2) - dr
+            x_obs = x * r_obs / (r_obs + dr)
+            y_obs = y * r_obs / (r_obs + dr)
+            z_obs = - np.sqrt(z**2 + dr**2)
+            positions = np.array([x_obs, y_obs, z_obs]).T
+
+        positions = np.array([x_obs, y_obs]).T 
+        return z_obs, positions
+    
+    @staticmethod
+    def field_distortion_comsol(x, y, z, resource):
+        """Field distortion from the COMSOL simulation for the given electrode configuration:
+        :param x: 1d array of float
+        :param y: 1d array of float
+        :param z: 1d array of float
+        :param resource: instance of resource class
+        returns z: 1d array, postions 2d array 
+        """
+        positions = np.array([np.sqrt(x**2 + y**2), z]).T
+        theta = np.arctan2(y, x)
+        r_obs = resource.fd_comsol(positions, map_name='r_distortion_map')
+        x_obs = r_obs * np.cos(theta)
+        y_obs = r_obs * np.sin(theta)
+        
+        positions = np.array([x_obs, y_obs]).T 
+        return z, positions
+
     def __call__(self, instruction):
         if len(instruction.shape) < 1:
             # shape of recarr is a bit strange
@@ -175,49 +219,66 @@ class S2(Pulse):
         return n_electron
 
     @staticmethod
-    def inverse_field_distortion_correction(x, y, z, resource):
-        """For 1T the pattern map is a data driven one so we need to reverse engineer field distortion correction
-        into the simulated positions
-        :param x: 1d array of float
-        :param y: 1d array of float
-        :param z: 1d array of float
-        :param resource: instance of resource class
-        returns z: 1d array, postions 2d array 
+    @njit
+    def electron_timings(t, n_electron, drift_time_mean, drift_time_spread, sc_gain, timings, gains,
+                         electron_trapping_time):
+        """Calculate arrival times of the electrons. Data is written to the timings and gains arrays
+        :param t: 1d array of ints
+        :param n_electron:1 d array of ints
+        :param drift_time_mean: 1d array of floats
+        :param drift_time_spread: 1d array of floats
+        :param sc_gain: secondary scintillation gain       
+        :param timings: empty array with length sum(n_electron)
+        :param gains: empty array with length sum(n_electron)
+        :param electron_trapping_time: configuration values
         """
-        positions = np.array([x, y, z]).T
-        for i_iter in range(6):  # 6 iterations seems to work
-            dr = resource.fdc_3d(positions)
-            if i_iter > 0:
-                dr = 0.5 * dr + 0.5 * dr_pre  # Average between iter
-            dr_pre = dr
+        assert len(timings) == np.sum(n_electron)
+        assert len(gains) == np.sum(n_electron)
+        assert len(sc_gain) == len(t)
 
-            r_obs = np.sqrt(x**2 + y**2) - dr
-            x_obs = x * r_obs / (r_obs + dr)
-            y_obs = y * r_obs / (r_obs + dr)
-            z_obs = - np.sqrt(z**2 + dr**2)
-            positions = np.array([x_obs, y_obs, z_obs]).T
+        i_electron = 0
+        for i in np.arange(len(t)):
+            # Calculate electron arrival times in the ELR region
+            for _ in np.arange(n_electron[i]):
+                _timing = np.random.exponential(electron_trapping_time)
+                _timing += np.random.normal(drift_time_mean[i], drift_time_spread[i])
+                timings[i_electron] = t[i] + int(_timing)
 
-        positions = np.array([x_obs, y_obs]).T 
-        return z_obs, positions
-    
+                # add manual fluctuation to sc gain
+                gains[i_electron] = sc_gain[i]
+                i_electron += 1
+
     @staticmethod
-    def field_distortion_comsol(x, y, z, resource):
-        """Field distortion from the COMSOL simulation for the given electrode configuration:
-        :param x: 1d array of float
-        :param y: 1d array of float
-        :param z: 1d array of float
-        :param resource: instance of resource class
-        returns z: 1d array, postions 2d array 
-        """
-        positions = np.array([np.sqrt(x**2 + y**2), z]).T
-        theta = np.arctan2(y, x)
-        r_obs = resource.fd_comsol(positions, map_name='r_distortion_map')
-        x_obs = r_obs * np.cos(theta)
-        y_obs = r_obs * np.sin(theta)
+    def get_n_photons(t, n_electron, z_obs, positions, sc_gain, config, resource):
+        """Generates photon timings for S2s.
+        Returns a list of photon timings and instructions repeated for original electron
         
-        positions = np.array([x_obs, y_obs]).T 
-        return z, positions
-    
+        :param t: 1d int array time of s2
+        :param n_electron: 1d float array number of electrons to simulate
+        :param z_obs: float array. Z positions of s2
+        :param positions: 2d float array, xy positions of s2
+        :param sc_gain: float, secondary s2 gain
+        :param config: dict of the wfsim config
+        :param resource: instance of the resource class """
+        # Get electron timings
+        drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z_obs, positions, config, resource)
+        _electron_timings = np.zeros(np.sum(n_electron), np.int64)
+        _electron_gains = np.zeros(np.sum(n_electron), np.float64)
+        S2.electron_timings(t, n_electron, drift_time_mean, drift_time_spread, sc_gain,
+                            _electron_timings, _electron_gains, config['electron_trapping_time'])
+        if len(_electron_timings) < 1:
+            return np.zeros(0, np.int64), np.zeros(0, np.int64), np.zeros(0)
+
+        # Populate with photons per e/ per position
+        n_photons_per_ele = np.random.poisson(_electron_gains)
+        n_photons_per_ele += np.random.normal(0, config.get('s2_gain_spread', 0), len(n_photons_per_ele)).astype(np.int64)
+        n_photons_per_ele[n_photons_per_ele < 0] = 0
+        #
+        n_photons_per_xy = np.cumsum(np.pad(n_photons_per_ele, [1, 0]))[np.cumsum(n_electron)]
+        n_photons_per_xy = np.diff(np.pad(n_photons_per_xy, [1, 0]))
+
+        return n_photons_per_xy, n_photons_per_ele, _electron_timings
+
     @staticmethod
     @njit
     def _luminescence_timings_simple(n, dG, E0, r, dr, rr, alpha, uE, p, n_photons):
@@ -314,36 +375,6 @@ class S2(Pulse):
         return resource.s2_luminescence['t'][index_row, index_col].astype(np.int64) - avgt
 
     @staticmethod
-    @njit
-    def electron_timings(t, n_electron, drift_time_mean, drift_time_spread, sc_gain, timings, gains,
-                         electron_trapping_time):
-        """Calculate arrival times of the electrons. Data is written to the timings and gains arrays
-        :param t: 1d array of ints
-        :param n_electron:1 d array of ints
-        :param drift_time_mean: 1d array of floats
-        :param drift_time_spread: 1d array of floats
-        :param sc_gain: secondary scintillation gain       
-        :param timings: empty array with length sum(n_electron)
-        :param gains: empty array with length sum(n_electron)
-        :param electron_trapping_time: configuration values
-        """
-        assert len(timings) == np.sum(n_electron)
-        assert len(gains) == np.sum(n_electron)
-        assert len(sc_gain) == len(t)
-
-        i_electron = 0
-        for i in np.arange(len(t)):
-            # Calculate electron arrival times in the ELR region
-            for _ in np.arange(n_electron[i]):
-                _timing = np.random.exponential(electron_trapping_time)
-                _timing += np.random.normal(drift_time_mean[i], drift_time_spread[i])
-                timings[i_electron] = t[i] + int(_timing)
-
-                # add manual fluctuation to sc gain
-                gains[i_electron] = sc_gain[i]
-                i_electron += 1
-
-    @staticmethod
     def optical_propagation(channels, config, spline):
         """Function gettting times from s2 timing splines:
         :param channels: The channels of all s2 photon
@@ -360,37 +391,6 @@ class S2(Pulse):
         prop_time[is_bottom] = spline(u_rand[is_bottom], map_name='bottom')
 
         return prop_time.astype(np.int64)
-
-    @staticmethod
-    def get_n_photons(t, n_electron, z_obs, positions, sc_gain, config, resource):
-        """Generates photon timings for S2s.
-        Returns a list of photon timings and instructions repeated for original electron
-        
-        :param t: 1d int array time of s2
-        :param n_electron: 1d float array number of electrons to simulate
-        :param z_obs: float array. Z positions of s2
-        :param positions: 2d float array, xy positions of s2
-        :param sc_gain: float, secondary s2 gain
-        :param config: dict of the wfsim config
-        :param resource: instance of the resource class """
-        # Get electron timings
-        drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z_obs, positions, config, resource)
-        _electron_timings = np.zeros(np.sum(n_electron), np.int64)
-        _electron_gains = np.zeros(np.sum(n_electron), np.float64)
-        S2.electron_timings(t, n_electron, drift_time_mean, drift_time_spread, sc_gain,
-                            _electron_timings, _electron_gains, config['electron_trapping_time'])
-        if len(_electron_timings) < 1:
-            return np.zeros(0, np.int64), np.zeros(0, np.int64), np.zeros(0)
-
-        # Populate with photons per e/ per position
-        n_photons_per_ele = np.random.poisson(_electron_gains)
-        n_photons_per_ele += np.random.normal(0, config.get('s2_gain_spread', 0), len(n_photons_per_ele)).astype(np.int64)
-        n_photons_per_ele[n_photons_per_ele < 0] = 0
-        #
-        n_photons_per_xy = np.cumsum(np.pad(n_photons_per_ele, [1, 0]))[np.cumsum(n_electron)]
-        n_photons_per_xy = np.diff(np.pad(n_photons_per_xy, [1, 0]))
-
-        return n_photons_per_xy, n_photons_per_ele, _electron_timings
 
     @staticmethod
     def photon_timings(positions, n_photons_per_xy, _electron_timings, n_photon_per_ele, _photon_channels, config, phase, resource):
