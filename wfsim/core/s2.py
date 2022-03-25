@@ -44,8 +44,8 @@ class S2(Pulse):
             z_obs, positions = z, np.array([x, y]).T
 
         n_electron = self.get_electron_yield(n_electron=n_electron,
-                                             positions= np.array([x, y]).T, # maps are in R_true, so orginal position should be here
-                                             z_obs=z, # maps are in Z_true, so orginal position should be here
+                                             xy_int= np.array([x, y]).T, # maps are in R_true, so orginal position should be here
+                                             z_int=z, # maps are in Z_true, so orginal position should be here
                                              config=self.config,
                                              resource=self.resource)
 
@@ -142,18 +142,18 @@ class S2(Pulse):
         return sc_gain
 
     @staticmethod
-    def get_electron_yield(n_electron, positions, z_obs, config, resource):
+    def get_electron_yield(n_electron, xy_int, z_int, config, resource):
         """Drift electrons up to the gas interface and absorb them
 
         :param n_electron: 1d array with ints as number of electrons
-        :param positions: 2d array of positions (floats)
-        :param z_obs: 1d array of floats with the observed z positions
+        :param xy_int: 2d array of xy interaction positions (floats)
+        :param z_int: 1d array of floats with the z interaction positions (floats)
         :param config: dict with wfsim config
 
         returns 1d array ints with number of electrons
         """
         # Average drift time of the electrons
-        drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z_obs, positions, config, resource)
+        drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z_int, xy_int, config, resource)
 
         # Absorb electrons during the drift, clipping to avoid artefacts of maps
         drift_time_mean=np.clip(drift_time_mean, a_min=0, a_max=np.inf)
@@ -163,7 +163,7 @@ class S2(Pulse):
 
         # Remove electrons in insensitive volume
         if config['enable_field_dependencies']['survival_probability_map']:
-            p_surv = resource.field_dependencies_map(z_obs, positions, map_name='survival_probability_map')
+            p_surv = resource.field_dependencies_map(z_int, xy_int, map_name='survival_probability_map')
             if np.any(p_surv<0) or np.any(p_surv>1):
                 # FIXME: this is necessary due to map artefacts, such as negative or values >1
                 p_surv=np.clip(p_surv, a_min = 0, a_max = 1)
