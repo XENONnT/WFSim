@@ -302,8 +302,7 @@ class Resource:
 
             # S2 photons timing optical propagation delays
             if config.get('s2_time_spline', False):
-                self.s2_optical_propagation_spline = straxen.get_resource(files['s2_time_spline'], fmt='json.gz')
-                # try with default method
+                self.s2_optical_propagation_spline = make_map(files['s2_time_spline'])
 
         elif config.get('detector', 'XENONnT') == 'XENONnT_neutron_veto':
             # Neutron veto PMT QE as function of wavelength

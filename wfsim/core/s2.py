@@ -317,6 +317,23 @@ class S2(Pulse):
                 gains[i_electron] = sc_gain[i]
                 i_electron += 1
 
+    @staticmethod
+    def optical_propagation(channels, config, spline):
+        """Function gettting times from s2 timing splines:
+        :param channels: The channels of all s2 photon
+        :param config: current configuration of wfsim
+        :param spline: pointer to s2 optical propagation splines from resources
+        """
+        prop_time = np.zeros_like(channels)
+        u_rand = np.random.rand(len(channels))
+
+        is_top = channels < config['n_top_pmts']
+        prop_time[is_top] = spline(u_rand[is_top], map_name='top')
+
+        is_bottom = channels >= config['n_top_pmts']
+        prop_time[is_bottom] = spline(u_rand[is_bottom], map_name='bottom')
+
+        return prop_time.astype(np.int64)
 
     @staticmethod
     def photon_timings(t, n_electron, z, xy, sc_gain, config, resource, phase):
@@ -385,8 +402,8 @@ class S2(Pulse):
         # Luminescence Timings
         if 'simple' in config['s2_luminescence_model']:
             photon_timings = S2.luminescence_timings_simple(xy, n_photons_per_xy,
-                                                             config=config,
-                                                             resource=resource)
+                                                            config=config,
+                                                            resource=resource)
         elif 'garfield' in config['s2_luminescence_model']:
             # check to see if extraction region in Garfield needs to be confined
             if 'confine_position=' in config['s2_luminescence_model']:
@@ -410,17 +427,8 @@ class S2(Pulse):
 
         # Optical Propagation Delay
         if "optical_propagation" in config['s2_time_model']:
-            # sample from inverse cdf of G4 distribution
-            bottom_index = channels > config['n_top_pmts']
-            top_index = ~bottom_index
-            spline = resource.s2_optical_propagation_spline
-            bins = np.linspace(0, 313, 1000) # do not change it unless you know the binning in data
-            for section, indices in zip(['top', 'bottom'], [top_index, bottom_index]):
-                splines = np.array(spline[section])
-                cdf = interpolate.interp1d(splines, bins[:-1], fill_value="extrapolate")
-                r = np.random.rand(len(photon_timings[indices]))
-                delay = cdf(r)
-                photon_timings[indices] += delay.astype(np.int64)
+            # optical propagation splitting top and bottom
+            photon_timings += S2.optical_propagation(channels, config, resource.s2_optical_propagation_spline)
         elif "zero_delay" in config['s2_time_model']:
             # no optical propagation delay
             photon_timings += np.zeros_like(photon_timings, dtype=np.int64)
