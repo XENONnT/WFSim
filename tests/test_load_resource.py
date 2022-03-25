@@ -37,6 +37,7 @@ def test_load_nt():
         "s2_correction_map": ["constant dummy", 1, []],
         "field_dependencies_map": ["constant dummy", 1, []],
         "gains": [1 for i in range(494)],
+        'tpc_length': straxen.tpc_z,
     }
     result = load_config(config)
     return result, config
