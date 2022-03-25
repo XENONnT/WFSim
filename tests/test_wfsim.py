@@ -70,6 +70,7 @@ def test_sim_nT_basics():
         conf['gain_model_mc'] = ("to_pe_placeholder", True)
         conf['hev_gain_model'] = ("to_pe_placeholder", True)
         conf['hit_min_amplitude'] = 'pmt_commissioning_initial'
+        conf['tpc_length'] = straxen.tpc_z
         resource, conf_override = test_load_nt()
 
         # The SPE table in this package is for a single channel
