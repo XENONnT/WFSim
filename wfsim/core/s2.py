@@ -98,15 +98,15 @@ class S2(Pulse):
                                              config=self.config,
                                              resource=self.resource)
 
-        n_photon_per_xy, n_photon_per_ele, self._electron_timings = self.get_n_photon(t=t,
-                                                                                      n_electron=n_electron,
-                                                                                      z_obs=z_obs,
-                                                                                      positions=positions,
-                                                                                      sc_gain=sc_gain, 
-                                                                                      config=self.config,
-                                                                                      resource=self.resource)
+        n_photons_per_xy, n_photons_per_ele, self._electron_timings = self.get_n_photons(t=t,
+                                                                                         n_electron=n_electron,
+                                                                                         z_obs=z_obs,
+                                                                                         positions=positions,
+                                                                                         sc_gain=sc_gain, 
+                                                                                         config=self.config,
+                                                                                         resource=self.resource)
 
-        self._instruction = np.repeat(np.arange(len(xy)), n_photons_per_xy)
+        self._instruction = np.repeat(np.arange(len(n_electron)), n_photons_per_xy)
         self._photon_channels = self.photon_channels(n_electron=n_electron,
                                                      z_obs=z_obs,
                                                      positions=positions,
@@ -118,9 +118,9 @@ class S2(Pulse):
         self._photon_timings = self.photon_timings(positions=positions, 
                                                    n_photons_per_xy=n_photons_per_xy,
                                                    _electron_timings=self._electron_timings,
-                                                   n_photon_per_ele=n_photon_per_ele,
+                                                   n_photons_per_ele=n_photons_per_ele,
                                                    _photon_channels=self._photon_channels,
-                                                   phase=self.phase
+                                                   phase=self.phase,
                                                    config=self.config,
                                                    resource=self.resource,)
 
@@ -266,8 +266,6 @@ class S2(Pulse):
         _electron_gains = np.zeros(np.sum(n_electron), np.float64)
         S2.electron_timings(t, n_electron, drift_time_mean, drift_time_spread, sc_gain,
                             _electron_timings, _electron_gains, config['electron_trapping_time'])
-        if len(_electron_timings) < 1:
-            return np.zeros(0, np.int64), np.zeros(0, np.int64), np.zeros(0)
 
         # Populate with photons per e/ per position
         n_photons_per_ele = np.random.poisson(_electron_gains)
@@ -382,7 +380,7 @@ class S2(Pulse):
         :param spline: pointer to s2 optical propagation splines from resources
         """
         prop_time = np.zeros_like(channels)
-        u_rand = np.random.rand(len(channels))
+        u_rand = np.random.rand(len(channels))[:, None]
 
         is_top = channels < config['n_top_pmts']
         prop_time[is_top] = spline(u_rand[is_top], map_name='top')
@@ -393,7 +391,7 @@ class S2(Pulse):
         return prop_time.astype(np.int64)
 
     @staticmethod
-    def photon_timings(positions, n_photons_per_xy, _electron_timings, n_photon_per_ele, _photon_channels, config, phase, resource):
+    def photon_timings(positions, n_photons_per_xy, _electron_timings, n_photons_per_ele, _photon_channels, phase, config, resource):
         """Get photon times and add delays based on models
 
         :param positions: 2d float array, xy positions of s2
@@ -435,7 +433,7 @@ class S2(Pulse):
         # Optical Propagation Delay
         if "optical_propagation" in config['s2_time_model']:
             # optical propagation splitting top and bottom
-            _photon_timings += S2.optical_propagation(channels, config, resource.s2_optical_propagation_spline)
+            _photon_timings += S2.optical_propagation(_photon_channels, config, resource.s2_optical_propagation_spline)
         elif "zero_delay" in config['s2_time_model']:
             # no optical propagation delay
             _photon_timings += np.zeros_like(_photon_timings, dtype=np.int64)
@@ -521,6 +519,10 @@ class S2(Pulse):
         :param config: dict wfsim config
         :param resource: instance of resource class
         """
+        if len(_instruction) == 0:
+            _photon_channels = np.zeros(0, dtype=np.int64)
+            return _photon_channels
+
         aft = config['s2_mean_area_fraction_top']
         aft_sigma = config.get('s2_aft_sigma', 0.0118)
         aft_skewness = config.get('s2_aft_skewness', -1.433)
