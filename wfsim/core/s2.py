@@ -86,7 +86,6 @@ class S2(Pulse):
             drift_v_LXe = resource.field_dependencies_map(z, xy, map_name='drift_speed_map')  # mm/µs
             drift_v_LXe *= 1e-4  # cm/ns
             drift_v_LXe *= resource.drift_velocity_scaling
-            drift_v_LXe
         else:
             drift_v_LXe=config['drift_velocity_liquid']
         return(drift_v_LXe)
