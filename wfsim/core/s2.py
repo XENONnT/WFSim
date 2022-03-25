@@ -92,24 +92,24 @@ class S2(Pulse):
         return(drift_v_LXe)
 
     @staticmethod
-    def get_s2_drift_time_params(z_obs, positions, config, resource):
+    def get_s2_drift_time_params(z_int, xy_int, config, resource):
         """Calculate s2 drift time mean and spread
 
-        :param positions: 1d array of z (floats)
-        :param positions: 2d array of positions (floats)
+        :param z_int: 1d array of true z (floats) 
+        :param xy_int: 2d array of true xy positions (floats)
         :param config: dict with wfsim config
         :param resource: instance of the resource class
 
         returns two arrays of floats (mean drift time, drift time spread) 
         """
-        drift_velocity_liquid = S2.get_avg_drift_velocity(z_obs, positions, config, resource)
+        drift_velocity_liquid = S2.get_avg_drift_velocity(z_int, xy_int, config, resource)
         if config['enable_field_dependencies']['diffusion_longitudinal_map']:
-            diffusion_constant_longitudinal = resource.field_dependencies_map(z_obs, positions, map_name='diffusion_longitudinal_map')  # cm²/s
+            diffusion_constant_longitudinal = resource.field_dependencies_map(z_int, xy_int, map_name='diffusion_longitudinal_map')  # cm²/s
             diffusion_constant_longitudinal *= 1e-9  # cm²/ns
         else:
             diffusion_constant_longitudinal = config['diffusion_constant_longitudinal']
 
-        drift_time_mean = - z_obs / \
+        drift_time_mean = - z_int / \
             drift_velocity_liquid + config['drift_time_gate']
         drift_time_mean = np.clip(drift_time_mean, 0, np.inf)
         drift_time_spread = np.sqrt(2 * diffusion_constant_longitudinal * drift_time_mean)
@@ -155,8 +155,7 @@ class S2(Pulse):
         # Average drift time of the electrons
         drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z_int, xy_int, config, resource)
 
-        # Absorb electrons during the drift, clipping to avoid artefacts of maps
-        drift_time_mean=np.clip(drift_time_mean, a_min=0, a_max=np.inf)
+        # Absorb electrons during the drift
         electron_lifetime_correction = np.exp(- 1 * drift_time_mean /
                                               config['electron_lifetime_liquid'])
         cy = config['electron_extraction_yield'] * electron_lifetime_correction
