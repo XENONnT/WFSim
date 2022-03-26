@@ -41,10 +41,10 @@ def test_sim_1T():
                 nchunk=2, event_rate=1, chunk_size=1,
                 detector='XENON1T',
                 fax_config=('https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files'
-                            '/c76f30ad20516efbcc832c97842abcba743f0017/sim_files/fax_config_1t.json'),  # noqa
+                            '/36d352580b328ff057b1588b8af8c9a6ed8ae704/sim_files/fax_config_1t.json'),  # noqa
                 fax_config_override=dict(
                     url_base=("https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files"
-                              "/c76f30ad20516efbcc832c97842abcba743f0017/sim_files/"), ),
+                              "/36d352580b328ff057b1588b8af8c9a6ed8ae704/sim_files/"), ),
                 **straxen.contexts.x1t_common_config),
             **straxen.contexts.x1t_context_config,
         )
@@ -87,7 +87,7 @@ def test_sim_nT_basics():
                 nchunk=1, event_rate=1, chunk_size=2,
                 detector='XENONnT',
                 fax_config=('https://raw.githubusercontent.com/XENONnT/WFSim'
-                            '/9e6ecfab13a314a83eec9844ba40811bc4a2dc36/files/XENONnT_wfsim_config.json'),
+                            '/b33656ac59d0366ccf3b20ab0686500cfd403cb6/files/XENONnT_wfsim_config.json'),
                 **conf,
                 fax_config_override=conf_override),
             **straxen.contexts.common_opts)
