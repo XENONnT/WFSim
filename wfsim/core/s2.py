@@ -420,21 +420,16 @@ class S2(Pulse):
         """
 
         # Luminescence Timings
-        if 'simple' in config['s2_luminescence_model']:
+        if config['s2_luminescence_model']=='simple':
             _photon_timings = S2.luminescence_timings_simple(positions, n_photons_per_xy,
                                                              config=config,
                                                              resource=resource)
-        elif 'garfield' in config['s2_luminescence_model']:
+        elif config['s2_luminescence_model']=='garfield':
             # check to see if extraction region in Garfield needs to be confined
-            if 'confine_position=' in config['s2_luminescence_model']:
-                try:
-                    confine_position = float(config['s2_luminescence_model'].split('=')[1].split(' ')[0])
-                except ValueError:
-                    # if the default is 'None'
-                    confine_position = None
-            else:
-                confine_position = None
-            # confine_position = True if 'confine_position=' in config['s2_luminescence_model'] else False
+            confine_position=None
+            if 's2_garfield_confine_position' in config:
+                if config['s2_garfield_confine_position'] > 0.0:
+                    confine_position=config['s2_garfield_confine_position']
             _photon_timings = S2.luminescence_timings_garfield(positions, n_photons_per_xy,
                                                                config=config,
                                                                resource=resource,
