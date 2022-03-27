@@ -280,7 +280,14 @@ class Resource:
             # This config entry a dictionary of 5 items
             if any(config['enable_field_dependencies'].values()):
                 field_dependencies_map = make_map(files['field_dependencies_map'], fmt='json.gz', method='RectBivariateSpline')
-
+                self.drift_velocity_scaling=1.0
+                # calculating drift velocity scaling to match total drift time for R=0 between cathode and gate
+                if "norm_drift_velocity" in config['enable_field_dependencies'].keys():
+                    if config['enable_field_dependencies']['norm_drift_velocity']:
+                        norm_dvel = field_dependencies_map(np.array([ [0], [- config['tpc_length']]]).T,
+                                                           map_name='drift_speed_map')[0]
+                        norm_dvel*=1e-4
+                        self.drift_velocity_scaling=config['drift_velocity_liquid']/norm_dvel
                 def rz_map(z, xy, **kwargs):
                     r = np.sqrt(xy[:, 0]**2 + xy[:, 1]**2)
                     return field_dependencies_map(np.array([r, z]).T, **kwargs)
