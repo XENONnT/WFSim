@@ -88,15 +88,16 @@ class S2(Pulse):
         else:
             z_obs, positions = z, np.array([x, y]).T
 
+        n_electron = self.get_electron_yield(n_electron=n_electron,
+                                             xy_int= np.array([x, y]).T, # maps are in R_true, so orginal position should be here
+                                             z_int=z, # maps are in Z_true, so orginal position should be here
+                                             config=self.config,
+                                             resource=self.resource)
+
         sc_gain = self.get_s2_light_yield(positions=positions,
                                           config=self.config,
                                           resource=self.resource)
 
-        n_electron = self.get_electron_yield(n_electron=n_electron,
-                                             positions=positions,
-                                             z_obs=z_obs,
-                                             config=self.config,
-                                             resource=self.resource)
 
         n_photons_per_xy, n_photons_per_ele, self._electron_timings = self.get_n_photons(t=t,
                                                                                          n_electron=n_electron,
@@ -134,33 +135,47 @@ class S2(Pulse):
         super().__call__()
 
     @staticmethod
-    def get_s2_drift_time_params(z_obs, positions, config, resource):
+    def get_avg_drift_velocity(z, xy, config, resource):
         """Calculate s2 drift time mean and spread
 
         :param positions: 1d array of z (floats)
-        :param positions: 2d array of positions (floats)
+        :param xy: 2d array of xy positions (floats)
+        :param config: dict with wfsim config
+        :param resource: instance of the resource class
+
+        returns array of floats corresponding to average drift velocities from given point to the gate
+        """
+        drift_v_LXe=None
+        if config['enable_field_dependencies']['drift_speed_map']:
+            drift_v_LXe = resource.field_dependencies_map(z, xy, map_name='drift_speed_map')  # mm/µs
+            drift_v_LXe *= 1e-4  # cm/ns
+            drift_v_LXe *= resource.drift_velocity_scaling
+        else:
+            drift_v_LXe=config['drift_velocity_liquid']
+        return(drift_v_LXe)
+
+    @staticmethod
+    def get_s2_drift_time_params(z_int, xy_int, config, resource):
+        """Calculate s2 drift time mean and spread
+
+        :param z_int: 1d array of true z (floats) 
+        :param xy_int: 2d array of true xy positions (floats)
         :param config: dict with wfsim config
         :param resource: instance of the resource class
 
         returns two arrays of floats (mean drift time, drift time spread) 
         """
-
-        if config['enable_field_dependencies']['drift_speed_map']:
-            drift_velocity_liquid = resource.field_dependencies_map(z_obs, positions, map_name='drift_speed_map')  # mm/µs
-            drift_velocity_liquid *= 1e-4  # cm/ns
-        else:
-            drift_velocity_liquid = config['drift_velocity_liquid']
-            
+        drift_velocity_liquid = S2.get_avg_drift_velocity(z_int, xy_int, config, resource)
         if config['enable_field_dependencies']['diffusion_longitudinal_map']:
-            diffusion_constant_longitudinal = resource.field_dependencies_map(z_obs, positions, map_name='diffusion_longitudinal_map')  # cm²/s
+            diffusion_constant_longitudinal = resource.field_dependencies_map(z_int, xy_int, map_name='diffusion_longitudinal_map')  # cm²/s
             diffusion_constant_longitudinal *= 1e-9  # cm²/ns
         else:
             diffusion_constant_longitudinal = config['diffusion_constant_longitudinal']
 
-        drift_time_mean = - z_obs / \
+        drift_time_mean = - z_int / \
             drift_velocity_liquid + config['drift_time_gate']
-        _drift_time_mean = np.clip(drift_time_mean, 0, np.inf)
-        drift_time_spread = np.sqrt(2 * diffusion_constant_longitudinal * _drift_time_mean)
+        drift_time_mean = np.clip(drift_time_mean, 0, np.inf)
+        drift_time_spread = np.sqrt(2 * diffusion_constant_longitudinal * drift_time_mean)
         drift_time_spread /= drift_velocity_liquid
         return drift_time_mean, drift_time_spread
 
@@ -190,18 +205,18 @@ class S2(Pulse):
         return sc_gain
 
     @staticmethod
-    def get_electron_yield(n_electron, positions, z_obs, config, resource):
+    def get_electron_yield(n_electron, xy_int, z_int, config, resource):
         """Drift electrons up to the gas interface and absorb them
 
         :param n_electron: 1d array with ints as number of electrons
-        :param positions: 2d array of positions (floats)
-        :param z_obs: 1d array of floats with the observed z positions
+        :param xy_int: 2d array of xy interaction positions (floats)
+        :param z_int: 1d array of floats with the z interaction positions (floats)
         :param config: dict with wfsim config
 
         returns 1d array ints with number of electrons
         """
         # Average drift time of the electrons
-        drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z_obs, positions, config, resource)
+        drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z_int, xy_int, config, resource)
 
         # Absorb electrons during the drift
         electron_lifetime_correction = np.exp(- 1 * drift_time_mean /
@@ -210,11 +225,11 @@ class S2(Pulse):
 
         # Remove electrons in insensitive volume
         if config['enable_field_dependencies']['survival_probability_map']:
-            survival_probability = resource.field_dependencies_map(z_obs, positions, map_name='survival_probability_map')
-            cy *= survival_probability
-
-        # why are there cy greater than 1? We should check this
-        cy = np.clip(cy, a_min = 0, a_max = 1)
+            p_surv = resource.field_dependencies_map(z_int, xy_int, map_name='survival_probability_map')
+            if np.any(p_surv<0) or np.any(p_surv>1):
+                # FIXME: this is necessary due to map artefacts, such as negative or values >1
+                p_surv=np.clip(p_surv, a_min = 0, a_max = 1)
+            cy *= p_surv
         n_electron = np.random.binomial(n=n_electron, p=cy)
         return n_electron
 
@@ -462,13 +477,8 @@ class S2(Pulse):
         :param resource: instance of the resource class
         """
         assert all(z < 0), 'All S2 in liquid should have z < 0'
-        
-        if config['enable_field_dependencies']['drift_speed_map']:
-            drift_velocity_liquid = resource.field_dependencies_map(z, xy, map_name='drift_speed_map')  # mm/µs
-            drift_velocity_liquid *= 1e-4  # cm/ns
-        else:
-            drift_velocity_liquid = config['drift_velocity_liquid']
-            
+        drift_velocity_liquid=S2.get_avg_drift_velocity(z, xy, config, resource)
+
         if config['enable_field_dependencies']['diffusion_transverse_map']:
             diffusion_constant_radial = resource.field_dependencies_map(z, xy, map_name='diffusion_radial_map')  # cm²/s
             diffusion_constant_azimuthal = resource.field_dependencies_map(z, xy, map_name='diffusion_azimuthal_map') # cm²/s
