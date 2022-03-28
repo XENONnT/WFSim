@@ -189,6 +189,13 @@ class PMT_Afterpulse(Pulse):
 
             # Select those photons with U <= max of cdf of specific channel
             cdf_max = delaytime_cdf[signal_pulse._photon_channels, -1]
+            if cdf_max.max() * config['pmt_ap_modifier'] > 0.5:
+                prob = cdf_max.max() * config['pmt_ap_modifier']
+                log.warning(f'PMT after pulse probability is {prob} larger than 0.5?')
+
+            # Double the probability for those photon emitting dpe
+            cdf_max[signal_pulse._photon_emit_dpe] *= 2
+
             sel_photon_id = np.where(rU0 <= cdf_max * config['pmt_ap_modifier'])[0]
             if len(sel_photon_id) == 0:
                 continue

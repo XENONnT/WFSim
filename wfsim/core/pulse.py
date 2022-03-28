@@ -62,6 +62,7 @@ class Pulse(object):
         self._n_pe_trigger = self._n_pe_trigger_bottom = 0
         self._raw_area = self._raw_area_bottom = 0
         self._raw_area_trigger = self._raw_area_trigger_bottom = 0
+        self._photon_emit_dpe = np.zeros(len(self._photon_timings), dtype=np.bool_)  # For PMT afterpulse
 
         counts_start = 0  # Secondary loop index for assigning channel
         for channel, counts in zip(*np.unique(self._photon_channels, return_counts=True)):
@@ -86,6 +87,8 @@ class Pulse(object):
 
                 _channel_photon_gains[:n_double_pe] += self.config['gains'][channel] \
                     * self.uniform_to_pe_arr(np.random.random(n_double_pe), channel)
+
+                self._photon_emit_dpe[counts_start: counts_start+n_double_pe] = True
 
             else:
                 n_double_pe = 0
