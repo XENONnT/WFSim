@@ -98,6 +98,7 @@ class Resource:
                 'fdc_3d': 'XnT_3D_FDC_xyt_dummy_all_zeros_v0.1.json.gz',
                 'field_dependencies_map': '',
                 's1_time_spline': 'XENONnT_s1_proponly_va43fa9b_wires_20200625.json.gz',
+                's2_time_spline': '',
              })
 
         elif config['detector'] == 'XENONnT_neutron_veto':
@@ -256,7 +257,8 @@ class Resource:
                 self.s2_correction_map = s2cmap
 
             # Garfield luminescence timing samples
-            if config.get('s2_luminescence_model', False) == 'garfield':
+            # if config.get('s2_luminescence_model', False) == 'garfield':
+            if 'garfield' in config.get('s2_luminescence_model', ''):
                 s2_luminescence_map = straxen.get_resource(files['s2_luminescence'], fmt='npy_pickle')['arr_0']
                 # Get directly the map for the simulated level
                 liquid_level_available = np.unique(s2_luminescence_map['ll'])  # available levels (cm)
@@ -304,6 +306,10 @@ class Resource:
             # Electron After Pulses
             if config.get('enable_electron_afterpulses', False):
                 self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
+
+            # S2 photons timing optical propagation delays
+            if config.get('s2_time_spline', False):
+                self.s2_optical_propagation_spline = make_map(files['s2_time_spline'])
 
         elif config.get('detector', 'XENONnT') == 'XENONnT_neutron_veto':
             # Neutron veto PMT QE as function of wavelength
