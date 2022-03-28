@@ -122,6 +122,7 @@ def test_sim_nT_advanced():
         st.set_config(dict(nchunk=1, event_rate=1, chunk_size=2,))
 
         st.set_config({'fax_config_override': dict(s2_luminescence_model='simple',
+                                                   s2_time_model="s2_time_spread around zero",
                                                    s1_lce_correction_map='XENONnT_s1_xyz_LCE_corrected_qes_MCva43fa9b_wires.json.gz',
                                                    s1_time_spline='XENONnT_s1_proponly_va43fa9b_wires_20200625.json.gz',
                                                    s1_model_type='optical_propagation+simple',)})
@@ -173,6 +174,7 @@ def test_sim_mc_chain():
             fax_config='fax_config_nt_design.json',
             fax_config_override=dict(
                 s1_model_type='nest',
+                s2_time_model="s2_time_spread around zero",
                 url_base='https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/master/sim_files',
                 s1_lce_correction_map=["constant dummy", 1, []],
                 enable_electron_afterpulses=False),
