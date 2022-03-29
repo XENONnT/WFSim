@@ -146,8 +146,6 @@ class S2(Pulse):
         
         cy[np.linalg.norm(positions, axis = 1)>config['out_of_bounds_radius']] = config['out_of_bounds_ext_eff']
         
-        print(np.sum(np.isnan(cy)))
-        
         # Remove electrons in insensitive volume
         if config['enable_field_dependencies']['survival_probability_map']:
             survival_probability = resource.field_dependencies_map(z_obs, positions, map_name='survival_probability_map')
@@ -314,6 +312,8 @@ class S2(Pulse):
         assert len(timings) == np.sum(n_electron)
         assert len(gains) == np.sum(n_electron)
         assert len(sc_gain) == len(t)
+        
+        print(n_electron)
         
         i_electron = 0
         for i in np.arange(len(t)):
