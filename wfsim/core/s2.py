@@ -256,7 +256,7 @@ class S2(Pulse):
         return S2._luminescence_timings_simple(len(xy), dG, E0, 
                                                r, dr, rr, alpha, uE,
                                                pressure, n_photons)
-
+    
     @staticmethod
     def luminescence_timings_garfield(xy, n_photons, config, resource, confxy):
         """
@@ -270,39 +270,10 @@ class S2(Pulse):
         """
         assert 's2_luminescence' in resource.__dict__, 's2_luminescence model not found'
         assert len(n_photons) == len(xy), 'Input number of n_electron should have same length as positions'
-#         assert len(resource.s2_luminescence['t'].shape) == 2, 'Timing data is expected to have D2'
-
-#         if type(confxy)==float:
-#             distance = np.random.uniform(-confxy, confxy, len(xy))
-#         else:
-#             tilt = config.get('anode_xaxis_angle', np.pi / 4)
-#             pitch = config.get('anode_pitch', 0.5)
-#             rotation_mat = np.array(((np.cos(tilt), -np.sin(tilt)), (np.sin(tilt), np.cos(tilt))))
-#             jagged = lambda relative_y: (relative_y + pitch / 2) % pitch - pitch / 2
-#             distance = jagged(np.matmul(xy, rotation_mat)[:, 1])  # shortest distance from any wire
         
+        draw_index = np.digitize(resource.garfield_gas_gap_map(xy), resource.s2_luminescence['gas_gap'])-1
         
-#         index_row = [np.argmin(np.abs(d - resource.s2_luminescence['x'])) for d in distance]
-        #This is just for testing!!! Later we want to 
-#         index_row = np.repeat(np.digitize(config['anode_sag'], resource.s2_luminescence['anode_sag'])-1,len(xy))
-
-#         index_row = np.repeat(np.where((resource.s2_luminescence['anode_sag']>=config['anode_sag']-0.01)&
-#                              (resource.s2_luminescence['anode_sag']<=config['anode_sag']+0.01))[0][0], len(xy))
-
-        index_row = np.repeat(np.where((resource.s2_luminescence['anode_sag']>=config['anode_sag']-0.01)&
-                             (resource.s2_luminescence['anode_sag']<=config['anode_sag']+0.01)&
-                             (resource.s2_luminescence['liquid_level']>=config['liquid_level']-0.01)&
-                             (resource.s2_luminescence['liquid_level']<=config['liquid_level']+0.01))[0][0], len(xy))
-        
-        index_row = np.repeat(index_row, n_photons).astype(np.int64)
-        #For the "index" of the inverse-cdf's x-axis, this is a float because I will interpolate
-        index_col_sample = np.random.uniform(0, resource.s2_luminescence['timing_inv_cdf'].shape[1], np.sum(n_photons))
-        index_col = np.digitize(index_col_sample, np.arange(resource.s2_luminescence['timing_inv_cdf'].shape[1]-1))-1
-        
-        return (resource.s2_luminescence['timing_inv_cdf'][index_row, index_col+1]-resource.s2_luminescence['timing_inv_cdf'][index_row, index_col])*(index_col_sample-index_col)+resource.s2_luminescence['timing_inv_cdf'][index_row, index_col]
-        
-#         avgt = np.average(resource.s2_luminescence['t']).astype(int)
-#         return resource.s2_luminescence['t'][index_row, index_col].astype(np.int64) - avgt
+        return draw_excitation_times(resource.s2_luminescence['timing_inv_cdf'], draw_index, n_photons)
 
     @staticmethod
     @njit
@@ -566,6 +537,19 @@ class S2(Pulse):
         
         _photon_channels = np.concatenate(_buffer_photon_channels)
         return _photon_channels
+
+@numba.njit()
+def draw_excitation_times(inv_cdf_list, hist_indices, nph):
+    inv_cdf_len = len(inv_cdf_list[0])
+    timings = np.zeros(np.sum(nph))
+    count = 0
+    for i, (hist_ind, n) in enumerate(zip(hist_indices, nph)):
+        samples = np.random.uniform(0, inv_cdf_len, n)
+        t1 = inv_cdf_list[hist_ind][np.floor(samples).astype('int')]
+        t2 = inv_cdf_list[hist_ind][np.ceil(samples).astype('int')]
+        timings[count:count+n] = (t2-t1)*(samples - np.floor(samples))+t1
+        count+=n
+    return timings
 
 @export
 class PhotoIonization_Electron(S2):
