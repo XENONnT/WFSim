@@ -138,13 +138,13 @@ class S2(Pulse):
                                               config['electron_lifetime_liquid'])
         
         
-        cy = config['electron_extraction_yield'] * electron_lifetime_correction
-#         cy = config['g2_mean']*resource.s2_correction_map(positions)*electron_lifetime_correction/resource.se_gain_map(positions)
+#         cy = config['electron_extraction_yield'] * electron_lifetime_correction
+        cy = config['g2_mean']*resource.s2_correction_map(positions)*electron_lifetime_correction/resource.se_gain_map(positions)
         print(cy, positions, resource.s2_correction_map(positions), resource.se_gain_map(positions), config['g2_mean'])
         #This method will get some strange results at the edge of the tpc, so it replaces the extraction efficiency
         #for the edge of the tpc with some nominal set value
         
-#         cy[np.linalg.norm(positions, axis = 1)>config['out_of_bounds_radius']] = config['out_of_bounds_ext_eff']
+        cy[np.linalg.norm(positions, axis = 1)>config['out_of_bounds_radius']] = config['out_of_bounds_ext_eff']
         
         # Remove electrons in insensitive volume
         if config['enable_field_dependencies']['survival_probability_map']:
