@@ -258,6 +258,20 @@ class S2(Pulse):
                                                pressure, n_photons)
     
     @staticmethod
+    @njit
+    def draw_excitation_times(inv_cdf_list, hist_indices, nph):
+        inv_cdf_len = len(inv_cdf_list[0])
+        timings = np.zeros(np.sum(nph))
+        count = 0
+        for i, (hist_ind, n) in enumerate(zip(hist_indices, nph)):
+            samples = np.random.uniform(0, inv_cdf_len, n)
+            t1 = inv_cdf_list[hist_ind][np.floor(samples).astype('int')]
+            t2 = inv_cdf_list[hist_ind][np.ceil(samples).astype('int')]
+            timings[count:count+n] = (t2-t1)*(samples - np.floor(samples))+t1
+            count+=n
+        return timings
+    
+    @staticmethod
     def luminescence_timings_garfield(xy, n_photons, config, resource, confxy):
         """
         Luminescence time distribution computation according to garfield scintillation maps
@@ -273,7 +287,7 @@ class S2(Pulse):
         
         draw_index = np.digitize(resource.garfield_gas_gap_map(xy), resource.s2_luminescence['gas_gap'])-1
         
-        return draw_excitation_times(resource.s2_luminescence['timing_inv_cdf'], draw_index, n_photons)
+        return S2.draw_excitation_times(resource.s2_luminescence['timing_inv_cdf'], draw_index, n_photons)
 
     @staticmethod
     @njit
@@ -292,7 +306,7 @@ class S2(Pulse):
         assert len(timings) == np.sum(n_electron)
         assert len(gains) == np.sum(n_electron)
         assert len(sc_gain) == len(t)
-
+        
         i_electron = 0
         for i in np.arange(len(t)):
             # Calculate electron arrival times in the ELR region
@@ -538,18 +552,6 @@ class S2(Pulse):
         _photon_channels = np.concatenate(_buffer_photon_channels)
         return _photon_channels
 
-@njit
-def draw_excitation_times(inv_cdf_list, hist_indices, nph):
-    inv_cdf_len = len(inv_cdf_list[0])
-    timings = np.zeros(np.sum(nph))
-    count = 0
-    for i, (hist_ind, n) in enumerate(zip(hist_indices, nph)):
-        samples = np.random.uniform(0, inv_cdf_len, n)
-        t1 = inv_cdf_list[hist_ind][np.floor(samples).astype('int')]
-        t2 = inv_cdf_list[hist_ind][np.ceil(samples).astype('int')]
-        timings[count:count+n] = (t2-t1)*(samples - np.floor(samples))+t1
-        count+=n
-    return timings
 
 @export
 class PhotoIonization_Electron(S2):
