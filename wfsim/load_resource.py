@@ -94,6 +94,7 @@ class Resource:
                 'photon_ap_cdfs': 'XENONnT_pmt_afterpulse_config_012605.json.gz',
                 's2_luminescence': 'XENONnT_GARFIELD_B1d5n_C30n_G1n_A6d5p_T1d5n_PMTs1d5n_FSR0d95n.npz',
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
+                'garfield_gas_gap_map': '/dali/jyangqi/s2only_stuff/garfield_gas_gap_map.json'
                 'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
                 'noise_file': 'x1t_noise_170203_0850_00_small.npz',
                 'fdc_3d': 'XnT_3D_FDC_xyt_dummy_all_zeros_v0.1.json.gz',
@@ -237,7 +238,7 @@ class Resource:
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='pkl')
             
             self.se_gain_map = make_map(files['se_gain_map'])
-
+            
             # if there is a (data driven!) map, load it. If not make it  from the pattern map
             if files['s1_lce_correction_map']:
                 self.s1_lce_correction_map = make_map(files['s1_lce_correction_map'])
@@ -263,11 +264,8 @@ class Resource:
             # if config.get('s2_luminescence_model', False) == 'garfield':
             if 'garfield' in config.get('s2_luminescence_model', ''):
                 s2_luminescence_map = straxen.get_resource(files['s2_luminescence'], fmt='npy')
-                # Get directly the map for the simulated level
-#                 liquid_level_available = np.unique(s2_luminescence_map['ll'])  # available levels (cm)
-#                 liquid_level = config['gate_to_anode_distance'] - config['elr_gas_gap_length']  # cm
-#                 liquid_level = min(liquid_level_available, key=lambda x: abs(x - liquid_level))
-                self.s2_luminescence = s2_luminescence_map #s2_luminescence_map[s2_luminescence_map['ll'] == liquid_level]
+                self.s2_luminescence = s2_luminescence_map
+                self.garfield_gas_gap_map = make_map(files['garfield_gas_gap_map'], fmt = 'json')
 
             if config.get('field_distortion_model', "none") == "inverse_fdc":
                 self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
