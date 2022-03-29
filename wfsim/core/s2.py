@@ -140,6 +140,7 @@ class S2(Pulse):
         
 #         cy = config['electron_extraction_yield'] * electron_lifetime_correction
         cy = config['g2_mean']*resource.s2_correction_map(positions)*electron_lifetime_correction/resource.se_gain_map(positions)
+        cy = np.nan_to_num(cy)
         # Remove electrons in insensitive volume
         if config['enable_field_dependencies']['survival_probability_map']:
             survival_probability = resource.field_dependencies_map(z_obs, positions, map_name='survival_probability_map')
