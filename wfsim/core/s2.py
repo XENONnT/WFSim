@@ -538,7 +538,7 @@ class S2(Pulse):
         _photon_channels = np.concatenate(_buffer_photon_channels)
         return _photon_channels
 
-@numba.njit()
+@njit
 def draw_excitation_times(inv_cdf_list, hist_indices, nph):
     inv_cdf_len = len(inv_cdf_list[0])
     timings = np.zeros(np.sum(nph))
