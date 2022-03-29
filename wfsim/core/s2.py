@@ -312,9 +312,7 @@ class S2(Pulse):
         assert len(timings) == np.sum(n_electron)
         assert len(gains) == np.sum(n_electron)
         assert len(sc_gain) == len(t)
-        
-        print(n_electron)
-        
+                
         i_electron = 0
         for i in np.arange(len(t)):
             # Calculate electron arrival times in the ELR region
@@ -345,6 +343,7 @@ class S2(Pulse):
         drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z, xy, config, resource)
         _electron_timings = np.zeros(np.sum(n_electron), np.int64)
         _electron_gains = np.zeros(np.sum(n_electron), np.float64)
+        print(n_electron)
         S2.electron_timings(t, n_electron, drift_time_mean, drift_time_spread, sc_gain,
                             _electron_timings, _electron_gains, config['electron_trapping_time'])
         if len(_electron_timings) < 1:
