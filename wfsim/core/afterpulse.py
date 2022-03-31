@@ -220,7 +220,6 @@ class PMT_Afterpulse(Pulse):
                         delaytime_cdf[sel_photon_channel]
                         - rU0[sel_photon_id][:, None]), axis=-1) * delaytime_bin_size
                             - config['pmt_ap_t_modifier'])
-                print(len(delaytime_cdf) )
                 if len(amplitude_cdf.shape) == 2:
                     ap_amplitude = np.argmin(
                         np.abs(
