@@ -187,16 +187,20 @@ class PMT_Afterpulse(Pulse):
             # Assign each photon FRIST random uniform number rU0 from (0, 1] for timing
             rU0 = 1 - np.random.rand(len(signal_pulse._photon_timings))
 
-            # Select those photons with U <= max of cdf of specific channel
-            cdf_max = delaytime_cdf[signal_pulse._photon_channels, -1]
-            if cdf_max.max() * config['pmt_ap_modifier'] > 0.5:
-                prob = cdf_max.max() * config['pmt_ap_modifier']
+            # delaytime_cdf is intentionally not normalized to 1 but the probability of the AP 
+            prob_ap = delaytime_cdf[signal_pulse._photon_channels, -1]
+            if prob_ap.max() * config['pmt_ap_modifier'] > 0.5:
+                prob = prob_ap.max() * config['pmt_ap_modifier']
                 log.warning(f'PMT after pulse probability is {prob} larger than 0.5?')
+
+            # Scaling down (up) rU0 effectivly increase (decrease) the ap rate
+            rU0 /= config['pmt_ap_modifier']
 
             # Double the probability for those photon emitting dpe
             rU0[signal_pulse._photon_is_dpe] /= 2
 
-            sel_photon_id = np.where(rU0 <= cdf_max * config['pmt_ap_modifier'])[0]
+            # Select those photons with U <= max of cdf of specific channel
+            sel_photon_id = np.where(rU0 <= prob_ap)[0]
             if len(sel_photon_id) == 0:
                 continue
             sel_photon_channel = signal_pulse._photon_channels[sel_photon_id]
@@ -216,6 +220,7 @@ class PMT_Afterpulse(Pulse):
                         delaytime_cdf[sel_photon_channel]
                         - rU0[sel_photon_id][:, None]), axis=-1) * delaytime_bin_size
                             - config['pmt_ap_t_modifier'])
+                print(len(delaytime_cdf) )
                 if len(amplitude_cdf.shape) == 2:
                     ap_amplitude = np.argmin(
                         np.abs(
