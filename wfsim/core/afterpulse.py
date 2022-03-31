@@ -194,7 +194,7 @@ class PMT_Afterpulse(Pulse):
                 log.warning(f'PMT after pulse probability is {prob} larger than 0.5?')
 
             # Double the probability for those photon emitting dpe
-            cdf_max[signal_pulse._photon_is_dpe] *= 2
+            rU0[signal_pulse._photon_is_dpe] /= 2
 
             sel_photon_id = np.where(rU0 <= cdf_max * config['pmt_ap_modifier'])[0]
             if len(sel_photon_id) == 0:
