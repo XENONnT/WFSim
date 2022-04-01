@@ -7,7 +7,7 @@ awkward==1.7.0
 blosc==1.10.6                                   # Strax dependency
 boltons==21.0.0
 datashader==0.13.0
-dask==2022.2.1
+dask==2022.3.0
 dill==0.3.4                                     # Strax dependency
 coveralls==3.3.1
 commentjson==0.9.0
@@ -30,7 +30,7 @@ numpy==1.21.5
 nestpy==1.5.0
 pandas==1.4.1                                   # Strax dependency
 psutil==5.9.0                                   # Strax dependency
-pytest==7.0.1
+pytest==7.1.1
 pytest-cov==3.0.0
 pymongo==3.12.0                                 # Strax dependency
 scikit-learn==1.0.2
