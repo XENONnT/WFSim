@@ -38,6 +38,6 @@ scipy==1.8.0                                    # Strax dependency
 tensorflow==2.8.0
 tqdm==4.63.1
 xarray==2022.3.0
-utilix==0.6.6
+utilix==0.6.7
 zstd==1.5.0.4                                   # Strax dependency
 uproot==4.2.2
