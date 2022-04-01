@@ -1,6 +1,6 @@
 # Test compatibility with these most often:
 strax==1.2.0
-straxen==1.5.0
+straxen==1.6.0
 
 # File for the requirements of straxen with the automated tests
 awkward==1.8.0
