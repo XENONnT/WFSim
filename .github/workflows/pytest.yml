@@ -50,9 +50,9 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Checkout repo
         uses: actions/checkout@v3
-      - name: Install requirements for tests and latest strax
-        run: |
-            pip install git+https://github.com/XENONnT/ax_env
+#       - name: Install requirements for tests and latest strax
+#         run: |
+#             pip install git+https://github.com/XENONnT/ax_env
       # Secrets and required files
       - name: patch utilix file
         # Patch this file if we want to have access to the database
