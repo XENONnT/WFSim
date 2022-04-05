@@ -1,9 +1,9 @@
 # Test compatibility with these most often:
-strax==1.1.8
+strax==1.2.0
 straxen==1.5.0
 
 # File for the requirements of straxen with the automated tests
-awkward==1.7.0
+awkward==1.8.0
 blosc==1.10.6                                   # Strax dependency
 boltons==21.0.0
 datashader==0.13.0
@@ -15,7 +15,7 @@ coverage==6.3.2
 epix==0.2.2
 flake8==4.0.1
 holoviews==1.14.5
-ipywidgets==7.6.4
+ipywidgets==7.7.0
 hypothesis==6.39.0
 jinja2==3.0.3                                  # Holoviews dependency
 jupyter-client==7.1.2                          # for ipywidgets
@@ -30,14 +30,14 @@ numpy==1.21.5
 nestpy==1.5.0
 pandas==1.4.1                                   # Strax dependency
 psutil==5.9.0                                   # Strax dependency
-pytest==7.0.1
+pytest==7.1.1
 pytest-cov==3.0.0
 pymongo==3.12.0                                 # Strax dependency
 scikit-learn==1.0.2
 scipy==1.8.0                                    # Strax dependency
 tensorflow==2.8.0
-tqdm==4.63.0
-xarray==0.21.1
+tqdm==4.63.1
+xarray==2022.3.0
 utilix==0.6.6
 zstd==1.5.0.4                                   # Strax dependency
-uproot==4.2.0
+uproot==4.2.2
