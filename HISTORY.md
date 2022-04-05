@@ -1,5 +1,6 @@
 v0.6.0 / 2022-04-05
 ===================
+* No dependabot in WFSim (#358)
 * AP probability for photons emitting double PE (#340)
 * FDC quick fix (#285)
 * SE shape: optical propagation + anode focusing (#320)
