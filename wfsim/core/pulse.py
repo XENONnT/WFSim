@@ -63,11 +63,19 @@ class Pulse(object):
         self._raw_area = self._raw_area_bottom = 0
         self._raw_area_trigger = self._raw_area_trigger_bottom = 0
 
+        # Assign DPE, and save it for compute after-pulses
+        p_dpe = self.config['p_double_pe_emision']
+        self._photon_is_dpe = np.random.binomial(n=1,
+                                                p=p_dpe,
+                                                size=len(self._photon_timings)).astype(np.bool_)
+
         counts_start = 0  # Secondary loop index for assigning channel
         for channel, counts in zip(*np.unique(self._photon_channels, return_counts=True)):
 
             # Use 'counts' amount of photon for this channel
             _channel_photon_timings = self._photon_timings[counts_start:counts_start+counts]
+            _channel_photon_is_dpe = self._photon_is_dpe[counts_start:counts_start+counts]
+
             counts_start += counts
             if channel in self.config['turned_off_pmts']:
                 continue
@@ -81,10 +89,8 @@ class Pulse(object):
                     * self.uniform_to_pe_arr(np.random.random(len(_channel_photon_timings)), channel)
 
                 # Add some double photoelectron emission by adding another sampled gain
-                n_double_pe = np.random.binomial(len(_channel_photon_timings),
-                                                 p=self.config['p_double_pe_emision'])
-
-                _channel_photon_gains[:n_double_pe] += self.config['gains'][channel] \
+                n_double_pe = _channel_photon_is_dpe.sum()
+                _channel_photon_gains[_channel_photon_is_dpe] += self.config['gains'][channel] \
                     * self.uniform_to_pe_arr(np.random.random(n_double_pe), channel)
 
             else:
