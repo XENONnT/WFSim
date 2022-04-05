@@ -51,10 +51,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Install requirements for tests and latest strax
-        run: |
-            # strax line is temp.
-            pip install git+https://github.com/AxFoundation/strax
-            pip install -r extra_requirements/requirements-tests.txt
+        run: pip install -r extra_requirements/requirements-tests.txt
       # Secrets and required files
       - name: patch utilix file
         # Patch this file if we want to have access to the database
