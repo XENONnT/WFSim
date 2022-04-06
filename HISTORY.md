@@ -1,3 +1,16 @@
+v0.6.0 / 2022-04-05
+===================
+* No dependabot in WFSim (#358)
+* AP probability for photons emitting double PE (#340)
+* FDC quick fix (#285)
+* SE shape: optical propagation + anode focusing (#320)
+* Fix CIV and average drift velocity implementation (#338)
+* Test with straxen 1.5.0 (#337)
+* Sort afterpulses by channel (#321)
+* Reduce warnings (#317)
+* Test with latest straxen (#322)
+* Up py version (#316)
+
 v0.5.13 / 2022-01-17
 ====================
 * Save full truth output (#288)
