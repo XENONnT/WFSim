@@ -101,8 +101,8 @@ class S2(Pulse):
 
         n_photons_per_xy, n_photons_per_ele, self._electron_timings = self.get_n_photons(t=t,
                                                                                          n_electron=n_electron,
-                                                                                         z_obs=z_obs,
-                                                                                         positions=positions,
+                                                                                         z_int=z,
+                                                                                         xy_int= np.array([x, y]).T,
                                                                                          sc_gain=sc_gain, 
                                                                                          config=self.config,
                                                                                          resource=self.resource)
@@ -264,19 +264,19 @@ class S2(Pulse):
                 i_electron += 1
 
     @staticmethod
-    def get_n_photons(t, n_electron, z_obs, positions, sc_gain, config, resource):
+    def get_n_photons(t, n_electron, z_int, xy_int, sc_gain, config, resource):
         """Generates photon timings for S2s.
         Returns a list of photon timings and instructions repeated for original electron
         
         :param t: 1d int array time of s2
         :param n_electron: 1d float array number of electrons to simulate
-        :param z_obs: float array. Z positions of s2
-        :param positions: 2d float array, xy positions of s2
+        :param z_int: float array. true Z interaction positions
+        :param positions: 2d float array, true xy interaction positions
         :param sc_gain: float, secondary s2 gain
         :param config: dict of the wfsim config
         :param resource: instance of the resource class """
         # Get electron timings
-        drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z_obs, positions, config, resource)
+        drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z_int, xy_int, config, resource)
         _electron_timings = np.zeros(np.sum(n_electron), np.int64)
         _electron_gains = np.zeros(np.sum(n_electron), np.float64)
         S2.electron_timings(t, n_electron, drift_time_mean, drift_time_spread, sc_gain,
