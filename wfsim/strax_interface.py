@@ -474,6 +474,7 @@ class ChunkRawRecords(object):
                       "generation of the instructions"),
 )
 class SimulatorPlugin(strax.Plugin):
+    compressor = 'zstd'
     depends_on = tuple()
 
     # Cannot arbitrarily rechunk records inside events
