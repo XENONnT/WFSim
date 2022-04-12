@@ -1,3 +1,8 @@
+v0.6.1 / 2022-04-12
+===================
+* Change default compressor (#361)
+* Drift velocity maps using true interaction point (#360)
+
 v0.6.0 / 2022-04-05
 ===================
 * No dependabot in WFSim (#358)
