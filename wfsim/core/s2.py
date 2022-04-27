@@ -178,7 +178,7 @@ class S2(Pulse):
         drift_time_spread = np.sqrt(2 * diffusion_constant_longitudinal * drift_time_mean)
         drift_time_spread /= drift_velocity_liquid
         return drift_time_mean, drift_time_spread
-
+    
     @staticmethod
     def get_s2_light_yield(positions, config, resource):
         """Calculate s2 light yield...
@@ -189,7 +189,7 @@ class S2(Pulse):
         
         returns array of floats (mean expectation) 
         """
-        sc_gain = resource.s2_correction_map(positions)
+        sc_gain = resource.se_gain_map(positions)
         # depending on if you use the data driven or mc pattern map for light yield for S2 
         # the shape of n_photon_hits will change. Mc needs a squeeze
         if len(sc_gain.shape) != 1:
@@ -197,7 +197,7 @@ class S2(Pulse):
 
         # sc gain should has the unit of pe / electron, here we divide 1 + dpe to get nphoton / electron
         sc_gain /= 1 + config['p_double_pe_emision']
-        sc_gain *= config['s2_secondary_sc_gain']
+#         sc_gain *= config['s2_secondary_sc_gain']
 
         # data driven map contains nan, will be set to 0 here
         sc_gain[np.isnan(sc_gain)] = 0
