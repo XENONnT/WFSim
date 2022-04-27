@@ -221,7 +221,7 @@ class S2(Pulse):
         # Absorb electrons during the drift
         electron_lifetime_correction = np.exp(- 1 * drift_time_mean /
                                               config['electron_lifetime_liquid'])
-        cy = config['electron_extraction_yield'] * electron_lifetime_correction
+        cy = config['g2_mean']*resource.s2_correction_map(xy_int)*electron_lifetime_correction/resource.se_gain_map(xy_int)
 
         # Remove electrons in insensitive volume
         if config['enable_field_dependencies']['survival_probability_map']:
@@ -354,39 +354,38 @@ class S2(Pulse):
         return S2._luminescence_timings_simple(len(xy), dG, E0, 
                                                r, dr, rr, alpha, uE,
                                                pressure, n_photons)
-
     @staticmethod
-    def luminescence_timings_garfield(xy, n_photons, config, resource, confine_position=None):
+    @njit
+    def draw_excitation_times(inv_cdf_list, hist_indices, nph):
+        inv_cdf_len = len(inv_cdf_list[0])
+        timings = np.zeros(np.sum(nph))
+        count = 0
+        for i, (hist_ind, n) in enumerate(zip(hist_indices, nph)):
+            samples = np.random.uniform(0, inv_cdf_len, n)
+            t1 = inv_cdf_list[hist_ind][np.floor(samples).astype('int')]
+            t2 = inv_cdf_list[hist_ind][np.ceil(samples).astype('int')]
+            timings[count:count+n] = (t2-t1)*(samples - np.floor(samples))+t1
+            count+=n
+        return timings
+    
+    @staticmethod
+    def luminescence_timings_garfield(xy, n_photons, config, resource):
         """
         Luminescence time distribution computation according to garfield scintillation maps
         :param xy: 1d array with positions
         :param n_photons: 1d array with ints for number of xy positions
         :param config: dict wfsim config
         :param resource: instance of wfsim resource
-        :param confine_position: if float, confine extraction region +/- this position around anode wires
 
         returns 2d array with ints for photon timings of input param 'shape'
         """
         assert 's2_luminescence' in resource.__dict__, 's2_luminescence model not found'
         assert len(n_photons) == len(xy), 'Input number of n_electron should have same length as positions'
-        assert len(resource.s2_luminescence['t'].shape) == 2, 'Timing data is expected to have D2'
-
-        if type(confine_position)==float:
-            distance = np.random.uniform(-confine_position, confine_position, len(xy))
-        else:
-            tilt = config.get('anode_xaxis_angle', np.pi / 4)
-            pitch = config.get('anode_pitch', 0.5)
-            rotation_mat = np.array(((np.cos(tilt), -np.sin(tilt)), (np.sin(tilt), np.cos(tilt))))
-            jagged = lambda relative_y: (relative_y + pitch / 2) % pitch - pitch / 2
-            distance = jagged(np.matmul(xy, rotation_mat)[:, 1])  # shortest distance from any wire
-
-        index_row = [np.argmin(np.abs(d - resource.s2_luminescence['x'])) for d in distance]
-        index_row = np.repeat(index_row, n_photons).astype(np.int64)
-        index_col = np.random.randint(0, resource.s2_luminescence['t'].shape[1], np.sum(n_photons), np.int64)
         
-        avgt = np.average(resource.s2_luminescence['t']).astype(int)
-        return resource.s2_luminescence['t'][index_row, index_col].astype(np.int64) - avgt
-
+        draw_index = np.digitize(resource.garfield_gas_gap_map(xy), resource.s2_luminescence['gas_gap'])-1
+        
+        return S2.draw_excitation_times(resource.s2_luminescence['timing_inv_cdf'], draw_index, n_photons)
+    
     @staticmethod
     def optical_propagation(channels, config, spline):
         """Function gettting times from s2 timing splines:
