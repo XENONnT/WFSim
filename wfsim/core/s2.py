@@ -424,15 +424,10 @@ class S2(Pulse):
                                                              config=config,
                                                              resource=resource)
         elif config['s2_luminescence_model']=='garfield':
-            # check to see if extraction region in Garfield needs to be confined
-            confine_position=None
-            if 's2_garfield_confine_position' in config:
-                if config['s2_garfield_confine_position'] > 0.0:
-                    confine_position=config['s2_garfield_confine_position']
+            #Got rid of the xy confinement option, it's always confined now >:)
             _photon_timings = S2.luminescence_timings_garfield(positions, n_photons_per_xy,
                                                                config=config,
-                                                               resource=resource,
-                                                               confine_position=confine_position)
+                                                               resource=resource)
         else:
             raise KeyError(f"{config['s2_luminescence_model']} is not valid! Use 'simple' or 'garfield'")
 
