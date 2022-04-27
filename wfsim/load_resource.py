@@ -238,7 +238,7 @@ class Resource:
             self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='pkl')
             
             self.se_gain_map = make_map(files['se_gain_map'])
-            self.s2_correction_map = make_map(files['s2_correction_map'], fmt = 'json')
+#             self.s2_correction_map = make_map(files['s2_correction_map'], fmt = 'json')
             
             # if there is a (data driven!) map, load it. If not make it  from the pattern map
             if files['s1_lce_correction_map']:
@@ -251,7 +251,7 @@ class Resource:
 
             # if there is a (data driven!) map, load it. If not make it  from the pattern map
             if files['s2_correction_map']:
-                self.s2_correction_map = make_map(files['s2_correction_map'])
+                self.s2_correction_map = make_map(files['s2_correction_map'], fmt = 'json')
             else:
                 s2cmap = deepcopy(self.s2_pattern_map)
                 # Lower the LCE by removing contribution from dead PMTs
