@@ -89,7 +89,7 @@ class Resource:
                 's1_pattern_map': 'XENONnT_s1_xyz_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
                 's1_lce_correction_map': 'XENONnT_s1_xyz_LCE_corrected_qes_MCva43fa9b_wires.json.gz',
                 's2_pattern_map': 'XENONnT_s2_xy_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
-                's2_correction_map': 'XENONnT_s2_xy_map_v0_20210130.json',
+                's2_correction_map': 'XENONnT_s2_xy_map_v4_210503_mlp_3_in_1_iterated.json',
                 'se_gain_map': 'XENONnT_se_xy_map_v1_mlp.json',
                 'photon_ap_cdfs': 'XENONnT_pmt_afterpulse_config_012605.json.gz',
                 's2_luminescence': 'XENONnT_GARFIELD_B1d5n_C30n_G1n_A6d5p_T1d5n_PMTs1d5n_FSR0d95n.npz',
