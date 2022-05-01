@@ -1,6 +1,6 @@
 # File for the requirements of the documentation
 numpy==1.19.5
-jinja2==3.0.3
+jinja2==3.1.2
 sphinx
 sphinx_rtd_theme
 nbsphinx
