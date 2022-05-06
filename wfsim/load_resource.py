@@ -93,6 +93,7 @@ class Resource:
                 'se_gain_map': 'XENONnT_se_xy_map_v1_mlp.json',
                 'photon_ap_cdfs': 'XENONnT_pmt_afterpulse_config_012605.json.gz',
                 's2_luminescence': 'XENONnT_GARFIELD_B1d5n_C30n_G1n_A6d5p_T1d5n_PMTs1d5n_FSR0d95n.npz',
+                "s2_luminescence_gg": "/dali/lgrandi/jyangqi/electroluminescence_timings/garfield_timing_map_gas_gap.npy",
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
                 'garfield_gas_gap_map': '/dali/lgrandi/jyangqi/s2only_stuff/garfield_gas_gap_map.json',
                 'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
@@ -268,6 +269,10 @@ class Resource:
             # if config.get('s2_luminescence_model', False) == 'garfield':
             if 'garfield' in config.get('s2_luminescence_model', ''):
                 s2_luminescence_map = straxen.get_resource(files['s2_luminescence'], fmt='npy')
+                self.s2_luminescence = s2_luminescence_map
+            
+            if 'garfield_gas_gap' in config.get('s2_luminescence_model', ''):
+                s2_luminescence_map = straxen.get_resource(files['s2_luminescence_gg'], fmt='npy')
                 self.s2_luminescence = s2_luminescence_map
                 self.garfield_gas_gap_map = make_map(files['garfield_gas_gap_map'], fmt = 'json')
 
