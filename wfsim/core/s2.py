@@ -366,6 +366,38 @@ class S2(Pulse):
         return S2._luminescence_timings_simple(len(xy), dG, E0, 
                                                r, dr, rr, alpha, uE,
                                                pressure, n_photons)
+    
+    @staticmethod
+    def luminescence_timings_garfield(xy, n_photons, config, resource, confine_position=None):
+        """
+        Luminescence time distribution computation according to garfield scintillation maps
+        :param xy: 1d array with positions
+        :param n_photons: 1d array with ints for number of xy positions
+        :param config: dict wfsim config
+        :param resource: instance of wfsim resource
+        :param confine_position: if float, confine extraction region +/- this position around anode wires
+        returns 2d array with ints for photon timings of input param 'shape'
+        """
+        assert 's2_luminescence' in resource.__dict__, 's2_luminescence model not found'
+        assert len(n_photons) == len(xy), 'Input number of n_electron should have same length as positions'
+        assert len(resource.s2_luminescence['t'].shape) == 2, 'Timing data is expected to have D2'
+
+        if type(confine_position)==float:
+            distance = np.random.uniform(-confine_position, confine_position, len(xy))
+        else:
+            tilt = config.get('anode_xaxis_angle', np.pi / 4)
+            pitch = config.get('anode_pitch', 0.5)
+            rotation_mat = np.array(((np.cos(tilt), -np.sin(tilt)), (np.sin(tilt), np.cos(tilt))))
+            jagged = lambda relative_y: (relative_y + pitch / 2) % pitch - pitch / 2
+            distance = jagged(np.matmul(xy, rotation_mat)[:, 1])  # shortest distance from any wire
+
+        index_row = [np.argmin(np.abs(d - resource.s2_luminescence['x'])) for d in distance]
+        index_row = np.repeat(index_row, n_photons).astype(np.int64)
+        index_col = np.random.randint(0, resource.s2_luminescence['t'].shape[1], np.sum(n_photons), np.int64)
+        
+        avgt = np.average(resource.s2_luminescence['t']).astype(int)
+        return resource.s2_luminescence['t'][index_row, index_col].astype(np.int64) - avgt
+    
     @staticmethod
     @njit
     def draw_excitation_times(inv_cdf_list, hist_indices, nph):
@@ -381,9 +413,10 @@ class S2(Pulse):
         return timings
     
     @staticmethod
-    def luminescence_timings_garfield(xy, n_photons, config, resource):
+    def luminescence_timings_garfield_gasgap(xy, n_photons, config, resource):
         """
         Luminescence time distribution computation according to garfield scintillation maps
+        which are ONLY drawn from below the anode, and at different gas gaps
         :param xy: 1d array with positions
         :param n_photons: 1d array with ints for number of xy positions
         :param config: dict wfsim config
@@ -436,12 +469,21 @@ class S2(Pulse):
                                                              config=config,
                                                              resource=resource)
         elif config['s2_luminescence_model']=='garfield':
-            #Got rid of the xy confinement option, it's always confined now >:)
+            confine_position=None
+            if 's2_garfield_confine_position' in config:
+                if config['s2_garfield_confine_position'] > 0.0:
+                    confine_position=config['s2_garfield_confine_position']
             _photon_timings = S2.luminescence_timings_garfield(positions, n_photons_per_xy,
                                                                config=config,
-                                                               resource=resource)
+                                                               resource=resource,
+                                                               confine_position=confine_position)
+            
+        elif config['s2_luminescence_model']=='garfield_gas_gap':
+            _photon_timings = S2.luminescence_timings_garfield(positions, n_photons_per_xy,
+                                                   config=config,
+                                                   resource=resource)
         else:
-            raise KeyError(f"{config['s2_luminescence_model']} is not valid! Use 'simple' or 'garfield'")
+            raise KeyError(f"{config['s2_luminescence_model']} is not valid! Use 'simple' or 'garfield' or 'garfield_gas_gap'")
 
         # Emission Delay
         _photon_timings += Pulse.singlet_triplet_delays(len(_photon_timings), config['singlet_fraction_gas'], config, phase)
