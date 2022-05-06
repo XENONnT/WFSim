@@ -479,7 +479,7 @@ class S2(Pulse):
                                                                confine_position=confine_position)
             
         elif config['s2_luminescence_model']=='garfield_gas_gap':
-            _photon_timings = S2.luminescence_timings_garfield(positions, n_photons_per_xy,
+            _photon_timings = S2.luminescence_timings_garfield_gasgap(positions, n_photons_per_xy,
                                                    config=config,
                                                    resource=resource)
         else:
