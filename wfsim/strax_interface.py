@@ -69,37 +69,45 @@ truth_extra_dtype = [
 
 
 @export
-def extra_truth_dtype_per_pmt(n_pmt):
+def extra_truth_dtype_per_pmt(n_pmt: ty.Union[bool, int]) -> ty.List[tuple]:
+    """
+    Generate the extra - truth dtype output
+
+    Return total/bottom seperation from truth_extra_dtype if n_pmt is False
+
+    :param n_pmt: Number of PMTs, when false (no PMTs, use total/bottom separation)
+    :return: dtype list
+    """
     if not n_pmt:
         return truth_extra_dtype
     return [
-    (('End time of the interaction [ns]', 'endtime'), np.int64),
-
-    (('Number of simulated electrons', 'n_electron_per_pmt'), (np.int32, n_pmt)),
-    (('Number of photons reaching PMT', 'n_photon_per_pmt'), (np.int32, n_pmt)),
-    (('Number of photons + dpe passing', 'n_pe_per_pmt'), (np.int32, n_pmt)),
-    (('Number of photons passing trigger', 'n_photon_trigger_per_pmt'), (np.int32, n_pmt)),
-    (('Number of photons + dpe passing trigger', 'n_pe_trigger_per_pmt'), (np.int32, n_pmt)),
-    (('Raw area in pe', 'raw_area_per_pmt'), (np.float64, n_pmt)),
-    (('Raw area in pe passing trigger', 'raw_area_trigger_per_pmt'), (np.float64, n_pmt)),
-
-    (('Number of photons reaching PMT (total)', 'n_photon'), np.int32),
-    (('Number of photons + dpe passing (total)', 'n_pe'), np.int32),
-    (('Number of photons passing trigger (total)', 'n_photon'), np.int32),
-    (('Number of photons + dpe passing trigger (total)', 'n_pe'), np.int32),
-    (('Raw area in pe (total)', 'raw_area'), np.float64),
-    (('Raw area in pe passing trigger (total)', 'raw_area_trigger'), np.float64),
-
-    (('Arrival time of the first photon [ns]', 't_first_photon'), np.float64),
-    (('Arrival time of the last photon [ns]', 't_last_photon'), np.float64),
-    (('Mean time of the photons [ns]', 't_mean_photon'), np.float64),
-    (('Standard deviation of photon arrival times [ns]', 't_sigma_photon'), np.float64),
-    (('X field-distorted mean position of the electrons [cm]', 'x_mean_electron'), np.float32),
-    (('Y field-distorted mean position of the electrons [cm]', 'y_mean_electron'), np.float32),
-    (('Arrival time of the first electron [ns]', 't_first_electron'), np.float64),
-    (('Arrival time of the last electron [ns]', 't_last_electron'), np.float64),
-    (('Mean time of the electrons [ns]', 't_mean_electron'), np.float64),
-    (('Standard deviation of electron arrival times [ns]', 't_sigma_electron'), np.float64),
+        (('End time of the interaction [ns]', 'endtime'), np.int64),
+        # Per PMT fields
+        (('Number of simulated electrons', 'n_electron_per_pmt'), (np.int32, n_pmt)),
+        (('Number of photons reaching PMT', 'n_photon_per_pmt'), (np.int32, n_pmt)),
+        (('Number of photons + dpe passing', 'n_pe_per_pmt'), (np.int32, n_pmt)),
+        (('Number of photons passing trigger', 'n_photon_trigger_per_pmt'), (np.int32, n_pmt)),
+        (('Number of photons + dpe passing trigger', 'n_pe_trigger_per_pmt'), (np.int32, n_pmt)),
+        (('Raw area in pe', 'raw_area_per_pmt'), (np.float64, n_pmt)),
+        (('Raw area in pe passing trigger', 'raw_area_trigger_per_pmt'), (np.float64, n_pmt)),
+        # Aggregate (total) fields
+        (('Number of photons reaching PMT (total)', 'n_photon'), np.int32),
+        (('Number of photons + dpe passing (total)', 'n_pe'), np.int32),
+        (('Number of photons passing trigger (total)', 'n_photon'), np.int32),
+        (('Number of photons + dpe passing trigger (total)', 'n_pe'), np.int32),
+        (('Raw area in pe (total)', 'raw_area'), np.float64),
+        (('Raw area in pe passing trigger (total)', 'raw_area_trigger'), np.float64),
+        # General fields
+        (('Arrival time of the first photon [ns]', 't_first_photon'), np.float64),
+        (('Arrival time of the last photon [ns]', 't_last_photon'), np.float64),
+        (('Mean time of the photons [ns]', 't_mean_photon'), np.float64),
+        (('Standard deviation of photon arrival times [ns]', 't_sigma_photon'), np.float64),
+        (('X field-distorted mean position of the electrons [cm]', 'x_mean_electron'), np.float32),
+        (('Y field-distorted mean position of the electrons [cm]', 'y_mean_electron'), np.float32),
+        (('Arrival time of the first electron [ns]', 't_first_electron'), np.float64),
+        (('Arrival time of the last electron [ns]', 't_last_electron'), np.float64),
+        (('Mean time of the electrons [ns]', 't_mean_electron'), np.float64),
+        (('Standard deviation of electron arrival times [ns]', 't_sigma_electron'), np.float64),
     ]
 
 
