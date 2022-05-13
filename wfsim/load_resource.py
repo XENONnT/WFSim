@@ -265,14 +265,15 @@ class Resource:
 
             # Garfield luminescence timing samples
             # if config.get('s2_luminescence_model', False) == 'garfield':
-            if 'garfield' in config.get('s2_luminescence_model', ''):
-                s2_luminescence_map = straxen.get_resource(files['s2_luminescence'], fmt='npy')
-                self.s2_luminescence = s2_luminescence_map
-            
             if 'garfield_gas_gap' in config.get('s2_luminescence_model', ''):
                 s2_luminescence_map = straxen.get_resource(files['s2_luminescence_gg'], fmt='npy')
                 self.s2_luminescence = s2_luminescence_map
                 self.garfield_gas_gap_map = make_map(files['garfield_gas_gap_map'], fmt = 'json')
+                
+            elif 'garfield' in config.get('s2_luminescence_model', ''):
+                s2_luminescence_map = straxen.get_resource(files['s2_luminescence'], fmt='npy')
+                self.s2_luminescence = s2_luminescence_map
+            
 
             if config.get('field_distortion_model', "none") == "inverse_fdc":
                 self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
