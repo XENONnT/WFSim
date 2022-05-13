@@ -56,18 +56,27 @@ class Pulse(object):
                                                      len(self._photon_timings)).astype(np.int64)
 
         dt = self.config.get('sample_duration', 10)  # Getting dt from the lib just once
-        self._n_photon = self._n_photon_bottom = 0  # For truth output
-        self._n_pe = self._n_pe_bottom = 0
-        self._n_photon_trigger = self._n_photon_trigger_bottom = 0
-        self._n_pe_trigger = self._n_pe_trigger_bottom = 0
-        self._raw_area = self._raw_area_bottom = 0
-        self._raw_area_trigger = self._raw_area_trigger_bottom = 0
+
+        # Save the truth info either total/per pmt or total/bottom
+        self._truth_buffer = {}
+        if self.config.get('per_channel_info', False):
+            _n_pmts = len(self.config['gains'])
+            for int_field in 'n_photon n_pe n_photon_trigger n_pe_trigger'.split():
+                self._truth_buffer[int_field] = 0
+                self._truth_buffer[int_field + '_per_pmt'] = np.zeros(_n_pmts, dtype=np.int32)
+            for float_field in 'raw_area raw_area_trigger'.split():
+                self._truth_buffer[float_field] = 0
+                self._truth_buffer[float_field + '_per_pmt'] = np.zeros(_n_pmts, dtype=np.int32)
+        else:
+            for field in 'n_photon n_pe n_photon_trigger n_pe_trigger raw_area raw_area_trigger'.split():
+                self._truth_buffer[field] = 0
+                self._truth_buffer[field + '_bottom'] = 0
 
         # Assign DPE, and save it for compute after-pulses
         p_dpe = self.config['p_double_pe_emision']
         self._photon_is_dpe = np.random.binomial(n=1,
-                                                p=p_dpe,
-                                                size=len(self._photon_timings)).astype(np.bool_)
+                                                 p=p_dpe,
+                                                 size=len(self._photon_timings)).astype(np.bool_)
 
         counts_start = 0  # Secondary loop index for assigning channel
         for channel, counts in zip(*np.unique(self._photon_channels, return_counts=True)):
@@ -86,12 +95,12 @@ class Pulse(object):
             if '_photon_gains' not in self.__dict__:
 
                 _channel_photon_gains = self.config['gains'][channel] \
-                    * self.uniform_to_pe_arr(np.random.random(len(_channel_photon_timings)), channel)
+                                        * self.uniform_to_pe_arr(np.random.random(len(_channel_photon_timings)), channel)
 
                 # Add some double photoelectron emission by adding another sampled gain
                 n_double_pe = _channel_photon_is_dpe.sum()
                 _channel_photon_gains[_channel_photon_is_dpe] += self.config['gains'][channel] \
-                    * self.uniform_to_pe_arr(np.random.random(n_double_pe), channel)
+                                                                 * self.uniform_to_pe_arr(np.random.random(n_double_pe), channel)
 
             else:
                 n_double_pe = 0
@@ -109,11 +118,11 @@ class Pulse(object):
             min_timing, max_timing = np.min(
                 _channel_photon_timings), np.max(_channel_photon_timings)
 
-            pulse_left = (int(min_timing // dt) 
+            pulse_left = (int(min_timing // dt)
                           - int(self.config['samples_to_store_before'])
                           - self.config.get('samples_before_pulse_center', 2))
 
-            pulse_right = (int(max_timing // dt) 
+            pulse_right = (int(max_timing // dt)
                            + int(self.config['samples_to_store_after'])
                            + self.config.get('samples_after_pulse_center', 20))
             pulse_current = np.zeros(pulse_right - pulse_left + 1)
@@ -247,20 +256,19 @@ class Pulse(object):
         raw_area = np.sum(photon_gains) / self.config['gains'][channel]
         trigger_raw_area = np.sum(photon_gains[above_threshold]) / self.config['gains'][channel]
 
-        self._n_photon += len(photon_timings)
-        self._n_pe += len(photon_timings) + n_double_pe
-        self._n_photon_trigger += trigger_photon
-        self._n_pe_trigger += trigger_photon + trigger_dpe
-        self._raw_area += raw_area
-        self._raw_area_trigger += trigger_raw_area
-
-        if channel in self.config['channels_bottom']:
-            self._n_photon_bottom += len(photon_timings)
-            self._n_pe_bottom += len(photon_timings) + n_double_pe
-            self._n_photon_trigger_bottom += trigger_photon
-            self._n_pe_trigger_bottom += trigger_photon + trigger_dpe
-            self._raw_area_bottom += raw_area
-            self._raw_area_trigger_bottom += trigger_raw_area
+        for field, value in {
+            'n_photon': len(photon_timings),
+            'n_photon_trigger': trigger_photon,
+            'n_pe': len(photon_timings) + n_double_pe,
+            'n_pe_trigger': trigger_photon + trigger_dpe,
+            'raw_area': raw_area,
+            'raw_area_trigger': trigger_raw_area,
+        }.items():
+            self._truth_buffer[field] += value
+            if self.config.get('per_channel_info', False):
+                self._truth_buffer[field + '_per_pmt'][channel] += value
+            elif channel in self.config['channels_bottom']:
+                self._truth_buffer[field + '_bottom'] += value
 
     def clear_pulse_cache(self):
         self._pulses = []

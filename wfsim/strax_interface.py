@@ -68,6 +68,41 @@ truth_extra_dtype = [
     (('Standard deviation of electron arrival times [ns]', 't_sigma_electron'), np.float64),]
 
 
+@export
+def extra_truth_dtype_per_pmt(n_pmt):
+    if not n_pmt:
+        return truth_extra_dtype
+    return [
+    (('End time of the interaction [ns]', 'endtime'), np.int64),
+
+    (('Number of simulated electrons', 'n_electron_per_pmt'), (np.int32, n_pmt)),
+    (('Number of photons reaching PMT', 'n_photon_per_pmt'), (np.int32, n_pmt)),
+    (('Number of photons + dpe passing', 'n_pe_per_pmt'), (np.int32, n_pmt)),
+    (('Number of photons passing trigger', 'n_photon_trigger_per_pmt'), (np.int32, n_pmt)),
+    (('Number of photons + dpe passing trigger', 'n_pe_trigger_per_pmt'), (np.int32, n_pmt)),
+    (('Raw area in pe', 'raw_area_per_pmt'), (np.float64, n_pmt)),
+    (('Raw area in pe passing trigger', 'raw_area_trigger_per_pmt'), (np.float64, n_pmt)),
+
+    (('Number of photons reaching PMT (total)', 'n_photon'), np.int32),
+    (('Number of photons + dpe passing (total)', 'n_pe'), np.int32),
+    (('Number of photons passing trigger (total)', 'n_photon'), np.int32),
+    (('Number of photons + dpe passing trigger (total)', 'n_pe'), np.int32),
+    (('Raw area in pe (total)', 'raw_area'), np.float64),
+    (('Raw area in pe passing trigger (total)', 'raw_area_trigger'), np.float64),
+
+    (('Arrival time of the first photon [ns]', 't_first_photon'), np.float64),
+    (('Arrival time of the last photon [ns]', 't_last_photon'), np.float64),
+    (('Mean time of the photons [ns]', 't_mean_photon'), np.float64),
+    (('Standard deviation of photon arrival times [ns]', 't_sigma_photon'), np.float64),
+    (('X field-distorted mean position of the electrons [cm]', 'x_mean_electron'), np.float32),
+    (('Y field-distorted mean position of the electrons [cm]', 'y_mean_electron'), np.float32),
+    (('Arrival time of the first electron [ns]', 't_first_electron'), np.float64),
+    (('Arrival time of the last electron [ns]', 't_last_electron'), np.float64),
+    (('Mean time of the electrons [ns]', 't_mean_electron'), np.float64),
+    (('Standard deviation of electron arrival times [ns]', 't_sigma_electron'), np.float64),
+    ]
+
+
 def rand_instructions(c):
     """Random instruction generator function. This will be called by wfsim if you do not specify 
     specific instructions.
@@ -185,7 +220,7 @@ def _read_optical_nveto(config, events, mask):
     :params events: g4 root file
     :params mask: 1d bool array to select events
     
-    returns two flatterned nested arrays of channels and timings, 
+    returns two flatterned nested arrays of channels and timings,
     """
     channels = np.hstack(events["pmthitID"].array(library="np")[mask])
     timings = np.hstack(events["pmthitTime"].array(library="np")[mask] * 1e9).astype(np.int64)
@@ -304,7 +339,9 @@ class ChunkRawRecords(object):
         self.rawdata = rawdata_generator(self.config, **kwargs)
         self.record_buffer = np.zeros(5000000,
                                       dtype=strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH))
-        self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)])
+        truth_per_n_pmts = self._n_channels if config.get('per_channel_info') else False
+        self.truth_dtype = extra_truth_dtype_per_pmt(truth_per_n_pmts)
+        self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + self.truth_dtype + [('fill', bool)])
 
         self.blevel = 0  # buffer_filled_level
 
@@ -418,7 +455,7 @@ class ChunkRawRecords(object):
 
         truth.sort(order='time')
         # Return truth without 'fill' field
-        _truth = np.zeros(len(truth), dtype=instruction_dtype + truth_extra_dtype)
+        _truth = np.zeros(len(truth), dtype=instruction_dtype + self.truth_dtype)
         for name in _truth.dtype.names:
             _truth[name] = truth[name]
         _truth['time'][~np.isnan(_truth['t_first_photon'])] = \
@@ -442,6 +479,9 @@ class ChunkRawRecords(object):
     def source_finished(self):
         return self.rawdata.source_finished
 
+    @property
+    def _n_channels(self):
+        return len(self.config.get('gains', np.arange(straxen.n_tpc_pmts)))
 
 @strax.takes_config(
     strax.Option('detector', default='XENONnT', track=True, infer_type=False),
@@ -451,6 +491,8 @@ class ChunkRawRecords(object):
                  help="Duration of each chunk in seconds"),
     strax.Option('n_chunk', default=10, track=False, infer_type=False,
                  help="Number of chunks to simulate"),
+    strax.Option('per_channel_info', default=False, track=True, type=bool,
+                 help="Store the info per channel in the truth file"),
     strax.Option('fax_file', default=None, track=False, infer_type=False,
                  help="Directory with fax instructions"), 
     strax.Option('fax_config', default='fax_config_nt_design.json'),
@@ -587,6 +629,14 @@ class SimulatorPlugin(strax.Plugin):
         """Return whether all instructions has been used."""
         return self.sim.source_finished()
 
+    @property
+    def _n_channels(self):
+        return len(self.config.get('gains', np.arange(straxen.n_tpc_pmts)))
+
+    @property
+    def _truth_dtype(self):
+        truth_per_n_pmts = self._n_channels if self.config.get('per_channel_info') else False
+        return extra_truth_dtype_per_pmt(truth_per_n_pmts)
 
 @export
 class RawRecordsFromFaxNT(SimulatorPlugin):
@@ -620,7 +670,8 @@ class RawRecordsFromFaxNT(SimulatorPlugin):
     def infer_dtype(self):
         dtype = {data_type: strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH)
                  for data_type in self.provides if data_type != 'truth'}
-        dtype['truth'] = instruction_dtype + truth_extra_dtype
+
+        dtype['truth'] = instruction_dtype + self._truth_dtype
         return dtype
 
     def compute(self):
@@ -652,7 +703,7 @@ class RawRecordsFromFaxOpticalNT(RawRecordsFromFaxNT):
                                    channels=self.channels,
                                    timings=self.timings,)
         self.sim.truth_buffer = np.zeros(10000, dtype=instruction_dtype + optical_extra_dtype
-                                                + truth_extra_dtype + [('fill', bool)])
+                                                + self._truth_dtype + [('fill', bool)])
         self.sim_iter = self.sim(self.instructions)
         
         
@@ -814,7 +865,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                                           channels=self.nveto_channels,
                                           timings=self.nveto_timings,)
             self.sim_nv.truth_buffer = np.zeros(10000, dtype=instruction_dtype + optical_extra_dtype
-                                                + truth_extra_dtype + [('fill', bool)])
+                                                + self._truth_dtype + [('fill', bool)])
 
             assert '_first' in self.instructions_nveto.dtype.names, 'Require indexing info in optical ' \
                                                                     'instruction see optical extra dtype'
@@ -826,7 +877,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                 progress_bar=True)
 
     def infer_dtype(self):
-        dtype = dict([(data_type, instruction_dtype + truth_extra_dtype) if 'truth' in data_type
+        dtype = dict([(data_type, instruction_dtype + self._truth_dtype) if 'truth' in data_type
                       else (data_type, strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH))
                       for data_type in self.provides])
         return dtype
@@ -883,7 +934,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                 # If nv is not one of the targets just return an empty chunk
                 # If there is TPC event, set TPC time for the start and end
                 else:
-                    dummy_dtype = wfsim.truth_extra_dtype if 'truth' in data_type else strax.raw_record_dtype()
+                    dummy_dtype = self._truth_dtype if 'truth' in data_type else strax.raw_record_dtype()
                     if exist_tpc_result:
                         chunk[data_type] = self.chunk(start=self.sim.chunk_time_pre,
                                                 end=self.sim.chunk_time,
@@ -899,7 +950,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                                               data=result[data_type],
                                               data_type=data_type)
                 else:
-                    dummy_dtype = wfsim.truth_extra_dtype if 'truth' in data_type else strax.raw_record_dtype()
+                    dummy_dtype = self._truth_dtype if 'truth' in data_type else strax.raw_record_dtype()
                     if exist_nveto_result:
                         chunk[data_type] = self.chunk(start=self.sim_nv.chunk_time_pre,
                                                       end=self.sim_nv.chunk_time,
