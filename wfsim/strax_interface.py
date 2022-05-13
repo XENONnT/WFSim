@@ -93,8 +93,8 @@ def extra_truth_dtype_per_pmt(n_pmt: ty.Union[bool, int]) -> ty.List[tuple]:
         # Aggregate (total) fields
         (('Number of photons reaching PMT (total)', 'n_photon'), np.int32),
         (('Number of photons + dpe passing (total)', 'n_pe'), np.int32),
-        (('Number of photons passing trigger (total)', 'n_photon'), np.int32),
-        (('Number of photons + dpe passing trigger (total)', 'n_pe'), np.int32),
+        (('Number of photons passing trigger (total)', 'n_photon_trigger'), np.int32),
+        (('Number of photons + dpe passing trigger (total)', 'n_pe_trigger'), np.int32),
         (('Raw area in pe (total)', 'raw_area'), np.float64),
         (('Raw area in pe passing trigger (total)', 'raw_area_trigger'), np.float64),
         # General fields
