@@ -233,9 +233,7 @@ class Resource:
                 self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
 
         elif config.get('detector', 'XENONnT') == 'XENONnT':
-            
-            print(files)
-            
+                        
             pmt_mask = np.array(config['gains']) > 0  # Converted from to pe (from cmt by default)
 
             self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
