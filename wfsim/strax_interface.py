@@ -347,7 +347,7 @@ class ChunkRawRecords(object):
         self.rawdata = rawdata_generator(self.config, **kwargs)
         self.record_buffer = np.zeros(5000000,
                                       dtype=strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH))
-        truth_per_n_pmts = self._n_channels if config.get('per_channel_info') else False
+        truth_per_n_pmts = self._n_channels if config.get('per_pmt_truth') else False
         self.truth_dtype = extra_truth_dtype_per_pmt(truth_per_n_pmts)
         self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + self.truth_dtype + [('fill', bool)])
 
@@ -499,7 +499,7 @@ class ChunkRawRecords(object):
                  help="Duration of each chunk in seconds"),
     strax.Option('n_chunk', default=10, track=False, infer_type=False,
                  help="Number of chunks to simulate"),
-    strax.Option('per_channel_info', default=False, track=True, type=bool,
+    strax.Option('per_pmt_truth', default=False, track=True, type=bool,
                  help="Store the info per channel in the truth file"),
     strax.Option('fax_file', default=None, track=False, infer_type=False,
                  help="Directory with fax instructions"), 
@@ -643,7 +643,7 @@ class SimulatorPlugin(strax.Plugin):
 
     @property
     def _truth_dtype(self):
-        truth_per_n_pmts = self._n_channels if self.config.get('per_channel_info') else False
+        truth_per_n_pmts = self._n_channels if self.config.get('per_pmt_truth') else False
         return extra_truth_dtype_per_pmt(truth_per_n_pmts)
 
 @export

@@ -59,7 +59,7 @@ class Pulse(object):
 
         # Save the truth info either total/per pmt or total/bottom
         self._truth_buffer = {}
-        if self.config.get('per_channel_info', False):
+        if self.config.get('per_pmt_truth', False):
             _n_pmts = len(self.config['gains'])
             for int_field in 'n_photon n_pe n_photon_trigger n_pe_trigger'.split():
                 self._truth_buffer[int_field] = 0
@@ -265,7 +265,7 @@ class Pulse(object):
             'raw_area_trigger': trigger_raw_area,
         }.items():
             self._truth_buffer[field] += value
-            if self.config.get('per_channel_info', False):
+            if self.config.get('per_pmt_truth', False):
                 self._truth_buffer[field + '_per_pmt'][channel] += value
             elif channel in self.config['channels_bottom']:
                 self._truth_buffer[field + '_bottom'] += value

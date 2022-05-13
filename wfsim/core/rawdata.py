@@ -353,7 +353,7 @@ class RawData(object):
 
         # Copy single valued fields directly from pulse class
         for field in ['n_pe', 'n_pe_trigger', 'n_photon', 'n_photon_trigger', 'raw_area', 'raw_area_trigger']:
-            if self.config.get('per_channel_info', False):
+            if self.config.get('per_pmt_truth', False):
                 suffices = ['', '_per_pmt']
             else:
                 suffices = ['', '_bottom']

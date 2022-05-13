@@ -118,7 +118,7 @@ def test_sim_nT_advanced():
         st.set_config(dict(gain_model_mc=("to_pe_placeholder", True),
                            gain_model=("to_pe_placeholder", True),
                            hit_min_amplitude='pmt_commissioning_initial',
-                           per_pmt_info=True,
+                           per_pmt_truth=True,
                           ))
         st.set_config(dict(nchunk=1, event_rate=1, chunk_size=2,))
 
