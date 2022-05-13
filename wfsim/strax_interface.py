@@ -82,8 +82,8 @@ def extra_truth_dtype_per_pmt(n_pmt: ty.Union[bool, int]) -> ty.List[tuple]:
         return truth_extra_dtype
     return [
         (('End time of the interaction [ns]', 'endtime'), np.int64),
+        (('Number of simulated electrons', 'n_electron'), np.int32),
         # Per PMT fields
-        (('Number of simulated electrons', 'n_electron_per_pmt'), (np.int32, n_pmt)),
         (('Number of photons reaching PMT', 'n_photon_per_pmt'), (np.int32, n_pmt)),
         (('Number of photons + dpe passing', 'n_pe_per_pmt'), (np.int32, n_pmt)),
         (('Number of photons passing trigger', 'n_photon_trigger_per_pmt'), (np.int32, n_pmt)),

@@ -137,7 +137,7 @@ def test_sim_nT_advanced():
 
         truth = st.get_array(run_id, 'truth')
         for field in 'n_pe n_photon raw_area'.split():
-            assert truth[field] == np.sum(truth[field + '_per_pmt'], axis=1)
+            assert np.all(np.isclose(truth[field], np.sum(truth[field + '_per_pmt'], axis=1)))
 
 
 def test_sim_mc_chain():
