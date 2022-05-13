@@ -66,7 +66,7 @@ class Pulse(object):
                 self._truth_buffer[int_field + '_per_pmt'] = np.zeros(_n_pmts, dtype=np.int32)
             for float_field in 'raw_area raw_area_trigger'.split():
                 self._truth_buffer[float_field] = 0
-                self._truth_buffer[float_field + '_per_pmt'] = np.zeros(_n_pmts, dtype=np.int32)
+                self._truth_buffer[float_field + '_per_pmt'] = np.zeros(_n_pmts, dtype=np.float64)
         else:
             for field in 'n_photon n_pe n_photon_trigger n_pe_trigger raw_area raw_area_trigger'.split():
                 self._truth_buffer[field] = 0
