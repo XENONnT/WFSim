@@ -232,17 +232,32 @@ class Resource:
         elif config.get('detector', 'XENONnT') == 'XENONnT':
             pmt_mask = np.array(config['gains']) > 0  # Converted from to pe (from cmt by default)
 
-            self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
-            self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='pkl')
+            self.s1_pattern_map = make_patternmap(files['s1_pattern_map'], fmt='pkl', pmt_mask=pmt_mask)
+            self.s2_pattern_map = make_patternmap(files['s2_pattern_map'], fmt='pkl', pmt_mask=pmt_mask)
 
             # if there is a (data driven!) map, load it. If not make it  from the pattern map
             if files['s1_lce_correction_map']:
                 self.s1_lce_correction_map = make_map(files['s1_lce_correction_map'])
             else:
                 lymap = deepcopy(self.s1_pattern_map)
+                # AT: this scaling with mast is redundant to `make_patternmap`, but keep it in for now
                 lymap.data['map'] = np.sum(lymap.data['map'][:][:][:], axis=3, keepdims=True, where=pmt_mask)
                 lymap.__init__(lymap.data)
                 self.s1_lce_correction_map = lymap
+            # making S2 aft scaling (if provided)
+            if 's2_mean_area_fraction_top' in config.keys():
+                avg_s2aft_=config['s2_mean_area_fraction_top']
+                if avg_s2aft_>=0.0:
+                    s2map=deepcopy(self.s2_pattern_map)
+                    s2map_topeff_=s2map.data['map'][...,0:config['n_top_pmts']].sum(axis=2)
+                    s2map_toteff_=s2map.data['map'].sum(axis=2)
+                    orig_aft_=np.mean((s2map_topeff_/s2map_toteff_)[s2map_toteff_>0.0])
+                    # getting scales for top/bottom separately to preserve total efficiency
+                    scale_top_=avg_s2aft_/orig_aft_
+                    scale_bot_=(1 - avg_s2aft_)/(1 - orig_aft_)
+                    s2map.data['map'][:,:,0:config['n_top_pmts']]*=scale_top_
+                    s2map.data['map'][:,:,config['n_top_pmts']:config['n_tpc_pmts']]*=scale_bot_
+                    self.s2_pattern_map.__init__(s2map.data)
 
             # if there is a (data driven!) map, load it. If not make it  from the pattern map
             if files['s2_correction_map']:
@@ -250,6 +265,7 @@ class Resource:
             else:
                 s2cmap = deepcopy(self.s2_pattern_map)
                 # Lower the LCE by removing contribution from dead PMTs
+                # AT: masking is a bit redundant due to PMT mask application in make_patternmap 
                 s2cmap.data['map'] = np.sum(s2cmap.data['map'][:][:], axis=2, keepdims=True, where=pmt_mask)
                 # Scale by median value
                 s2cmap.data['map'] = s2cmap.data['map'] / np.median(s2cmap.data['map'][s2cmap.data['map'] > 0])
@@ -349,7 +365,28 @@ def make_map(map_file, fmt=None, method='WeightedNearestNeighbors'):
     else:
         raise TypeError("Can't handle map_file except a string or a list")
 
-
+def make_patternmap(map_file, fmt=None, method='WeightedNearestNeighbors', pmt_mask=None):
+    """ This is special interpretation of the of previous make_map(), but designed 
+    for pattern map loading with provided PMT maksk. This way simplifies both S1 and S2 
+    cases
+    """
+    map_data = deepcopy(straxen.get_resource(map_file, fmt=fmt)) 
+    # XXX: straxed deals with pointers and caches resources, it means that resources are global
+    # what is bad, so we make own copy here and modify it locally
+    if 'compressed' in map_data:
+        compressor, dtype, shape = map_data['compressed']
+        map_data['map'] = np.frombuffer(
+            strax.io.COMPRESSORS[compressor]['decompress'](map_data['map']),
+            dtype=dtype).reshape(*shape)
+        del map_data['compressed']
+    if 'quantized' in map_data:
+        map_data['map'] = map_data['quantized']*map_data['map'].astype(np.float32)
+        del map_data['quantized']
+    if not (pmt_mask is None):
+        assert (map_data['map'].shape[-1]==pmt_mask.shape[0]), "Error! Pattern map and PMT gains must have same dimensions!"
+        map_data['map'][..., ~pmt_mask]=0.0
+    return straxen.InterpolatingMap(map_data, method=method)
+    
 @export
 class DummyMap:
     """Return constant results
