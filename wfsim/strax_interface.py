@@ -508,15 +508,10 @@ class SimulatorPlugin(strax.Plugin):
             self.config.update({'field_distortion_model': "inverse_fdc" if self.config['field_distortion_on'] else "none"})
 
         # Update gains to the nT defaults
-        if straxen.is_cmt_option((self.run_id, self.config['gain_model_mc'],)):
-            pass
-
-        self.to_pe = straxen.get_correction_from_cmt(self.run_id,
-                                                     self.config['gain_model_mc'])
         if len(self.config['gain_model_mc']) == self.config['n_tpc_pmts']:
+            # Allow a list of values, although usually just get it from CMT
             self.to_pe = self.config['gain_model_mc']
         else:
-
             self.to_pe = straxen.get_correction_from_cmt(self.run_id, self.config['gain_model_mc'])
 
 
