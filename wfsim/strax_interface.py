@@ -502,21 +502,23 @@ class SimulatorPlugin(strax.Plugin):
         overrides = self.config['fax_config_override']
         if overrides is not None:
             self.config.update(overrides)
-            
+
         # backwards compatibility
         if 'field_distortion_on' in self.config and not 'field_distortion_model' in self.config:
             self.config.update({'field_distortion_model': "inverse_fdc" if self.config['field_distortion_on'] else "none"})
 
         # Update gains to the nT defaults
         if straxen.is_cmt_option((self.run_id, self.config['gain_model_mc'],)):
-            self.to_pe = straxen.get_correction_from_cmt(self.run_id,
-                                                         self.config['gain_model_mc'])
-        elif len(self.config['gain_model_mc']) == self.config['n_tpc_pmts']:
+            pass
+
+        self.to_pe = straxen.get_correction_from_cmt(self.run_id,
+                                                     self.config['gain_model_mc'])
+        if len(self.config['gain_model_mc']) == self.config['n_tpc_pmts']:
             self.to_pe = self.config['gain_model_mc']
         else:
-            raise ValueError(f'Sorry but we we don\'t allow other formats than CMT or a '
-                             f'list of gains. Input was {self.config["gain_model_mc"]}.')
-          
+
+            self.to_pe = straxen.get_correction_from_cmt(self.run_id, self.config['gain_model_mc'])
+
 
         adc_2_current = (self.config['digitizer_voltage_range']
                          / 2 ** (self.config['digitizer_bits'])
@@ -539,7 +541,7 @@ class SimulatorPlugin(strax.Plugin):
         if self.config['fax_config_override_from_cmt'] is not None:
             for fax_field, cmt_option in self.config['fax_config_override_from_cmt'].items():
                 if (fax_field in ['fdc_3d', 's1_lce_correction_map']
-                    and self.config.get('default_reconstruction_algorithm', False)):
+                        and self.config.get('default_reconstruction_algorithm', False)):
                     cmt_option = tuple(['suffix',
                                         self.config['default_reconstruction_algorithm'],
                                         *cmt_option])
