@@ -406,9 +406,13 @@ class RawData(object):
         right = np.max(channel_mask['right'][channel_mask['mask']])
 
         if noise_data_length-right+left-1 < 0:
-            ix_rand = np.random.randint(low=0, high=noise_data_length-1)
+            high = noise_data_length-1
         else:
-            ix_rand = np.random.randint(low=0, high=noise_data_length-right+left-1)
+            high = noise_data_length-right+left-1
+        if high <= 0:
+            ix_rand = 0
+        else:
+            ix_rand = np.random.randint(low=0, high=high)
 
         for ch in range(data.shape[0]):
             # In case adding noise to he channels is not supported
