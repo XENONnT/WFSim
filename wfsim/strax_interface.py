@@ -508,8 +508,18 @@ class SimulatorPlugin(strax.Plugin):
             self.config.update({'field_distortion_model': "inverse_fdc" if self.config['field_distortion_on'] else "none"})
 
         # Update gains to the nT defaults
-        self.to_pe = straxen.get_correction_from_cmt(self.run_id,
-                               self.config['gain_model_mc'])
+        if straxen.is_cmt_option(self.run_id,
+                                 self.config['gain_model_mc'],
+                                ):
+          self.to_pe = straxen.get_correction_from_cmt(self.run_id,
+                                                       self.config['gain_model_mc'])
+        elif len(self.config['gain_model_mc']) == self.config['n_tpc_pmts']
+          self.to_pe = self.config['gain_model_mc']
+        else:
+          
+          raise ValueError(f'Sorry but we we don\'t allow other formats that CMT or a '
+                           f'list of gains. Input was {self.config["gain_model_mc"]}')
+          
 
         adc_2_current = (self.config['digitizer_voltage_range']
                          / 2 ** (self.config['digitizer_bits'])
