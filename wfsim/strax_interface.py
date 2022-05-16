@@ -511,13 +511,13 @@ class SimulatorPlugin(strax.Plugin):
         if straxen.is_cmt_option(self.run_id,
                                  self.config['gain_model_mc'],
                                 ):
-          self.to_pe = straxen.get_correction_from_cmt(self.run_id,
-                                                       self.config['gain_model_mc'])
-        elif len(self.config['gain_model_mc']) == self.config['n_tpc_pmts']
-          self.to_pe = self.config['gain_model_mc']
+            self.to_pe = straxen.get_correction_from_cmt(self.run_id,
+                                                         self.config['gain_model_mc'])
+        elif len(self.config['gain_model_mc']) == self.config['n_tpc_pmts']:
+            self.to_pe = self.config['gain_model_mc']
         else:
-          raise ValueError(f'Sorry but we we don\'t allow other formats than CMT or a '
-                           f'list of gains. Input was {self.config["gain_model_mc"]}.')
+            raise ValueError(f'Sorry but we we don\'t allow other formats than CMT or a '
+                             f'list of gains. Input was {self.config["gain_model_mc"]}.')
           
 
         adc_2_current = (self.config['digitizer_voltage_range']
