@@ -93,9 +93,9 @@ class Resource:
                 'se_gain_map': 'XENONnT_se_xy_map_v1_mlp.json',
                 'photon_ap_cdfs': 'XENONnT_pmt_afterpulse_config_012605.json.gz',
                 's2_luminescence': 'XENONnT_GARFIELD_B1d5n_C30n_G1n_A6d5p_T1d5n_PMTs1d5n_FSR0d95n.npz',
-                "s2_luminescence_gg": "garfield_timing_map_gas_gap.npy",
+                "s2_luminescence_gg": "garfield_timing_map_gas_gap_sr0.npy",
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
-                'garfield_gas_gap_map': 'garfield_gas_gap_map.json',
+                'garfield_gas_gap_map': 'garfield_gas_gap_map_sr0.json',
                 'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
                 'noise_file': 'x1t_noise_170203_0850_00_small.npz',
                 'fdc_3d': 'XnT_3D_FDC_xyt_dummy_all_zeros_v0.1.json.gz',
@@ -147,10 +147,11 @@ class Resource:
             log.warning(f"A file has value False, assuming this is intentional.")
             return
 
-        if fname.startswith('/'):
-            log.warning(f"Using local file {fname} for a resource. "
-                        f"Do not set this as a default or TravisCI tests will break")
-            return fname
+        if (type(fname) == str):
+            if fname.startswith('/'):
+                log.warning(f"Using local file {fname} for a resource. "
+                            f"Do not set this as a default or TravisCI tests will break")
+                return fname
         
         if base.startswith('/'):
             log.warning(f"Using local folder {base} for all resources. "
