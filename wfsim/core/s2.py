@@ -399,15 +399,45 @@ class S2(Pulse):
     
     @staticmethod
     @njit
-    def draw_excitation_times(inv_cdf_list, hist_indices, nph):
+    def draw_excitation_times(inv_cdf_list, hist_indices, nph, diff_nearest_gg, d_gas_gap):
+        
+        """
+        Draws the excitation times from the GARFIELD electroluminescence map
+        
+        :param inv_cdf_list:       List of inverse CDFs for the excitation time histograms
+        :param hist_indices:       The index of the histogram which refers to the gas gap
+        :param diff_nearest_gg:    The difference between the gas gap from the map
+                                   (continuous value) and the nearest (discrete) value
+                                   of the gas gap corresponding to the excitation time
+                                   histograms
+        :param d_gas_gap:          Spacing between two consecutive gas gap values
+        
+        returns time of each photon
+        """
+        
         inv_cdf_len = len(inv_cdf_list[0])
         timings = np.zeros(np.sum(nph))
+        upper_hist_ind = np.clip(hist_indices+1, 0, len(inv_cdf_list)-1)
+        
         count = 0
-        for i, (hist_ind, n) in enumerate(zip(hist_indices, nph)):
-            samples = np.random.uniform(0, inv_cdf_len, n)
-            t1 = inv_cdf_list[hist_ind][np.floor(samples).astype('int')]
-            t2 = inv_cdf_list[hist_ind][np.ceil(samples).astype('int')]
-            timings[count:count+n] = (t2-t1)*(samples - np.floor(samples))+t1
+        for i, (hist_ind, u_hist_ind, n, dngg) in enumerate(zip(hist_indices,
+                                                                upper_hist_ind, 
+                                                                nph,
+                                                                diff_nearest_gg)):
+            
+            #There are only 10 values of gas gap separated by 0.1mm, so we interpolate
+            #between two histograms
+            
+            interp_cdf = ((inv_cdf_list[u_hist_ind]-inv_cdf_list[hist_ind])*(dngg/d_gas_gap)
+                           +inv_cdf_list[hist_ind])
+
+            samples = np.random.uniform(0, inv_cdf_len-1, n)
+            t1 = interp_cdf[np.floor(samples).astype('int')]
+            t2 = interp_cdf[np.ceil(samples).astype('int')]
+            T = (t2-t1)*(samples - np.floor(samples))+t1
+            
+            #subtract mean to get proper drift time and z correlation
+            timings[count:count+n] = T - np.mean(T) 
             count+=n
         return timings
     
@@ -425,9 +455,17 @@ class S2(Pulse):
         assert 's2_luminescence' in resource.__dict__, 's2_luminescence model not found'
         assert len(n_photons) == len(xy), 'Input number of n_electron should have same length as positions'
         
-        draw_index = np.digitize(resource.garfield_gas_gap_map(xy), resource.s2_luminescence['gas_gap'])-1
+        d_gasgap = resource.s2_luminescence['gas_gap'][1]-resource.s2_luminescence['gas_gap'][0]
         
-        return S2.draw_excitation_times(resource.s2_luminescence['timing_inv_cdf'], draw_index, n_photons)
+        cont_gas_gaps = resource.garfield_gas_gap_map(xy)
+        draw_index = np.digitize(cont_gas_gaps, resource.s2_luminescence['gas_gap'])-1
+        diff_nearest_gg = cont_gas_gaps - resource.s2_luminescence['gas_gap'][draw_index]
+        
+        return S2.draw_excitation_times(resource.s2_luminescence['timing_inv_cdf'],
+                                        draw_index,
+                                        n_photons,
+                                        diff_nearest_gg,
+                                        d_gasgap)
     
     @staticmethod
     def optical_propagation(channels, config, spline):
