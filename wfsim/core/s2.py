@@ -191,9 +191,11 @@ class S2(Pulse):
        # calculate it from MC pattern map directly if no "se_gain_map" is given 
         if ('se_gain_from_map' not in config):
             sc_gain = resource.s2_correction_map(positions)
+            sc_gain *= config['s2_secondary_sc_gain']
         else:
             if config['se_gain_from_map'] == False:
                 sc_gain = resource.s2_correction_map(positions)
+                sc_gain *= config['s2_secondary_sc_gain']
             else:
                 sc_gain = resource.se_gain_map(positions)
 
@@ -204,9 +206,6 @@ class S2(Pulse):
 
         # sc gain should has the unit of pe / electron, here we divide 1 + dpe to get nphoton / electron
         sc_gain /= 1 + config['p_double_pe_emision']
-        
-        if ('se_gain_from_map' not in config) or config['se_gain_from_map'] == False:
-            sc_gain *= config['s2_secondary_sc_gain']
 
         # data driven map contains nan, will be set to 0 here
         sc_gain[np.isnan(sc_gain)] = 0
