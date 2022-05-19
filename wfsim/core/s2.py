@@ -97,7 +97,6 @@ class S2(Pulse):
                                           config=self.config,
                                           resource=self.resource)
         
-        print(f'sc_gains are: {sc_gain}')
 
 
         n_photons_per_xy, n_photons_per_ele, self._electron_timings = self.get_n_photons(t=t,
@@ -235,20 +234,16 @@ class S2(Pulse):
         cy = config['g2_mean']*resource.s2_correction_map(xy_int)*\
              electron_lifetime_correction/resource.se_gain_map(xy_int)
 
-        print(f"charge yield is: {cy}")
 
         # Remove electrons in insensitive volume
         if config['enable_field_dependencies']['survival_probability_map']:
             p_surv = resource.field_dependencies_map(z_int, xy_int, map_name='survival_probability_map')
-            print(f"Survival probability due to charge insensitive volume is: {p_surv}")
             if np.any(p_surv<0) or np.any(p_surv>1):
                 # FIXME: this is necessary due to map artefacts, such as negative or values >1
                 p_surv=np.clip(p_surv, a_min = 0, a_max = 1)
-            print(f"p_surv after getting rid of artifacts: {p_surv}")
             cy *= p_surv
         n_electron = np.random.binomial(n=n_electron, p=cy)
         
-        print(f'Number of electrons for each xy is: {n_electron}')
         return n_electron
 
     @staticmethod
@@ -302,13 +297,11 @@ class S2(Pulse):
 
         # Populate with photons per e/ per position
         n_photons_per_ele = np.random.poisson(_electron_gains)
-        print(f'n_photons_per_ele are: {n_photons_per_ele}')
         n_photons_per_ele += np.random.normal(0, config.get('s2_gain_spread', 0), len(n_photons_per_ele)).astype(np.int64)
         n_photons_per_ele[n_photons_per_ele < 0] = 0
         #
         n_photons_per_xy = np.cumsum(np.pad(n_photons_per_ele, [1, 0]))[np.cumsum(n_electron)]
         n_photons_per_xy = np.diff(np.pad(n_photons_per_xy, [1, 0]))
-        print(f'n_photons_per_xy are: {n_photons_per_xy}')
 
         return n_photons_per_xy, n_photons_per_ele, _electron_timings
 
@@ -467,8 +460,6 @@ class S2(Pulse):
         assert len(n_photons) == len(xy), 'Input number of n_electron should have same length as positions'
         
         d_gasgap = resource.s2_luminescence['gas_gap'][1]-resource.s2_luminescence['gas_gap'][0]
-        print(d_gasgap)
-        print(n_photons)
         
         cont_gas_gaps = resource.garfield_gas_gap_map(xy)
         draw_index = np.digitize(cont_gas_gaps, resource.s2_luminescence['gas_gap'])-1
