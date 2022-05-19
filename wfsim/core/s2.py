@@ -96,6 +96,7 @@ class S2(Pulse):
         sc_gain = self.get_s2_light_yield(positions=positions,
                                           config=self.config,
                                           resource=self.resource)
+        
 
 
         n_photons_per_xy, n_photons_per_ele, self._electron_timings = self.get_n_photons(t=t,
@@ -233,6 +234,7 @@ class S2(Pulse):
         cy = config['g2_mean']*resource.s2_correction_map(xy_int)*\
              electron_lifetime_correction/resource.se_gain_map(xy_int)
 
+
         # Remove electrons in insensitive volume
         if config['enable_field_dependencies']['survival_probability_map']:
             p_surv = resource.field_dependencies_map(z_int, xy_int, map_name='survival_probability_map')
@@ -241,6 +243,7 @@ class S2(Pulse):
                 p_surv=np.clip(p_surv, a_min = 0, a_max = 1)
             cy *= p_surv
         n_electron = np.random.binomial(n=n_electron, p=cy)
+        
         return n_electron
 
     @staticmethod
@@ -434,9 +437,11 @@ class S2(Pulse):
             t1 = interp_cdf[np.floor(samples).astype('int')]
             t2 = interp_cdf[np.ceil(samples).astype('int')]
             T = (t2-t1)*(samples - np.floor(samples))+t1
+            if n!=0:
+                T = T-np.mean(T)
             
             #subtract mean to get proper drift time and z correlation
-            timings[count:count+n] = T - np.mean(T) 
+            timings[count:count+n] = T
             count+=n
         return timings
     
