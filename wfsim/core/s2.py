@@ -455,6 +455,8 @@ class S2(Pulse):
         assert len(n_photons) == len(xy), 'Input number of n_electron should have same length as positions'
         
         d_gasgap = resource.s2_luminescence['gas_gap'][1]-resource.s2_luminescence['gas_gap'][0]
+        print(d_gasgap)
+        print(n_photons)
         
         cont_gas_gaps = resource.garfield_gas_gap_map(xy)
         draw_index = np.digitize(cont_gas_gaps, resource.s2_luminescence['gas_gap'])-1
