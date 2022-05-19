@@ -444,9 +444,11 @@ class S2(Pulse):
             t1 = interp_cdf[np.floor(samples).astype('int')]
             t2 = interp_cdf[np.ceil(samples).astype('int')]
             T = (t2-t1)*(samples - np.floor(samples))+t1
+            if n!=0:
+                T = T-np.mean(T)
             
             #subtract mean to get proper drift time and z correlation
-            timings[count:count+n] = T - np.mean(T) 
+            timings[count:count+n] = T
             count+=n
         return timings
     
