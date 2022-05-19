@@ -96,6 +96,8 @@ class S2(Pulse):
         sc_gain = self.get_s2_light_yield(positions=positions,
                                           config=self.config,
                                           resource=self.resource)
+        
+        print(f'sc_gains are: {sc_gain}')
 
 
         n_photons_per_xy, n_photons_per_ele, self._electron_timings = self.get_n_photons(t=t,
@@ -241,6 +243,8 @@ class S2(Pulse):
                 p_surv=np.clip(p_surv, a_min = 0, a_max = 1)
             cy *= p_surv
         n_electron = np.random.binomial(n=n_electron, p=cy)
+        
+        print(f'Number of electrons for each xy is: {n_electron}')
         return n_electron
 
     @staticmethod
@@ -294,11 +298,13 @@ class S2(Pulse):
 
         # Populate with photons per e/ per position
         n_photons_per_ele = np.random.poisson(_electron_gains)
+        print(f'n_photons_per_ele are: {n_photons_per_ele}')
         n_photons_per_ele += np.random.normal(0, config.get('s2_gain_spread', 0), len(n_photons_per_ele)).astype(np.int64)
         n_photons_per_ele[n_photons_per_ele < 0] = 0
         #
         n_photons_per_xy = np.cumsum(np.pad(n_photons_per_ele, [1, 0]))[np.cumsum(n_electron)]
         n_photons_per_xy = np.diff(np.pad(n_photons_per_xy, [1, 0]))
+        print(f'n_photons_per_xy are: {n_photons_per_xy}')
 
         return n_photons_per_xy, n_photons_per_ele, _electron_timings
 
