@@ -615,9 +615,9 @@ class S2(Pulse):
             _photon_channels = np.zeros(0, dtype=np.int64)
             return _photon_channels
 
-        aft = config['s2_mean_area_fraction_top']
-        aft_sigma = config.get('s2_aft_sigma', 0.0118)
-        aft_skewness = config.get('s2_aft_skewness', -1.433)
+        #aft = config['s2_mean_area_fraction_top']
+        aft_sigma = config.get('s2_aft_sigma', 0.0)
+        aft_skewness = config.get('s2_aft_skewness', 0.0)
 
         channels = np.arange(config['n_tpc_pmts']).astype(np.int64)
         top_index = np.arange(config['n_top_pmts'])
@@ -646,13 +646,15 @@ class S2(Pulse):
         for unique_i, count in zip(*np.unique(_instruction, return_counts=True)):
             pat = pattern[unique_i]  # [pmt]
 
-            if aft > 0:  # Redistribute pattern with user specified aft
-                _aft = aft * (1 + skewnorm.rvs(loc=0,
-                                               scale=aft_sigma,
-                                               a=aft_skewness))
-                _aft = np.clip(_aft, 0, 1)
-                pat[top_index] = pat[top_index] / pat[top_index].sum() * _aft
-                pat[bottom_index] = pat[bottom_index] / pat[bottom_index].sum() * (1 - _aft)
+            if aft_sigma != 0:  # Redistribute pattern with user specified aft smearing
+                _cur_aft=np.sum(pat[top_index])/np.sum(pat)
+                _new_aft=_cur_aft*skewnorm.rvs(loc=1.0, scale=aft_sigma, a=aft_skewness)
+                _new_aft=np.clip(_new_aft, 0, 1)
+                pat[top_index]*=(_new_aft/_cur_aft)
+                pat[bottom_index]*=(1 - _new_aft)/(1 - _cur_aft)
+                # old code from Peter
+                #pat[top_index] = pat[top_index] / pat[top_index].sum() * _aft
+                #pat[bottom_index] = pat[bottom_index] / pat[bottom_index].sum() * (1 - _aft)
 
             if np.isnan(pat).sum() > 0:  # Pattern map return zeros
                 _photon_channels = np.array([-1] * count)
