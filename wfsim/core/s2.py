@@ -235,12 +235,16 @@ class S2(Pulse):
         cy = config['g2_mean']*resource.s2_correction_map(xy_int)*\
              electron_lifetime_correction/resource.se_gain_map(xy_int)
 
+        print(f"charge yield is: {cy}")
+
         # Remove electrons in insensitive volume
         if config['enable_field_dependencies']['survival_probability_map']:
             p_surv = resource.field_dependencies_map(z_int, xy_int, map_name='survival_probability_map')
+            print(f"Survival probability due to charge insensitive volume is: {p_surv}")
             if np.any(p_surv<0) or np.any(p_surv>1):
                 # FIXME: this is necessary due to map artefacts, such as negative or values >1
                 p_surv=np.clip(p_surv, a_min = 0, a_max = 1)
+            print(f"p_surv after getting rid of artifacts: {p_surv}")
             cy *= p_surv
         n_electron = np.random.binomial(n=n_electron, p=cy)
         
