@@ -76,7 +76,9 @@ class Resource:
                 's1_lce_correction_map': 'XENON1T_s1_xyz_ly_kr83m_SR1_pax-680_fdc-3d_v0.json',
                 's1_pattern_map': 'XENON1T_s1_xyz_patterns_interp_corrected_MCv2.1.0.json.gz',
                 's2_correction_map': 'XENON1T_s2_xy_ly_SR1_v2.2.json',
+                's2_luminescence_gg': "garfield_timing_map_gas_gap_sr0.npy",
                 's2_pattern_map': 'XENON1T_s2_xy_patterns_top_corrected_MCv2.1.0.json.gz',
+                'garfield_gas_gap_map': 'garfield_gas_gap_map_sr0.json',
                 'photon_ap_cdfs': 'x1t_pmt_afterpulse_config.pkl.gz',
                 'fdc_3d': 'XENON1T_FDC_SR1_data_driven_time_dependent_3d_correction_tf_nn_part1_v1.json.gz',
                 'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
@@ -282,11 +284,17 @@ class Resource:
             # Garfield luminescence timing samples
             # if config.get('s2_luminescence_model', False) == 'garfield':
             if 'garfield_gas_gap' in config.get('s2_luminescence_model', ''):
+                #garfield_gas_gap option is using (x,y) -> gas gap (from the map) -> s2 luminescence
+                #from garfield. This s2_luminescence_gg is indexed only by the gas gap, and
+                #corresponds to electrons drawn directly below the anode
+                
                 s2_luminescence_map = straxen.get_resource(files['s2_luminescence_gg'], fmt='npy')
                 self.s2_luminescence = s2_luminescence_map
                 self.garfield_gas_gap_map = make_map(files['garfield_gas_gap_map'], fmt = 'json')
 
             elif 'garfield' in config.get('s2_luminescence_model', ''):
+                #This option indexes the luminescence times using the liquid level values
+                #as well as the position between the full pitch of two gate wires
                 s2_luminescence_map = straxen.get_resource(files['s2_luminescence'], fmt='npy')
                 self.s2_luminescence = s2_luminescence_map
 
