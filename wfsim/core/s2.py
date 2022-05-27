@@ -408,6 +408,7 @@ class S2(Pulse):
         
         :param inv_cdf_list:       List of inverse CDFs for the excitation time histograms
         :param hist_indices:       The index of the histogram which refers to the gas gap
+        :param nph:                A 1-d array of the number of photons per electron
         :param diff_nearest_gg:    The difference between the gas gap from the map
                                    (continuous value) and the nearest (discrete) value
                                    of the gas gap corresponding to the excitation time
