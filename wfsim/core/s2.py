@@ -231,6 +231,8 @@ class S2(Pulse):
         # Absorb electrons during the drift
         electron_lifetime_correction = np.exp(- 1 * drift_time_mean /
                                               config['electron_lifetime_liquid'])
+        
+        # Extraction efficiency is g2(x,y)/SE_gain(x,y)
         cy = config['g2_mean']*resource.s2_correction_map(xy_int)*\
              electron_lifetime_correction/resource.se_gain_map(xy_int)
 
