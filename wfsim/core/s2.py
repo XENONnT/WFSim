@@ -232,9 +232,15 @@ class S2(Pulse):
         electron_lifetime_correction = np.exp(- 1 * drift_time_mean /
                                               config['electron_lifetime_liquid'])
         
-        # Extraction efficiency is g2(x,y)/SE_gain(x,y)
-        cy = config['g2_mean']*resource.s2_correction_map(xy_int)*\
-             electron_lifetime_correction/resource.se_gain_map(xy_int)
+        if ('ext_eff_from_map' not in config):
+            cy = electron_lifetime_correction*config['electron_extraction_yield']
+        else:
+            if config['ext_eff_from_map'] == False:
+                cy = electron_lifetime_correction*config['electron_extraction_yield']
+            else:
+                # Extraction efficiency is g2(x,y)/SE_gain(x,y)
+                cy = config['g2_mean']*resource.s2_correction_map(xy_int)*\
+                    electron_lifetime_correction/resource.se_gain_map(xy_int)
 
 
         # Remove electrons in insensitive volume
