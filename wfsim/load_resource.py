@@ -287,7 +287,7 @@ class Resource:
                 #corresponds to electrons drawn directly below the anode
                 
                 s2_luminescence_map = straxen.get_resource(files['s2_luminescence_gg'], fmt='npy')
-                self.s2_luminescence = s2_luminescence_map
+                self.s2_luminescence_gg = s2_luminescence_map
                 self.garfield_gas_gap_map = make_map(files['garfield_gas_gap_map'], fmt = 'json')
 
             elif 'garfield' in config.get('s2_luminescence_model', ''):
