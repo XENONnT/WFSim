@@ -459,16 +459,16 @@ class S2(Pulse):
 
         returns 2d array with ints for photon timings of input param 'shape'
         """
-        assert 's2_luminescence' in resource.__dict__, 's2_luminescence model not found'
+        assert 's2_luminescence_gg' in resource.__dict__, 's2_luminescence_gg model not found'
         assert len(n_photons) == len(xy), 'Input number of n_electron should have same length as positions'
         
-        d_gasgap = resource.s2_luminescence['gas_gap'][1]-resource.s2_luminescence['gas_gap'][0]
+        d_gasgap = resource.s2_luminescence_gg['gas_gap'][1]-resource.s2_luminescence_gg['gas_gap'][0]
         
         cont_gas_gaps = resource.garfield_gas_gap_map(xy)
-        draw_index = np.digitize(cont_gas_gaps, resource.s2_luminescence['gas_gap'])-1
-        diff_nearest_gg = cont_gas_gaps - resource.s2_luminescence['gas_gap'][draw_index]
+        draw_index = np.digitize(cont_gas_gaps, resource.s2_luminescence_gg['gas_gap'])-1
+        diff_nearest_gg = cont_gas_gaps - resource.s2_luminescence_gg['gas_gap'][draw_index]
         
-        return S2.draw_excitation_times(resource.s2_luminescence['timing_inv_cdf'],
+        return S2.draw_excitation_times(resource.s2_luminescence_gg['timing_inv_cdf'],
                                         draw_index,
                                         n_photons,
                                         diff_nearest_gg,
