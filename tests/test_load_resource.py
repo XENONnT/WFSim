@@ -1,3 +1,4 @@
+import straxen
 from wfsim.load_resource import load_config
 
 
@@ -38,7 +39,8 @@ def test_load_nt():
         "s2_pattern_map": ["constant dummy", 30e-5, [494,]],
         "s2_correction_map": ["constant dummy", 1, []],
         "field_dependencies_map": ["constant dummy", 1, []],
-        "gains": [1 for i in range(494)],
+        "gains": [1 for _ in range(straxen.n_tpc_pmts)],
+        "se_gain_map": ["constant dummy", 1, []],
     }
     result = load_config(config)
     return result, config
