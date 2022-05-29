@@ -8,6 +8,7 @@ import straxen
 
 import wfsim
 from .test_load_resource import test_load_nt
+from unittest import skipIf
 
 logging.basicConfig(
     level=logging.DEBUG,
