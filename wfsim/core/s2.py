@@ -196,8 +196,8 @@ class S2(Pulse):
            sc_gain = resource.s2_correction_map(positions)
            sc_gain *= config['s2_secondary_sc_gain']
 
-           # depending on if you use the data driven or mc pattern map for light yield for S2
-           # the shape of n_photon_hits will change. Mc needs a squeeze
+       # depending on if you use the data driven or mc pattern map for light yield for S2
+       # the shape of n_photon_hits will change. Mc needs a squeeze
         if len(sc_gain.shape) != 1:
             sc_gain=np.squeeze(sc_gain, axis=-1)
 
