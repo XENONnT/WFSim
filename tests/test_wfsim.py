@@ -212,8 +212,6 @@ def test_sim_mc_chain():
             fax_config_override=dict(
                 s1_model_type='nest',
                 s2_time_model="s2_time_spread around zero",
-                # url_base='https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/master/sim_files',
-                # s1_lce_correction_map=["constant dummy", 1, []],
                 enable_electron_afterpulses=False),
             epix_config=epix_config,
             fax_config_nveto='fax_config_nt_nveto.json',
