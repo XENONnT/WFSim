@@ -65,7 +65,7 @@ def test_sim_1T():
 
 
 @skipIf(not straxen.utilix_is_configured(), 'utilix is not configured')
-def test_sim_nT_basics():
+def test_sim_nt_basics():
     """Test the nT simulator. Uses basic config so complicated steps are skipped. So this will test
        the simple s1 model and the simple s2 model"""
 
@@ -111,14 +111,18 @@ def test_sim_nT_basics():
 def test_sim_nt_advanced(
         config = None
 ):
-    """Test the nT simulator. Works only if one has access to the XENONnT databases.
-        Clone the repo to dali and type 'pytest' to run. The first run will test simple s1,
-        garfield s2 and noise/afterpulses. The second run will test the s1 spline model"""
+    """
+    Test the nT simulator. Works only if one has access to the XENONnT databases.
+    Clone the repo to dali and type 'pytest' to run.
+    """
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
+
         st = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000',
                                                  cmt_version='global_ONLINE',
-                                                 _config_overlap={},)
+                                                 _config_overlap={},
+                                                 fax_config='fax_config_nt_sr0_v0.json'
+                                                 )
         st.set_config(dict(nchunk=1, event_rate=1, chunk_size=2,))
 
         if config is not None:
@@ -131,6 +135,8 @@ def test_sim_nt_advanced(
         _sanity_check(rr, p)
         log.info(f'All done')
 
+
+@skipIf(not straxen.utilix_is_configured(), 'utilix is not configured')
 def test_nt_advanced_alt_s2_model():
     config = dict(
         fax_config_override=dict(
@@ -143,6 +149,8 @@ def test_nt_advanced_alt_s2_model():
     )
     test_sim_nt_advanced(config)
 
+
+@skipIf(not straxen.utilix_is_configured(), 'utilix is not configured')
 def test_nt_advanced_garfield():
     config = dict(
         fax_config_override=dict(
