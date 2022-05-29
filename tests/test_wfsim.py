@@ -164,6 +164,22 @@ def test_nt_advanced_garfield():
     )
     test_sim_nt_advanced(config)
 
+@skipIf(not straxen.utilix_is_configured(), 'utilix is not configured')
+def test_nt_advanced_gas_gap_garfield():
+    config = dict(
+        fax_config_override=dict(
+            s2_luminescence_model='garfield_gas_gap',
+            s2_correction_map="XENONnT_s2_xy_map_v4_210503_mlp_3_in_1_iterated.json",
+            s2_luminescence_gg= "garfield_timing_map_gas_gap_sr0.npy",
+            garfield_gas_gap_map= "garfield_gas_gap_map_sr0.json",
+            s2_time_model="s2_time_spread around zero",
+            s1_lce_correction_map='XENONnT_s1_xyz_LCE_corrected_qes_MCva43fa9b_wires.json.gz',
+            s1_time_spline='XENONnT_s1_proponly_va43fa9b_wires_20200625.json.gz',
+            s1_model_type='optical_propagation+simple',
+        )
+    )
+    test_sim_nt_advanced(config)
+
 
 @skipIf(not straxen.utilix_is_configured(), 'utilix is not configured')
 def test_sim_mc_chain():
