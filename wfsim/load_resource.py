@@ -183,7 +183,7 @@ class Resource:
             # FileNotFoundError, ValueErrors can be raised if we
             # cannot load the requested config
             fpath = downloader.download_single(fname)
-            log.warning(f"Loading {fname} from mongo downloader")
+            log.warning(f"Loading {fname} from mongo downloader to {fpath}")
             return fname  # Keep the name and let get_resource do its thing
 
         except (FileNotFoundError, ValueError, NameError, AttributeError):

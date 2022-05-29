@@ -377,6 +377,8 @@ class RawData(object):
                 _, xy_tmp = self.pulses['s2'].field_distortion_comsol(instruction['x'], instruction['y'], instruction['z'], self.resource)
             elif self.config.get('field_distortion_model', "none") == 'inverse_fdc':
                 _, xy_tmp = self.pulses['s2'].inverse_field_distortion_correction(instruction['x'], instruction['y'], instruction['z'], self.resource)
+            else:
+                raise ValueError(f'{self.config.get("field_distortion_model", "none")} is invalid!')
             tb['x_mean_electron'] = np.mean(xy_tmp.T[0])
             tb['y_mean_electron'] = np.mean(xy_tmp.T[1])
         else:
@@ -455,7 +457,7 @@ class RawData(object):
 @export
 class RawDataOptical(RawData):
 
-    def __init__(self, config, channels=[], timings=[]):
+    def __init__(self, config, channels=tuple(), timings=tuple()):
         self.config = config
         self.pulses = dict(
             s1=Pulse(config),
