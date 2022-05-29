@@ -189,15 +189,15 @@ class S2(Pulse):
         returns array of floats (mean expectation) 
         """
         
-       # calculate it from MC pattern map directly if no "se_gain_map" is given 
         if config.get('se_gain_from_map', False):
-            sc_gain = resource.s2_correction_map(positions)
-            sc_gain *= config['s2_secondary_sc_gain']
+           sc_gain = resource.se_gain_map(positions)
         else:
-            sc_gain = resource.se_gain_map(positions)
+           # calculate it from MC pattern map directly if no "se_gain_map" is given
+           sc_gain = resource.s2_correction_map(positions)
+           sc_gain *= config['s2_secondary_sc_gain']
 
-        # depending on if you use the data driven or mc pattern map for light yield for S2 
-        # the shape of n_photon_hits will change. Mc needs a squeeze
+           # depending on if you use the data driven or mc pattern map for light yield for S2
+           # the shape of n_photon_hits will change. Mc needs a squeeze
         if len(sc_gain.shape) != 1:
             sc_gain=np.squeeze(sc_gain, axis=-1)
 
@@ -229,12 +229,11 @@ class S2(Pulse):
                                               config['electron_lifetime_liquid'])
 
         if config.get('ext_eff_from_map', False):
-            cy = electron_lifetime_correction*config['electron_extraction_yield']
-        else:
             # Extraction efficiency is g2(x,y)/SE_gain(x,y)
             cy = config['g2_mean']*resource.s2_correction_map(xy_int)* \
                  electron_lifetime_correction/resource.se_gain_map(xy_int)
-
+        else:
+            cy = electron_lifetime_correction*config['electron_extraction_yield']
 
         # Remove electrons in insensitive volume
         if config['enable_field_dependencies']['survival_probability_map']:

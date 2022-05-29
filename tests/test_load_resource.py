@@ -11,7 +11,8 @@ def test_load_1t():
         "enable_electron_afterpulses": True,
         "enable_noise": False,
         "field_distortion_on": True,
-        "g2_mean": 32.3
+        "g2_mean": 32.3,
+        's2_time_model': 's2_time_spread around zero',
     }
     result = load_config(config)
     return result, config

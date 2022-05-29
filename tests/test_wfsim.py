@@ -7,7 +7,7 @@ import strax
 import straxen
 
 import wfsim
-from .test_load_resource import test_load_nt
+from .test_load_resource import test_load_nt, test_load_1t
 from unittest import skipIf
 
 logging.basicConfig(
@@ -31,10 +31,12 @@ def test_sim_1T():
     """Test the 1T simulator (should always work with the publicly available files)"""
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
-        testing_config_1T = dict(
+        _, conf_1t = test_load_1t()
+        testing_config_1t = dict(
             hev_gain_model=("1T_to_pe_placeholder", True),
             gain_model=("1T_to_pe_placeholder", True),
-            gain_model_mc=("1T_to_pe_placeholder", True),)
+            gain_model_mc=("1T_to_pe_placeholder", True),
+        )
 
         st = strax.Context(
             storage=tempdir,
@@ -42,16 +44,18 @@ def test_sim_1T():
                 nchunk=2, event_rate=1, chunk_size=1,
                 detector='XENON1T',
                 fax_config=('https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files'
-                            '/36d352580b328ff057b1588b8af8c9a6ed8ae704/sim_files/fax_config_1t.json'),  # noqa
+                            '/a5b92102505d6d0bfcdb563b6117bd4040a93435/sim_files/fax_config_1t.json'),  # noqa
                 fax_config_override=dict(
                     url_base=("https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files"
-                              "/36d352580b328ff057b1588b8af8c9a6ed8ae704/sim_files/"), ),
+                              "/a5b92102505d6d0bfcdb563b6117bd4040a93435/sim_files/"),
+                    **conf_1t,
+                ),
                 **straxen.contexts.x1t_common_config),
             **straxen.contexts.x1t_context_config,
         )
         st.register(wfsim.RawRecordsFromFax1T)
-        log.debug(f'Setting testing config {testing_config_1T}')
-        st.set_config(testing_config_1T)
+        log.debug(f'Setting testing config {testing_config_1t}')
+        st.set_config(testing_config_1t)
 
         log.debug(f'Getting raw-records')
         rr = st.get_array(run_id, 'raw_records')
