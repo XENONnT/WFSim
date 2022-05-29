@@ -73,6 +73,19 @@ def test_sim_nT_basics():
         log.debug(f'Working in {tempdir}')
         conf = copy.deepcopy(straxen.contexts.xnt_common_config)
         resource, conf_override = test_load_nt()
+        conf['gain_model'] = ("to_pe_placeholder", True)
+        conf['gain_model_mc'] = ("to_pe_placeholder", True)
+        conf['hev_gain_model'] = ("to_pe_placeholder", True)
+        conf['hit_min_amplitude'] = 'pmt_commissioning_initial'
+
+        # The SPE table in this package is for a single channel
+        # We generate the full SPE file for testing here
+        for i in range(1, 494):
+            resource.photon_area_distribution[str(i)] = \
+                resource.photon_area_distribution['0']
+        spe_file = osp.join(tempdir, 'XENONnT_spe_distributions.csv')
+        resource.photon_area_distribution.to_csv(spe_file, index=False)
+        conf_override['photon_area_distribution'] = spe_file
 
         st = strax.Context(
             storage=tempdir,
@@ -95,7 +108,7 @@ def test_sim_nT_basics():
 
 
 @skipIf(not straxen.utilix_is_configured(), 'utilix is not configured')
-def test_sim_nT_advanced(
+def test_sim_nt_advanced(
         config = None
 ):
     """Test the nT simulator. Works only if one has access to the XENONnT databases.
@@ -128,9 +141,9 @@ def test_nt_advanced_alt_s2_model():
             s1_model_type='optical_propagation+simple',
         )
     )
-    test_sim_nT_advanced(config)
+    test_sim_nt_advanced(config)
 
-def test_nt_advanced_alt_s2_model_garfield():
+def test_nt_advanced_garfield():
     config = dict(
         fax_config_override=dict(
             s2_luminescence_model='garfield',
@@ -141,7 +154,7 @@ def test_nt_advanced_alt_s2_model_garfield():
             s1_model_type='optical_propagation+simple',
         )
     )
-    test_sim_nT_advanced(config)
+    test_sim_nt_advanced(config)
 
 
 @skipIf(not straxen.utilix_is_configured(), 'utilix is not configured')
