@@ -93,7 +93,9 @@ class PaxEventSimulator(object):
     Call compute to start the simulation process.
     """
 
-    def __init__(self, config={}):
+    def __init__(self, config=None):
+        if config is None:
+            config = {}
         self.config = default_config
         self.config.update(get_resource(self.config['fax_config'], fmt='json'))
         self.config.update(config)

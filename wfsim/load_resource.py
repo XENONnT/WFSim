@@ -183,7 +183,7 @@ class Resource:
             # FileNotFoundError, ValueErrors can be raised if we
             # cannot load the requested config
             fpath = downloader.download_single(fname)
-            log.warning(f"Loading {fname} from mongo downloader")
+            log.warning(f"Loading {fname} from mongo downloader to {fpath}")
             return fname  # Keep the name and let get_resource do its thing
 
         except (FileNotFoundError, ValueError, NameError, AttributeError):
@@ -293,9 +293,20 @@ class Resource:
             elif 'garfield' in config.get('s2_luminescence_model', ''):
                 #This option indexes the luminescence times using the liquid level values
                 #as well as the position between the full pitch of two gate wires
-                s2_luminescence_map = straxen.get_resource(files['s2_luminescence'], fmt='npy')
-                self.s2_luminescence = s2_luminescence_map
-
+                gf_file_name = files['s2_luminescence']
+                if gf_file_name.endswith('npy'):
+                    s2_luminescence_map = straxen.get_resource(gf_file_name, fmt='npy')
+                    self.s2_luminescence = s2_luminescence_map
+                elif gf_file_name.endswith('npz'):
+                    # Backwards compatibility from before #363 / #370
+                    s2_luminescence_map = straxen.get_resource(gf_file_name, fmt='npy_pickle')['arr_0']
+                    # Get directly the map for the simulated level
+                    liquid_level_available = np.unique(s2_luminescence_map['ll'])  # available levels (cm)
+                    liquid_level = config['gate_to_anode_distance'] - config['elr_gas_gap_length']  # cm
+                    liquid_level = min(liquid_level_available, key=lambda x: abs(x - liquid_level))
+                    self.s2_luminescence = s2_luminescence_map[s2_luminescence_map['ll'] == liquid_level]
+                else:
+                    raise ValueError(f'{gf_file_name} is of unknown format')
 
             if config.get('field_distortion_model', "none") == "inverse_fdc":
                 self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
