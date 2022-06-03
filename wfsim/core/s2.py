@@ -223,18 +223,21 @@ class S2(Pulse):
         """
         # Average drift time of the electrons
         drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z_int, xy_int, config, resource)
-
+        # extraction efficiency in LXe/GXe interface
+        if config.get('ext_eff_from_map', False):
+            # Extraction efficiency is g2(x,y)/SE_gain(x,y)
+            if config.get('se_gain_from_map', False):
+                se_gains=resource.se_gain_map(xy_int)
+            else:
+                se_gains=config['s2_secondary_sc_gain']
+            rel_s2_cor=resource.s2_correction_map(xy_int)
+            cy = config['g2_mean']*rel_s2_cor/se_gains
+        else:
+            cy = config['electron_extraction_yield']
         # Absorb electrons during the drift
         electron_lifetime_correction = np.exp(- 1 * drift_time_mean /
                                               config['electron_lifetime_liquid'])
-
-        if config.get('ext_eff_from_map', False):
-            # Extraction efficiency is g2(x,y)/SE_gain(x,y)
-            cy = config['g2_mean']*resource.s2_correction_map(xy_int)* \
-                 electron_lifetime_correction/resource.se_gain_map(xy_int)
-        else:
-            cy = electron_lifetime_correction*config['electron_extraction_yield']
-
+        cy*=electron_lifetime_correction
         # Remove electrons in insensitive volume
         if config['enable_field_dependencies']['survival_probability_map']:
             p_surv = resource.field_dependencies_map(z_int, xy_int, map_name='survival_probability_map')
