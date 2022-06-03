@@ -206,9 +206,6 @@ class S2(Pulse):
 
         # data driven map contains nan, will be set to 0 here
         sc_gain[np.isnan(sc_gain)] = 0
-        
-        print(f"sc_gain is: {sc_gain}")
-        
         return sc_gain
 
     @staticmethod
@@ -252,8 +249,6 @@ class S2(Pulse):
                 # FIXME: this is necessary due to map artefacts, such as negative or values >1
                 p_surv=np.clip(p_surv, a_min = 0, a_max = 1)
             cy *= p_surv
-        
-        print(f"Electron efficiency is: {cy}")
         
         n_electron = np.random.binomial(n=n_electron, p=cy)
         
@@ -305,7 +300,6 @@ class S2(Pulse):
         drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z_int, xy_int, config, resource)
         _electron_timings = np.zeros(np.sum(n_electron), np.int64)
         _electron_gains = np.zeros(np.sum(n_electron), np.float64)
-        print(f"n_electron is: {n_electron}")
         S2.electron_timings(t, n_electron, drift_time_mean, drift_time_spread, sc_gain,
                             _electron_timings, _electron_gains, config['electron_trapping_time'])
 
