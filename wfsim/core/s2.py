@@ -226,11 +226,13 @@ class S2(Pulse):
         # extraction efficiency in LXe/GXe interface
         if config.get('ext_eff_from_map', False):
             # Extraction efficiency is g2(x,y)/SE_gain(x,y)
+            rel_s2_cor=resource.s2_correction_map(xy_int)
             if config.get('se_gain_from_map', False):
                 se_gains=resource.se_gain_map(xy_int)
             else:
-                se_gains=config['s2_secondary_sc_gain']
-            rel_s2_cor=resource.s2_correction_map(xy_int)
+                # is in get_s2_light_yield map is scaled according to relative s2 correction
+                # we also need to do it here to have consistent g2
+                se_gains=rel_s2_cor*config['s2_secondary_sc_gain']
             cy = config['g2_mean']*rel_s2_cor/se_gains
         else:
             cy = config['electron_extraction_yield']
