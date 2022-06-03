@@ -229,7 +229,9 @@ class S2(Pulse):
         if config.get('ext_eff_from_map', False):
             # Extraction efficiency is g2(x,y)/SE_gain(x,y)
             rel_s2_cor=resource.s2_correction_map(xy_int)
-            print(f"Relative S2 Correction: {rel_s2_cor}")
+            #doesn't always need to be flattened, but if s2_correction_map = False, then map is made from MC
+            rel_s2_cor = rel_s2_cor.flatten()
+
             if config.get('se_gain_from_map', False):
                 se_gains=resource.se_gain_map(xy_int)
             else:
