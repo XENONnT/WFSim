@@ -441,8 +441,9 @@ class S2(Pulse):
             
             interp_cdf = ((inv_cdf_list[u_hist_ind]-inv_cdf_list[hist_ind])*(dngg/d_gas_gap)
                            +inv_cdf_list[hist_ind])
-
-            samples = np.random.uniform(0, inv_cdf_len-1, n)
+            
+            #Subtract 2 because this way we don't want to sample from this last strange tail
+            samples = np.random.uniform(0, inv_cdf_len-2, n)
             t1 = interp_cdf[np.floor(samples).astype('int')]
             t2 = interp_cdf[np.ceil(samples).astype('int')]
             T = (t2-t1)*(samples - np.floor(samples))+t1
