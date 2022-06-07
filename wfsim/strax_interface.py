@@ -34,7 +34,10 @@ instruction_dtype = [(('Waveform simulator event number.', 'event_number'), np.i
                      (('Volume id giving the detector subvolume', 'vol_id'), np.int32),
                      (('Local field [ V / cm ]', 'local_field'), np.float64),
                      (('Number of excitons', 'n_excitons'), np.int32),
-]
+                     (('X position of the primary particle [cm]', 'x_pri'), np.float32),
+                     (('Y position of the primary particle [cm]', 'y_pri'), np.float32),
+                     (('Z position of the primary particle [cm]', 'z_pri'), np.float32),
+                    ]
 
 
 optical_extra_dtype = [(('first optical input index', '_first'), np.int32),
@@ -181,6 +184,10 @@ def _rand_instructions(
     inst['y'] = np.repeat(r * np.sin(t), 2)
     inst['z'] = np.repeat(np.random.uniform(-tpc_length, 0, n_events), 2)
 
+    inst['x_pri'] = inst['x']
+    inst['y_pri'] = inst['y']
+    inst['z_pri'] = inst['z']
+
     # Here we'll define our XENON-like detector
     nest_calc = nestpy.NESTcalc(nestpy.VDetector())
     nucleus_A = 131.293
@@ -308,6 +315,9 @@ def read_optical(config):
     ins['x'] = events["xp_pri"].array(library="np").flatten()[mask] / 10.
     ins['y'] = events["yp_pri"].array(library="np").flatten()[mask] / 10.
     ins['z'] = events["zp_pri"].array(library="np").flatten()[mask] / 10.
+    ins['x_pri'] = np.zeros(n_events, np.int64)
+    ins['y_pri'] = np.zeros(n_events, np.int64)
+    ins['z_pri'] = np.zeros(n_events, np.int64)
     ins['time'] = np.zeros(n_events, np.int64)
     ins['event_number'] = np.arange(n_events)
     ins['g4id'] = events['eventid'].array(library="np")[mask]
@@ -669,9 +679,9 @@ class RawRecordsFromFaxNT(SimulatorPlugin):
         self.instructions = self.instructions[~m]
 
         assert np.all(self.instructions['x']**2 + self.instructions['y']**2 < self.config['tpc_radius']**2), \
-            "Interation is outside the TPC"
+            "Interaction is outside the TPC (radius)"
         assert np.all(self.instructions['z'] < 0.25), \
-            "Interation is outside the TPC"
+            "Interaction is outside the TPC (in Z)"
         assert np.all(self.instructions['amp'] > 0), \
             "Interaction has zero size"
 
@@ -847,9 +857,9 @@ class RawRecordsFromMcChain(SimulatorPlugin):
 
             assert np.all(self.instructions_epix['x']**2 + self.instructions_epix['y']**2 <
                           self.config['tpc_radius']**2), \
-                "Interation is outside the TPC"
+                "Interaction is outside the TPC (radius)"
             assert np.all(self.instructions_epix['z'] < 0.25), \
-                "Interation is outside the TPC"
+                "Interaction is outside the TPC (in Z)"
             assert np.all(self.instructions_epix['amp'] > 0), \
                 "Interaction has zero size"
             assert all(self.instructions_epix['g4id'] >= self.config['entry_start'])

@@ -2,7 +2,6 @@ import logging
 from numba import njit
 import numpy as np
 from scipy.stats import skewnorm
-from scipy import interpolate
 from strax import exporter
 from .pulse import Pulse
 from .. import units
@@ -97,6 +96,7 @@ class S2(Pulse):
         sc_gain = self.get_s2_light_yield(positions=positions,
                                           config=self.config,
                                           resource=self.resource)
+        
 
 
         n_photons_per_xy, n_photons_per_ele, self._electron_timings = self.get_n_photons(t=t,
@@ -138,21 +138,20 @@ class S2(Pulse):
     def get_avg_drift_velocity(z, xy, config, resource):
         """Calculate s2 drift time mean and spread
 
-        :param positions: 1d array of z (floats)
+        :param z: 1d array of z (floats)
         :param xy: 2d array of xy positions (floats)
         :param config: dict with wfsim config
         :param resource: instance of the resource class
 
         returns array of floats corresponding to average drift velocities from given point to the gate
         """
-        drift_v_LXe=None
         if config['enable_field_dependencies']['drift_speed_map']:
             drift_v_LXe = resource.field_dependencies_map(z, xy, map_name='drift_speed_map')  # mm/µs
             drift_v_LXe *= 1e-4  # cm/ns
             drift_v_LXe *= resource.drift_velocity_scaling
         else:
-            drift_v_LXe=config['drift_velocity_liquid']
-        return(drift_v_LXe)
+            drift_v_LXe = config['drift_velocity_liquid']
+        return drift_v_LXe
 
     @staticmethod
     def get_s2_drift_time_params(z_int, xy_int, config, resource):
@@ -178,7 +177,7 @@ class S2(Pulse):
         drift_time_spread = np.sqrt(2 * diffusion_constant_longitudinal * drift_time_mean)
         drift_time_spread /= drift_velocity_liquid
         return drift_time_mean, drift_time_spread
-
+    
     @staticmethod
     def get_s2_light_yield(positions, config, resource):
         """Calculate s2 light yield...
@@ -189,19 +188,24 @@ class S2(Pulse):
         
         returns array of floats (mean expectation) 
         """
-        sc_gain = resource.s2_correction_map(positions)
-        # depending on if you use the data driven or mc pattern map for light yield for S2 
-        # the shape of n_photon_hits will change. Mc needs a squeeze
+        
+        if config.get('se_gain_from_map', False):
+           sc_gain = resource.se_gain_map(positions)
+        else:
+           # calculate it from MC pattern map directly if no "se_gain_map" is given
+           sc_gain = resource.s2_correction_map(positions)
+           sc_gain *= config['s2_secondary_sc_gain']
+
+       # depending on if you use the data driven or mc pattern map for light yield for S2
+       # the shape of n_photon_hits will change. Mc needs a squeeze
         if len(sc_gain.shape) != 1:
             sc_gain=np.squeeze(sc_gain, axis=-1)
 
         # sc gain should has the unit of pe / electron, here we divide 1 + dpe to get nphoton / electron
         sc_gain /= 1 + config['p_double_pe_emision']
-        sc_gain *= config['s2_secondary_sc_gain']
 
         # data driven map contains nan, will be set to 0 here
         sc_gain[np.isnan(sc_gain)] = 0
-
         return sc_gain
 
     @staticmethod
@@ -212,17 +216,32 @@ class S2(Pulse):
         :param xy_int: 2d array of xy interaction positions (floats)
         :param z_int: 1d array of floats with the z interaction positions (floats)
         :param config: dict with wfsim config
+        :param resource: instance of the resource class
 
         returns 1d array ints with number of electrons
         """
         # Average drift time of the electrons
         drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z_int, xy_int, config, resource)
+        # extraction efficiency in LXe/GXe interface
+        if config.get('ext_eff_from_map', False):
+            # Extraction efficiency is g2(x,y)/SE_gain(x,y)
+            rel_s2_cor=resource.s2_correction_map(xy_int)
+            #doesn't always need to be flattened, but if s2_correction_map = False, then map is made from MC
+            rel_s2_cor = rel_s2_cor.flatten()
 
+            if config.get('se_gain_from_map', False):
+                se_gains=resource.se_gain_map(xy_int)
+            else:
+                # is in get_s2_light_yield map is scaled according to relative s2 correction
+                # we also need to do it here to have consistent g2
+                se_gains=rel_s2_cor*config['s2_secondary_sc_gain']
+            cy = config['g2_mean']*rel_s2_cor/se_gains
+        else:
+            cy = config['electron_extraction_yield']
         # Absorb electrons during the drift
         electron_lifetime_correction = np.exp(- 1 * drift_time_mean /
                                               config['electron_lifetime_liquid'])
-        cy = config['electron_extraction_yield'] * electron_lifetime_correction
-
+        cy*=electron_lifetime_correction
         # Remove electrons in insensitive volume
         if config['enable_field_dependencies']['survival_probability_map']:
             p_surv = resource.field_dependencies_map(z_int, xy_int, map_name='survival_probability_map')
@@ -230,7 +249,9 @@ class S2(Pulse):
                 # FIXME: this is necessary due to map artefacts, such as negative or values >1
                 p_surv=np.clip(p_surv, a_min = 0, a_max = 1)
             cy *= p_surv
+        
         n_electron = np.random.binomial(n=n_electron, p=cy)
+        
         return n_electron
 
     @staticmethod
@@ -271,7 +292,7 @@ class S2(Pulse):
         :param t: 1d int array time of s2
         :param n_electron: 1d float array number of electrons to simulate
         :param z_int: float array. true Z interaction positions
-        :param positions: 2d float array, true xy interaction positions
+        :param xy_int: 2d float array, true xy interaction positions
         :param sc_gain: float, secondary s2 gain
         :param config: dict of the wfsim config
         :param resource: instance of the resource class """
@@ -354,7 +375,7 @@ class S2(Pulse):
         return S2._luminescence_timings_simple(len(xy), dG, E0, 
                                                r, dr, rr, alpha, uE,
                                                pressure, n_photons)
-
+    
     @staticmethod
     def luminescence_timings_garfield(xy, n_photons, config, resource, confine_position=None):
         """
@@ -364,7 +385,6 @@ class S2(Pulse):
         :param config: dict wfsim config
         :param resource: instance of wfsim resource
         :param confine_position: if float, confine extraction region +/- this position around anode wires
-
         returns 2d array with ints for photon timings of input param 'shape'
         """
         assert 's2_luminescence' in resource.__dict__, 's2_luminescence model not found'
@@ -386,10 +406,84 @@ class S2(Pulse):
         
         avgt = np.average(resource.s2_luminescence['t']).astype(int)
         return resource.s2_luminescence['t'][index_row, index_col].astype(np.int64) - avgt
+    
+    @staticmethod
+    @njit
+    def draw_excitation_times(inv_cdf_list, hist_indices, nph, diff_nearest_gg, d_gas_gap):
+        
+        """
+        Draws the excitation times from the GARFIELD electroluminescence map
+        
+        :param inv_cdf_list:       List of inverse CDFs for the excitation time histograms
+        :param hist_indices:       The index of the histogram which refers to the gas gap
+        :param nph:                A 1-d array of the number of photons per electron
+        :param diff_nearest_gg:    The difference between the gas gap from the map
+                                   (continuous value) and the nearest (discrete) value
+                                   of the gas gap corresponding to the excitation time
+                                   histograms
+        :param d_gas_gap:          Spacing between two consecutive gas gap values
+        
+        returns time of each photon
+        """
+        
+        inv_cdf_len = len(inv_cdf_list[0])
+        timings = np.zeros(np.sum(nph))
+        upper_hist_ind = np.clip(hist_indices+1, 0, len(inv_cdf_list)-1)
+        
+        count = 0
+        for i, (hist_ind, u_hist_ind, n, dngg) in enumerate(zip(hist_indices,
+                                                                upper_hist_ind, 
+                                                                nph,
+                                                                diff_nearest_gg)):
+            
+            #There are only 10 values of gas gap separated by 0.1mm, so we interpolate
+            #between two histograms
+            
+            interp_cdf = ((inv_cdf_list[u_hist_ind]-inv_cdf_list[hist_ind])*(dngg/d_gas_gap)
+                           +inv_cdf_list[hist_ind])
+            
+            #Subtract 2 because this way we don't want to sample from this last strange tail
+            samples = np.random.uniform(0, inv_cdf_len-2, n)
+            t1 = interp_cdf[np.floor(samples).astype('int')]
+            t2 = interp_cdf[np.ceil(samples).astype('int')]
+            T = (t2-t1)*(samples - np.floor(samples))+t1
+            if n!=0:
+                T = T-np.mean(T)
+            
+            #subtract mean to get proper drift time and z correlation
+            timings[count:count+n] = T
+            count+=n
+        return timings
+    
+    @staticmethod
+    def luminescence_timings_garfield_gasgap(xy, n_photons, resource):
+        """
+        Luminescence time distribution computation according to garfield scintillation maps
+        which are ONLY drawn from below the anode, and at different gas gaps
+        :param xy: 1d array with positions
+        :param n_photons: 1d array with ints for number of xy positions
+        :param resource: instance of wfsim resource
 
+        returns 2d array with ints for photon timings of input param 'shape'
+        """
+        assert 's2_luminescence_gg' in resource.__dict__, 's2_luminescence_gg model not found'
+        assert len(n_photons) == len(xy), 'Input number of n_electron should have same length as positions'
+        
+        d_gasgap = resource.s2_luminescence_gg['gas_gap'][1]-resource.s2_luminescence_gg['gas_gap'][0]
+        
+        cont_gas_gaps = resource.garfield_gas_gap_map(xy)
+        draw_index = np.digitize(cont_gas_gaps, resource.s2_luminescence_gg['gas_gap'])-1
+        diff_nearest_gg = cont_gas_gaps - resource.s2_luminescence_gg['gas_gap'][draw_index]
+        
+        return S2.draw_excitation_times(resource.s2_luminescence_gg['timing_inv_cdf'],
+                                        draw_index,
+                                        n_photons,
+                                        diff_nearest_gg,
+                                        d_gasgap)
+    
     @staticmethod
     def optical_propagation(channels, config, spline):
-        """Function gettting times from s2 timing splines:
+        """Function getting times from s2 timing splines:
         :param channels: The channels of all s2 photon
         :param config: current configuration of wfsim
         :param spline: pointer to s2 optical propagation splines from resources
@@ -425,7 +519,6 @@ class S2(Pulse):
                                                              config=config,
                                                              resource=resource)
         elif config['s2_luminescence_model']=='garfield':
-            # check to see if extraction region in Garfield needs to be confined
             confine_position=None
             if 's2_garfield_confine_position' in config:
                 if config['s2_garfield_confine_position'] > 0.0:
@@ -434,8 +527,12 @@ class S2(Pulse):
                                                                config=config,
                                                                resource=resource,
                                                                confine_position=confine_position)
+            
+        elif config['s2_luminescence_model']=='garfield_gas_gap':
+            _photon_timings = S2.luminescence_timings_garfield_gasgap(positions, n_photons_per_xy,
+                                                                      resource=resource)
         else:
-            raise KeyError(f"{config['s2_luminescence_model']} is not valid! Use 'simple' or 'garfield'")
+            raise KeyError(f"{config['s2_luminescence_model']} is not valid! Use 'simple' or 'garfield' or 'garfield_gas_gap'")
 
         # Emission Delay
         _photon_timings += Pulse.singlet_triplet_delays(len(_photon_timings), config['singlet_fraction_gas'], config, phase)
@@ -497,7 +594,7 @@ class S2(Pulse):
         # Should we also output this xy position in truth?
         xy_multi = np.repeat(xy, n_electron, axis=0) + hdiff  # One entry xy per electron
         # Remove points outside tpc, and the pattern will be the average inside tpc
-        # Should be done naturally with the s2 pattern map, however, there's some bug there so we apply this hard cut
+        # Should be done naturally with the s2 pattern map, however, there's some bug there, so we apply this hard cut
         mask = np.sum(xy_multi ** 2, axis=1) <= config['tpc_radius'] ** 2
 
         if isinstance(resource.s2_pattern_map, DummyMap):
