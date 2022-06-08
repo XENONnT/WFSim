@@ -121,7 +121,7 @@ def test_sim_nt_advanced(
         st = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000',
                                                  cmt_version='global_ONLINE',
                                                  _config_overlap={},
-                                                 fax_config='fax_config_nt_sr0_v0.json'
+                                                 fax_config='fax_config_nt_sr0_v0.json',
                                                  override_s1_photon_time_field=200, # V/cm, see github.com/XENONnT/WFSim/pull/381
                                                  )
         st.set_config(dict(nchunk=1, event_rate=1, chunk_size=2,))
