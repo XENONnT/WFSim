@@ -177,6 +177,7 @@ def test_nt_advanced_gas_gap_garfield():
     )
     test_sim_nt_advanced(config)
 
+
 @skipIf(not straxen.utilix_is_configured(), 'utilix is not configured')
 def test_nt_advanced_simple_garfield():
     config = dict({'enable_electron_afterpulses': False,

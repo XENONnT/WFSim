@@ -206,7 +206,6 @@ class S2(Pulse):
 
         # data driven map contains nan, will be set to 0 here
         sc_gain[np.isnan(sc_gain)] = 0
-
         return sc_gain
 
     @staticmethod
@@ -223,17 +222,27 @@ class S2(Pulse):
         """
         # Average drift time of the electrons
         drift_time_mean, drift_time_spread = S2.get_s2_drift_time_params(z_int, xy_int, config, resource)
+        # extraction efficiency in LXe/GXe interface
+        if config.get('ext_eff_from_map', False):
+            # Extraction efficiency is g2(x,y)/SE_gain(x,y)
+            rel_s2_cor=resource.s2_correction_map(xy_int)
+            #doesn't always need to be flattened, but if s2_correction_map = False, then map is made from MC
+            rel_s2_cor = rel_s2_cor.flatten()
 
+            if config.get('se_gain_from_map', False):
+                se_gains=resource.se_gain_map(xy_int)
+            else:
+                # is in get_s2_light_yield map is scaled according to relative s2 correction
+                # we also need to do it here to have consistent g2
+                se_gains=rel_s2_cor*config['s2_secondary_sc_gain']
+            cy = config['g2_mean']*rel_s2_cor/se_gains
+        else:
+            cy = config['electron_extraction_yield']
         # Absorb electrons during the drift
         electron_lifetime_correction = np.exp(- 1 * drift_time_mean /
                                               config['electron_lifetime_liquid'])
 
-        if config.get('ext_eff_from_map', False):
-            # Extraction efficiency is g2(x,y)/SE_gain(x,y)
-            cy = config['g2_mean']*resource.s2_correction_map(xy_int)* \
-                 electron_lifetime_correction/resource.se_gain_map(xy_int)
-        else:
-            cy = electron_lifetime_correction*config['electron_extraction_yield']
+        cy*=electron_lifetime_correction
 
         # Remove electrons in insensitive volume
         if config['enable_field_dependencies']['survival_probability_map']:
@@ -242,6 +251,7 @@ class S2(Pulse):
                 # FIXME: this is necessary due to map artefacts, such as negative or values >1
                 p_surv=np.clip(p_surv, a_min = 0, a_max = 1)
             cy *= p_surv
+        
         n_electron = np.random.binomial(n=n_electron, p=cy)
         
         return n_electron
@@ -434,7 +444,8 @@ class S2(Pulse):
             interp_cdf = ((inv_cdf_list[u_hist_ind]-inv_cdf_list[hist_ind])*(dngg/d_gas_gap)
                            +inv_cdf_list[hist_ind])
 
-            samples = np.random.uniform(0, inv_cdf_len-1, n)
+            #Subtract 2 because this way we don't want to sample from this last strange tail
+            samples = np.random.uniform(0, inv_cdf_len-2, n)
             t1 = interp_cdf[np.floor(samples).astype('int')]
             t2 = interp_cdf[np.ceil(samples).astype('int')]
             T = (t2-t1)*(samples - np.floor(samples))+t1
