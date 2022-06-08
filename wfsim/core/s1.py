@@ -217,6 +217,9 @@ class S1(Pulse):
                 if 'nest' in config['s1_model_type']:
                     # Making it possible for changing field just for photon timing
                     _local_field = config.get('override_s1_photon_time_field', local_field[i])
+                    if not isinsance(_local_field, (float, type(None))):
+                        raise ValueError(f'override_s1_photon_time_field should be float (or'
+                                         'None if you want to disable it. No ints/bools etc)')
                     if _local_field is None or _local_field < 0:
                         # Different ways of telling the config to use the local_field[i]
                         _local_field = local_field[i]
