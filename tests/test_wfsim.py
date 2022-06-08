@@ -122,7 +122,6 @@ def test_sim_nt_advanced(
                                                  cmt_version='global_ONLINE',
                                                  _config_overlap={},
                                                  fax_config='fax_config_nt_sr0_v0.json',
-                                                 override_s1_photon_time_field=200, # V/cm, see github.com/XENONnT/WFSim/pull/381
                                                  )
         st.set_config(dict(nchunk=1, event_rate=1, chunk_size=2,))
 
@@ -162,6 +161,7 @@ def test_nt_advanced_garfield():
             s1_lce_correction_map='XENONnT_s1_xyz_LCE_corrected_qes_MCva43fa9b_wires.json.gz',
             s1_time_spline='XENONnT_s1_proponly_va43fa9b_wires_20200625.json.gz',
             s1_model_type='optical_propagation+simple',
+            override_s1_photon_time_field=200, # V/cm, see github.com/XENONnT/WFSim/pull/381
         )
     )
     test_sim_nt_advanced(config)
