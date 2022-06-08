@@ -335,6 +335,7 @@ class S1(Pulse):
         """
         return Pulse.singlet_triplet_delays(size, config['s1_NR_singlet_fraction'], config, phase)
 
+
 def _override_local_field_for_s1_photon_time(config):
     # Making it possible for changing field just for photon timing
     _local_field = config.get('override_s1_photon_time_field', local_field[i])
