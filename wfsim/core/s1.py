@@ -214,9 +214,13 @@ class S1(Pulse):
                         raise AttributeError(f"Recoil type must be ER, NR, alpha or LED, "
                                              f"not {recoil_type}. Check nest ids")
 
-                # Making it possible for changing field just for photon timing
-                _local_field = config.get('override_s1_photon_time_field', local_field[i])
                 if 'nest' in config['s1_model_type']:
+                    # Making it possible for changing field just for photon timing
+                    _local_field = config.get('override_s1_photon_time_field', local_field[i])
+                    if _local_field is None or _local_field < 0:
+                        # Different ways of telling the config to use the local_field[i]
+                        _local_field = local_field[i]
+
                     scint_time = nestpy_calc.GetPhotonTimes(
                         nestpy.INTERACTION_TYPE(recoil_type[i]),
                         n_photons_emitted[i],
