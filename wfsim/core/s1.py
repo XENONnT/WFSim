@@ -217,7 +217,7 @@ class S1(Pulse):
                 if 'nest' in config['s1_model_type']:
                     # Allow overwriting with "override_s1_photon_time_field"
                     # xenon:j_angevaare:wfsim_photon_timing_bug
-                    _local_field = config.get('override_s1_photon_time_field', local_field)
+                    _local_field = config.get('override_s1_photon_time_field', local_field[i])
                     _local_field = (_local_field if _local_field >0 else local_field[i])
                     scint_time = nestpy_calc.GetPhotonTimes(
                         nestpy.INTERACTION_TYPE(recoil_type[i]),
