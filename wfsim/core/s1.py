@@ -217,7 +217,8 @@ class S1(Pulse):
                 if 'nest' in config['s1_model_type']:
                     # Allow overwriting with "override_s1_photon_time_field"
                     # xenon:j_angevaare:wfsim_photon_timing_bug
-                    _local_field = _override_local_field_for_s1_photon_time(config, local_field[i])
+                    _local_field = config.get('override_s1_photon_time_field', local_field)
+                    _local_field = (_local_field if _local_field >0 else local_field[i])
                     scint_time = nestpy_calc.GetPhotonTimes(
                         nestpy.INTERACTION_TYPE(recoil_type[i]),
                         n_photons_emitted[i],
@@ -334,16 +335,3 @@ class S1(Pulse):
         return 1d array of photon timings
         """
         return Pulse.singlet_triplet_delays(size, config['s1_NR_singlet_fraction'], config, phase)
-
-
-def _override_local_field_for_s1_photon_time(config: dict, local_field: float)-> float:
-    """Override local_field if there is such an option in the config"""
-    # Making it possible for changing field just for photon timing
-    override_with_field = config.get('override_s1_photon_time_field', local_field)
-    if not isinstance(override_with_field, (float, type(None))):
-        raise ValueError(f'override_s1_photon_time_field should be float (or'
-                         'None if you want to disable it. No ints/bools etc)')
-    if override_with_field is None or override_with_field < 0:
-        # Different ways of telling the config to use the local_field[i]
-        return local_field
-    return override_with_field
