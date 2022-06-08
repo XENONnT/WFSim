@@ -345,3 +345,4 @@ def _override_local_field_for_s1_photon_time(config):
     if _local_field is None or _local_field < 0:
         # Different ways of telling the config to use the local_field[i]
         _local_field = local_field[i]
+    return _local_field
