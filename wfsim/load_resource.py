@@ -89,15 +89,19 @@ class Resource:
                 's1_pattern_map': 'XENONnT_s1_xyz_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
                 's1_lce_correction_map': 'XENONnT_s1_xyz_LCE_corrected_qes_MCva43fa9b_wires.json.gz',
                 's2_pattern_map': 'XENONnT_s2_xy_patterns_LCE_corrected_qes_MCva43fa9b_wires.pkl',
-                's2_correction_map': 'XENONnT_s2_xy_correction_corrected_qes_MCva43fa9b_wires.json.gz',
+                's2_correction_map': 'XENONnT_s2_xy_map_v4_210503_mlp_3_in_1_iterated.json',
+                'se_gain_map': 'XENONnT_se_xy_map_v1_mlp.json',
                 'photon_ap_cdfs': 'XENONnT_pmt_afterpulse_config_012605.json.gz',
                 's2_luminescence': 'XENONnT_GARFIELD_B1d5n_C30n_G1n_A6d5p_T1d5n_PMTs1d5n_FSR0d95n.npz',
+                "s2_luminescence_gg": "garfield_timing_map_gas_gap_sr0.npy",
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
+                'garfield_gas_gap_map': 'garfield_gas_gap_map_sr0.json',
                 'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
                 'noise_file': 'x1t_noise_170203_0850_00_small.npz',
                 'fdc_3d': 'XnT_3D_FDC_xyt_dummy_all_zeros_v0.1.json.gz',
                 'field_dependencies_map': '',
                 's1_time_spline': 'XENONnT_s1_proponly_va43fa9b_wires_20200625.json.gz',
+                's2_time_spline': '',
              })
 
         elif config['detector'] == 'XENONnT_neutron_veto':
@@ -179,7 +183,7 @@ class Resource:
             # FileNotFoundError, ValueErrors can be raised if we
             # cannot load the requested config
             fpath = downloader.download_single(fname)
-            log.warning(f"Loading {fname} from mongo downloader")
+            log.warning(f"Loading {fname} from mongo downloader to {fpath}")
             return fname  # Keep the name and let get_resource do its thing
 
         except (FileNotFoundError, ValueError, NameError, AttributeError):
@@ -230,25 +234,45 @@ class Resource:
 
         elif config.get('detector', 'XENONnT') == 'XENONnT':
             pmt_mask = np.array(config['gains']) > 0  # Converted from to pe (from cmt by default)
-
-            self.s1_pattern_map = make_map(files['s1_pattern_map'], fmt='pkl')
-            self.s2_pattern_map = make_map(files['s2_pattern_map'], fmt='pkl')
+            self.s1_pattern_map = make_patternmap(files['s1_pattern_map'], fmt='pkl', pmt_mask=pmt_mask)
+            self.s2_pattern_map = make_patternmap(files['s2_pattern_map'], fmt='pkl', pmt_mask=pmt_mask)
+            self.se_gain_map = make_map(files['se_gain_map'])
+#             self.s2_correction_map = make_map(files['s2_correction_map'], fmt = 'json')
 
             # if there is a (data driven!) map, load it. If not make it  from the pattern map
             if files['s1_lce_correction_map']:
                 self.s1_lce_correction_map = make_map(files['s1_lce_correction_map'])
             else:
                 lymap = deepcopy(self.s1_pattern_map)
+                # AT: this scaling with mast is redundant to `make_patternmap`, but keep it in for now
                 lymap.data['map'] = np.sum(lymap.data['map'][:][:][:], axis=3, keepdims=True, where=pmt_mask)
                 lymap.__init__(lymap.data)
                 self.s1_lce_correction_map = lymap
+            # making S2 aft scaling (if provided)
+            if 's2_mean_area_fraction_top' in config.keys():
+                avg_s2aft_=config['s2_mean_area_fraction_top']
+                if avg_s2aft_>=0.0:
+                    if isinstance(files['s2_pattern_map'], list):
+                        log.warning(f'Scaling of S2 AFT with dummy map, this will have no effect!')
+                    else:
+                        s2map=deepcopy(self.s2_pattern_map)
+                        s2map_topeff_=s2map.data['map'][...,0:config['n_top_pmts']].sum(axis=2)
+                        s2map_toteff_=s2map.data['map'].sum(axis=2)
+                        orig_aft_=np.mean((s2map_topeff_/s2map_toteff_)[s2map_toteff_>0.0])
+                        # getting scales for top/bottom separately to preserve total efficiency
+                        scale_top_=avg_s2aft_/orig_aft_
+                        scale_bot_=(1 - avg_s2aft_)/(1 - orig_aft_)
+                        s2map.data['map'][:,:,0:config['n_top_pmts']]*=scale_top_
+                        s2map.data['map'][:,:,config['n_top_pmts']:config['n_tpc_pmts']]*=scale_bot_
+                        self.s2_pattern_map.__init__(s2map.data)
 
             # if there is a (data driven!) map, load it. If not make it  from the pattern map
             if files['s2_correction_map']:
-                self.s2_correction_map = make_map(files['s2_correction_map'])
+                self.s2_correction_map = make_map(files['s2_correction_map'], fmt = 'json')
             else:
                 s2cmap = deepcopy(self.s2_pattern_map)
                 # Lower the LCE by removing contribution from dead PMTs
+                # AT: masking is a bit redundant due to PMT mask application in make_patternmap
                 s2cmap.data['map'] = np.sum(s2cmap.data['map'][:][:], axis=2, keepdims=True, where=pmt_mask)
                 # Scale by median value
                 s2cmap.data['map'] = s2cmap.data['map'] / np.median(s2cmap.data['map'][s2cmap.data['map'] > 0])
@@ -256,16 +280,37 @@ class Resource:
                 self.s2_correction_map = s2cmap
 
             # Garfield luminescence timing samples
-            if config.get('s2_luminescence_model', False) == 'garfield':
-                s2_luminescence_map = straxen.get_resource(files['s2_luminescence'], fmt='npy_pickle')['arr_0']
-                # Get directly the map for the simulated level
-                liquid_level_available = np.unique(s2_luminescence_map['ll'])  # available levels (cm)
-                liquid_level = config['gate_to_anode_distance'] - config['elr_gas_gap_length']  # cm
-                liquid_level = min(liquid_level_available, key=lambda x: abs(x - liquid_level))
-                self.s2_luminescence = s2_luminescence_map[s2_luminescence_map['ll'] == liquid_level]
+            # if config.get('s2_luminescence_model', False) == 'garfield':
+            if 'garfield_gas_gap' in config.get('s2_luminescence_model', ''):
+                #garfield_gas_gap option is using (x,y) -> gas gap (from the map) -> s2 luminescence
+                #from garfield. This s2_luminescence_gg is indexed only by the gas gap, and
+                #corresponds to electrons drawn directly below the anode
+                
+                s2_luminescence_map = straxen.get_resource(files['s2_luminescence_gg'], fmt='npy')
+                self.s2_luminescence_gg = s2_luminescence_map
+                self.garfield_gas_gap_map = make_map(files['garfield_gas_gap_map'], fmt = 'json')
+
+            elif 'garfield' in config.get('s2_luminescence_model', ''):
+                #This option indexes the luminescence times using the liquid level values
+                #as well as the position between the full pitch of two gate wires
+                gf_file_name = files['s2_luminescence']
+                if gf_file_name.endswith('npy'):
+                    s2_luminescence_map = straxen.get_resource(gf_file_name, fmt='npy')
+                    self.s2_luminescence = s2_luminescence_map
+                elif gf_file_name.endswith('npz'):
+                    # Backwards compatibility from before #363 / #370
+                    s2_luminescence_map = straxen.get_resource(gf_file_name, fmt='npy_pickle')['arr_0']
+                    # Get directly the map for the simulated level
+                    liquid_level_available = np.unique(s2_luminescence_map['ll'])  # available levels (cm)
+                    liquid_level = config['gate_to_anode_distance'] - config['elr_gas_gap_length']  # cm
+                    liquid_level = min(liquid_level_available, key=lambda x: abs(x - liquid_level))
+                    self.s2_luminescence = s2_luminescence_map[s2_luminescence_map['ll'] == liquid_level]
+                else:
+                    raise ValueError(f'{gf_file_name} is of unknown format')
 
             if config.get('field_distortion_model', "none") == "inverse_fdc":
                 self.fdc_3d = make_map(files['fdc_3d'], fmt='json.gz')
+                self.fdc_3d.scale_coordinates([1., 1., - config['drift_velocity_liquid']])
 
             if config.get('field_distortion_model', "none") == "comsol":
                 self.fd_comsol = make_map(config['field_distortion_comsol_map'], fmt='json.gz', method='RectBivariateSpline')
@@ -279,7 +324,14 @@ class Resource:
             # This config entry a dictionary of 5 items
             if any(config['enable_field_dependencies'].values()):
                 field_dependencies_map = make_map(files['field_dependencies_map'], fmt='json.gz', method='RectBivariateSpline')
-
+                self.drift_velocity_scaling=1.0
+                # calculating drift velocity scaling to match total drift time for R=0 between cathode and gate
+                if "norm_drift_velocity" in config['enable_field_dependencies'].keys():
+                    if config['enable_field_dependencies']['norm_drift_velocity']:
+                        norm_dvel = field_dependencies_map(np.array([ [0], [- config['tpc_length']]]).T,
+                                                           map_name='drift_speed_map')[0]
+                        norm_dvel*=1e-4
+                        self.drift_velocity_scaling=config['drift_velocity_liquid']/norm_dvel
                 def rz_map(z, xy, **kwargs):
                     r = np.sqrt(xy[:, 0]**2 + xy[:, 1]**2)
                     return field_dependencies_map(np.array([r, z]).T, **kwargs)
@@ -297,6 +349,10 @@ class Resource:
             # Electron After Pulses
             if config.get('enable_electron_afterpulses', False):
                 self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
+
+            # S2 photons timing optical propagation delays
+            if config.get('s2_time_spline', False):
+                self.s2_optical_propagation_spline = make_map(files['s2_time_spline'])
 
         elif config.get('detector', 'XENONnT') == 'XENONnT_neutron_veto':
             # Neutron veto PMT QE as function of wavelength
@@ -334,7 +390,39 @@ def make_map(map_file, fmt=None, method='WeightedNearestNeighbors'):
 
     else:
         raise TypeError("Can't handle map_file except a string or a list")
-
+@export
+def make_patternmap(map_file, fmt=None, method='WeightedNearestNeighbors', pmt_mask=None):
+    """ This is special interpretation of the of previous make_map(), but designed
+    for pattern map loading with provided PMT mask. This way simplifies both S1 and S2
+    cases
+    """
+    # making tests not failing, we can probably overwrite it completel
+    if isinstance(map_file, list):
+        log.warning(f'Using dummy map with pattern mask! This has no effect here!')
+        assert map_file[0] == 'constant dummy', ('Alternative file input can only be '
+                                                 '("constant dummy", constant: int, shape: list')
+        return DummyMap(map_file[1], map_file[2])
+    elif isinstance(map_file, str):
+        if fmt is None:
+            fmt = parse_extension(map_file)
+        map_data = deepcopy(straxen.get_resource(map_file, fmt=fmt))
+        # XXX: straxed deals with pointers and caches resources, it means that resources are global
+        # what is bad, so we make own copy here and modify it locally
+        if 'compressed' in map_data:
+            compressor, dtype, shape = map_data['compressed']
+            map_data['map'] = np.frombuffer(
+                strax.io.COMPRESSORS[compressor]['decompress'](map_data['map']),
+                dtype=dtype).reshape(*shape)
+            del map_data['compressed']
+        if 'quantized' in map_data:
+            map_data['map'] = map_data['quantized']*map_data['map'].astype(np.float32)
+            del map_data['quantized']
+        if not (pmt_mask is None):
+            assert (map_data['map'].shape[-1]==pmt_mask.shape[0]), "Error! Pattern map and PMT gains must have same dimensions!"
+            map_data['map'][..., ~pmt_mask]=0.0
+        return straxen.InterpolatingMap(map_data, method=method)
+    else:
+        raise TypeError("Can't handle map_file except a string or a list")
 
 @export
 class DummyMap:

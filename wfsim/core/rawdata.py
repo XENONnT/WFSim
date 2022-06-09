@@ -353,8 +353,12 @@ class RawData(object):
 
         # Copy single valued fields directly from pulse class
         for field in ['n_pe', 'n_pe_trigger', 'n_photon', 'n_photon_trigger', 'raw_area', 'raw_area_trigger']:
-            for suffix in ['', '_bottom']:
-                tb[field+suffix] = getattr(pulse, '_' + field + suffix, 0)
+            if self.config.get('per_pmt_truth', False):
+                suffices = ['', '_per_pmt']
+            else:
+                suffices = ['', '_bottom']
+            for suffix in suffices:
+                tb[field+suffix] = pulse._truth_buffer[field+suffix]
 
         # Summarize the instruction cluster in one row of the truth file
         for field in instruction.dtype.names:
@@ -377,6 +381,8 @@ class RawData(object):
                 _, xy_tmp = self.pulses['s2'].field_distortion_comsol(instruction['x'], instruction['y'], instruction['z'], self.resource)
             elif self.config.get('field_distortion_model', "none") == 'inverse_fdc':
                 _, xy_tmp = self.pulses['s2'].inverse_field_distortion_correction(instruction['x'], instruction['y'], instruction['z'], self.resource)
+            else:
+                raise ValueError(f'{self.config.get("field_distortion_model", "none")} is invalid!')
             tb['x_mean_electron'] = np.mean(xy_tmp.T[0])
             tb['y_mean_electron'] = np.mean(xy_tmp.T[1])
         else:
@@ -402,9 +408,13 @@ class RawData(object):
         right = np.max(channel_mask['right'][channel_mask['mask']])
 
         if noise_data_length-right+left-1 < 0:
-            ix_rand = np.random.randint(low=0, high=noise_data_length-1)
+            high = noise_data_length-1
         else:
-            ix_rand = np.random.randint(low=0, high=noise_data_length-right+left-1)
+            high = noise_data_length-right+left-1
+        if high <= 0:
+            ix_rand = 0
+        else:
+            ix_rand = np.random.randint(low=0, high=high)
 
         for ch in range(data.shape[0]):
             # In case adding noise to he channels is not supported
@@ -451,7 +461,7 @@ class RawData(object):
 @export
 class RawDataOptical(RawData):
 
-    def __init__(self, config, channels=[], timings=[]):
+    def __init__(self, config, channels=tuple(), timings=tuple()):
         self.config = config
         self.pulses = dict(
             s1=Pulse(config),

@@ -1,3 +1,33 @@
+v1.0.0 / 2022-06-09
+===================
+* Start per pmt truth info (#369)
+* S1 pulse shape debug (#381)
+* Save Geant4 primary position in truth (#379)
+* XY-dependent SE gain and extraction efficiency (#363)
+* Fix broken tests (#375)
+* Added scaling of S2 AFT according to value from config (#370)
+* Off by one in noise (#364)
+* Update requirements-tests.txt (#368)
+* Fix zenodo badge 
+
+v0.6.1 / 2022-04-12
+===================
+* Change default compressor (#361)
+* Drift velocity maps using true interaction point (#360)
+
+v0.6.0 / 2022-04-05
+===================
+* No dependabot in WFSim (#358)
+* AP probability for photons emitting double PE (#340)
+* FDC quick fix (#285)
+* SE shape: optical propagation + anode focusing (#320)
+* Fix CIV and average drift velocity implementation (#338)
+* Test with straxen 1.5.0 (#337)
+* Sort afterpulses by channel (#321)
+* Reduce warnings (#317)
+* Test with latest straxen (#322)
+* Up py version (#316)
+
 v0.5.13 / 2022-01-17
 ====================
 * Save full truth output (#288)

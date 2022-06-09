@@ -8,6 +8,7 @@
 {
     // Configuration flags
     "s1_model_type": "simple",
+    "s2_time_model": "s2_time_spread around zero",
     "s2_luminescence_model": "simple",
     "enable_gas_gap_warping": false,
     "enable_pmt_afterpulses": false,

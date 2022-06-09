@@ -2,12 +2,13 @@ import logging
 import os.path as osp
 import tempfile
 import copy
-
+import numpy as np
 import strax
 import straxen
 
 import wfsim
-from .test_load_resource import test_load_nt
+from .test_load_resource import test_load_nt, test_load_1t
+from unittest import skipIf
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -30,10 +31,12 @@ def test_sim_1T():
     """Test the 1T simulator (should always work with the publicly available files)"""
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
-        testing_config_1T = dict(
+        _, conf_1t = test_load_1t()
+        testing_config_1t = dict(
             hev_gain_model=("1T_to_pe_placeholder", True),
             gain_model=("1T_to_pe_placeholder", True),
-            gain_model_mc=("1T_to_pe_placeholder", True),)
+            gain_model_mc=("1T_to_pe_placeholder", True),
+        )
 
         st = strax.Context(
             storage=tempdir,
@@ -41,16 +44,18 @@ def test_sim_1T():
                 nchunk=2, event_rate=1, chunk_size=1,
                 detector='XENON1T',
                 fax_config=('https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files'
-                            '/c76f30ad20516efbcc832c97842abcba743f0017/sim_files/fax_config_1t.json'),  # noqa
+                            '/a5b92102505d6d0bfcdb563b6117bd4040a93435/sim_files/fax_config_1t.json'),  # noqa
                 fax_config_override=dict(
                     url_base=("https://raw.githubusercontent.com/XENONnT/strax_auxiliary_files"
-                              "/c76f30ad20516efbcc832c97842abcba743f0017/sim_files/"), ),
+                              "/a5b92102505d6d0bfcdb563b6117bd4040a93435/sim_files/"),
+                    **conf_1t,
+                ),
                 **straxen.contexts.x1t_common_config),
             **straxen.contexts.x1t_context_config,
         )
         st.register(wfsim.RawRecordsFromFax1T)
-        log.debug(f'Setting testing config {testing_config_1T}')
-        st.set_config(testing_config_1T)
+        log.debug(f'Setting testing config {testing_config_1t}')
+        st.set_config(testing_config_1t)
 
         log.debug(f'Getting raw-records')
         rr = st.get_array(run_id, 'raw_records')
@@ -59,18 +64,19 @@ def test_sim_1T():
         log.info(f'All done')
 
 
-def test_sim_nT_basics():
+@skipIf(not straxen.utilix_is_configured(), 'utilix is not configured')
+def test_sim_nt_basics():
     """Test the nT simulator. Uses basic config so complicated steps are skipped. So this will test
        the simple s1 model and the simple s2 model"""
 
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
         conf = copy.deepcopy(straxen.contexts.xnt_common_config)
+        resource, conf_override = test_load_nt()
         conf['gain_model'] = ("to_pe_placeholder", True)
         conf['gain_model_mc'] = ("to_pe_placeholder", True)
         conf['hev_gain_model'] = ("to_pe_placeholder", True)
         conf['hit_min_amplitude'] = 'pmt_commissioning_initial'
-        resource, conf_override = test_load_nt()
 
         # The SPE table in this package is for a single channel
         # We generate the full SPE file for testing here
@@ -87,7 +93,7 @@ def test_sim_nT_basics():
                 nchunk=1, event_rate=1, chunk_size=2,
                 detector='XENONnT',
                 fax_config=('https://raw.githubusercontent.com/XENONnT/WFSim'
-                            '/9e6ecfab13a314a83eec9844ba40811bc4a2dc36/files/XENONnT_wfsim_config.json'),
+                            '/b33656ac59d0366ccf3b20ab0686500cfd403cb6/files/XENONnT_wfsim_config.json'),
                 **conf,
                 fax_config_override=conf_override),
             **straxen.contexts.common_opts)
@@ -101,31 +107,31 @@ def test_sim_nT_basics():
         log.info(f'All done')
 
 
-def test_sim_nT_advanced():
-    """Test the nT simulator. Works only if one has access to the XENONnT databases.
-        Clone the repo to dali and type 'pytest' to run. The first run will test simple s1,
-        garfield s2 and noise/afterpulses. The second run will test the s1 spline model"""
-
-    if not straxen.utilix_is_configured():
-        log.warning(f"Utilix is not configured, skipping database-requiring tests!")
-        return
-
+@skipIf(not straxen.utilix_is_configured(), 'utilix is not configured')
+def test_sim_nt_advanced(
+        config = None
+):
+    """
+    Test the nT simulator. Works only if one has access to the XENONnT databases.
+    Clone the repo to dali and type 'pytest' to run.
+    """
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
+
         st = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000',
                                                  cmt_version='global_ONLINE',
+                                                 fax_config='fax_config_nt_sr0_v0.json',
                                                  _config_overlap={},)
         st.set_config(dict(gain_model_mc=("to_pe_placeholder", True),
                            gain_model=("to_pe_placeholder", True),
-                           hit_min_amplitude='pmt_commissioning_initial'
+                           hit_min_amplitude='pmt_commissioning_initial',
+                           per_pmt_truth=True,
                           ))
         st.set_config(dict(nchunk=1, event_rate=1, chunk_size=2,))
 
-        st.set_config({'fax_config_override': dict(s2_luminescence_model='simple',
-                                                   s1_lce_correction_map='XENONnT_s1_xyz_LCE_corrected_qes_MCva43fa9b_wires.json.gz',
-                                                   s1_time_spline='XENONnT_s1_proponly_va43fa9b_wires_20200625.json.gz',
-                                                   s1_model_type='optical_propagation+simple',)})
-
+        if config is not None:
+            log.warning(f'Update config with {config}')
+            st.set_config(config)
         log.debug(f'Getting raw-records')
         rr = st.get_array(run_id, 'raw_records')
         log.debug(f'Getting peaks')
@@ -133,13 +139,58 @@ def test_sim_nT_advanced():
         _sanity_check(rr, p)
         log.info(f'All done')
 
+        truth = st.get_array(run_id, 'truth')
+        for field in 'n_pe n_photon raw_area'.split():
+            assert np.all(np.isclose(truth[field], np.sum(truth[field + '_per_pmt'], axis=1)))
 
+
+@skipIf(not straxen.utilix_is_configured(), 'utilix is not configured')
+def test_nt_advanced_alt_s2_model():
+    config = dict(
+        fax_config_override=dict(
+            s2_luminescence_model='simple',
+            s2_time_model="s2_time_spread around zero",
+            s1_lce_correction_map='XENONnT_s1_xyz_LCE_corrected_qes_MCva43fa9b_wires.json.gz',
+            s1_time_spline='XENONnT_s1_proponly_va43fa9b_wires_20200625.json.gz',
+            s1_model_type='optical_propagation+simple',
+            override_s1_photon_time_field=False, # Set it tot the proper local field, just to test the alternative
+        )
+    )
+    test_sim_nt_advanced(config)
+
+
+@skipIf(not straxen.utilix_is_configured(), 'utilix is not configured')
+def test_nt_advanced_garfield():
+    config = dict(
+        fax_config_override=dict(
+            s2_luminescence_model='garfield',
+            s2_correction_map=False,
+            s2_time_model="s2_time_spread around zero",
+            s1_lce_correction_map='XENONnT_s1_xyz_LCE_corrected_qes_MCva43fa9b_wires.json.gz',
+            s1_time_spline='XENONnT_s1_proponly_va43fa9b_wires_20200625.json.gz',
+            s1_model_type='optical_propagation+simple',
+            override_s1_photon_time_field=200, # V/cm, see github.com/XENONnT/WFSim/pull/381
+        )
+    )
+    test_sim_nt_advanced(config)
+
+@skipIf(not straxen.utilix_is_configured(), 'utilix is not configured')
+def test_nt_advanced_gas_gap_garfield():
+    config = dict(
+        fax_config_override=dict(
+            s2_luminescence_model='garfield_gas_gap',
+            s2_correction_map="XENONnT_s2_xy_map_v4_210503_mlp_3_in_1_iterated.json",
+            s2_luminescence_gg= "garfield_timing_map_gas_gap_sr0.npy",
+            garfield_gas_gap_map= "garfield_gas_gap_map_sr0.json",
+            se_gain_map="XENONnT_se_xy_map_v1_mlp.json",
+    )
+    )
+    test_sim_nt_advanced(config)
+
+
+@skipIf(not straxen.utilix_is_configured(), 'utilix is not configured')
 def test_sim_mc_chain():
     """Test the nT simulator by Geant4 output file"""
-
-    if not straxen.utilix_is_configured():
-        log.warning(f"Utilix is not configured, skipping database-requiring tests!")
-        return
 
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
@@ -153,15 +204,12 @@ def test_sim_mc_chain():
         st = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000',
                                                  cmt_version='global_ONLINE',
                                                  _config_overlap={},)
-        st.set_config(dict(gain_model_mc=("to_pe_placeholder", True),
-                           gain_model=("to_pe_placeholder", True),
-                           gain_model_nv=("adc_nv", True),
-                           hit_min_amplitude='pmt_commissioning_initial',
+        st.set_config(dict(gain_model_nv=("adc_nv", True),
                           ))
 
         epix_config = {'cut_by_eventid': True, 'debug': True, 'source_rate': 0, 'micro_separation_time': 10.,
                        'max_delay': 1e7, 'detector_config_override': None, 'micro_separation': 0.05,
-                       'tag_cluster_by': 'time'}
+                       'tag_cluster_by': 'time', 'nr_only': False}
 
         st.register(wfsim.RawRecordsFromMcChain)
         st.set_config(dict(
@@ -173,8 +221,7 @@ def test_sim_mc_chain():
             fax_config='fax_config_nt_design.json',
             fax_config_override=dict(
                 s1_model_type='nest',
-                url_base='https://raw.githubusercontent.com/XENONnT/private_nt_aux_files/master/sim_files',
-                s1_lce_correction_map=["constant dummy", 1, []],
+                s2_time_model="s2_time_spread around zero",
                 enable_electron_afterpulses=False),
             epix_config=epix_config,
             fax_config_nveto='fax_config_nt_nveto.json',
