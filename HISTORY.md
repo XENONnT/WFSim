@@ -1,3 +1,58 @@
+v1.0.0 / 2022-06-09
+===================
+* Bump straxen from 1.2.5 to 1.2.6 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/315
+* Bump jupyter-client from 7.1.0 to 7.1.2 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/313
+* Bump numba from 0.55.0 to 0.55.1 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/311
+* Bump dask from 2021.10.0 to 2022.1.1 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/309
+* Bump utilix from 0.6.5 to 0.6.6 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/306
+* Bump coverage from 6.2 to 6.3 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/314
+* Bump hypothesis from 6.34.1 to 6.36.1 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/308
+* Bump tensorflow from 2.7.0 to 2.8.0 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/319
+* up py version by @JoranAngevaare in https://github.com/XENONnT/WFSim/pull/316
+* Test with latest straxen by @JoranAngevaare in https://github.com/XENONnT/WFSim/pull/322
+* reduce warnings by @JoranAngevaare in https://github.com/XENONnT/WFSim/pull/317
+* Bump hypothesis from 6.36.1 to 6.38.0 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/333
+* Bump tqdm from 4.62.2 to 4.63.0 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/332
+* Bump dask from 2022.1.1 to 2022.2.1 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/331
+* Bump uproot from 4.1.1 to 4.2.0 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/329
+* Bump straxen from 1.2.8 to 1.3.0 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/328
+* Bump scipy from 1.7.3 to 1.8.0 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/327
+* Bump coverage from 6.3 to 6.3.2 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/325
+* Bump pytest from 6.2.5 to 7.0.1 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/324
+* Bump actions/setup-python from 2 to 3 by @dependabot in https://github.com/XENONnT/WFSim/pull/323
+* Bump pandas from 1.4.0 to 1.4.1 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/326
+* Bump xarray from 0.20.1 to 0.21.1 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/335
+* Bump hypothesis from 6.38.0 to 6.39.0 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/336
+* PMT afterpulse not sorted by channel by @zhut19 in https://github.com/XENONnT/WFSim/pull/321
+* Test with straxen 1.5.0 by @JoranAngevaare in https://github.com/XENONnT/WFSim/pull/337
+* Fix CIV and average drift velocity implementation by @terliuk in https://github.com/XENONnT/WFSim/pull/338
+* SE shape: optical propagation + anode focusing by @KaraMelih in https://github.com/XENONnT/WFSim/pull/320
+* Fdc quick fix by @zhut19 in https://github.com/XENONnT/WFSim/pull/285
+* Bump pytest from 7.0.1 to 7.1.1 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/343
+* Bump tqdm from 4.63.0 to 4.63.1 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/344
+* Bump actions/checkout from 2 to 3 by @dependabot in https://github.com/XENONnT/WFSim/pull/341
+* Bump awkward from 1.7.0 to 1.8.0 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/345
+* Bump xarray from 0.21.1 to 2022.3.0 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/346
+* Bump strax from 1.1.8 to 1.2.0 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/347
+* Bump ipywidgets from 7.6.4 to 7.7.0 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/348
+* Bump uproot from 4.2.0 to 4.2.2 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/349
+* Double PMT ap probability for photons emitting double PE. by @zhut19 in https://github.com/XENONnT/WFSim/pull/340
+* no dependabot in WFSim by @JoranAngevaare in https://github.com/XENONnT/WFSim/pull/358
+* New release (v0.6.0) by @ramirezdiego in https://github.com/XENONnT/WFSim/pull/359
+* Fix drift velocity map usage (again) by @terliuk in https://github.com/XENONnT/WFSim/pull/360
+* Change default compressor by @JoranAngevaare in https://github.com/XENONnT/WFSim/pull/361
+* New release (v0.6.1) by @ramirezdiego in https://github.com/XENONnT/WFSim/pull/362
+* Bump straxen from 1.6.0 to 1.6.1 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/367
+* Bump strax from 1.2.0 to 1.2.1 in /extra_requirements by @dependabot in https://github.com/XENONnT/WFSim/pull/366
+* Test with latest strax by @JoranAngevaare in https://github.com/XENONnT/WFSim/pull/368
+* Off by one in noise by @JoranAngevaare in https://github.com/XENONnT/WFSim/pull/364
+* Added scaling of S2 AFT according to value from config by @terliuk in https://github.com/XENONnT/WFSim/pull/370
+* Fix broken tests by @JoranAngevaare in https://github.com/XENONnT/WFSim/pull/375
+* XY-dependent SE gain and extraction efficiency by @JYangQi00 in https://github.com/XENONnT/WFSim/pull/363
+* Save Geant4 primary position in truth by @PavelKavrigin in https://github.com/XENONnT/WFSim/pull/379
+* S1 pulse shape debug by @zhut19 in https://github.com/XENONnT/WFSim/pull/381
+* Start per pmt truth info by @JoranAngevaare in https://github.com/XENONnT/WFSim/pull/369
+
 v0.6.1 / 2022-04-12
 ===================
 * Change default compressor (#361)
