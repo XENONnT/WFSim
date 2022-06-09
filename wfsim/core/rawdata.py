@@ -353,8 +353,12 @@ class RawData(object):
 
         # Copy single valued fields directly from pulse class
         for field in ['n_pe', 'n_pe_trigger', 'n_photon', 'n_photon_trigger', 'raw_area', 'raw_area_trigger']:
-            for suffix in ['', '_bottom']:
-                tb[field+suffix] = getattr(pulse, '_' + field + suffix, 0)
+            if self.config.get('per_pmt_truth', False):
+                suffices = ['', '_per_pmt']
+            else:
+                suffices = ['', '_bottom']
+            for suffix in suffices:
+                tb[field+suffix] = pulse._truth_buffer[field+suffix]
 
         # Summarize the instruction cluster in one row of the truth file
         for field in instruction.dtype.names:

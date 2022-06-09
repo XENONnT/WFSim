@@ -2,7 +2,7 @@ import logging
 import os.path as osp
 import tempfile
 import copy
-
+import numpy as np
 import strax
 import straxen
 
@@ -120,9 +120,13 @@ def test_sim_nt_advanced(
 
         st = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000',
                                                  cmt_version='global_ONLINE',
-                                                 _config_overlap={},
-                                                 fax_config='fax_config_nt_sr0_v0.json'
-                                                 )
+                                                 fax_config='fax_config_nt_sr0_v0.json',
+                                                 _config_overlap={},)
+        st.set_config(dict(gain_model_mc=("to_pe_placeholder", True),
+                           gain_model=("to_pe_placeholder", True),
+                           hit_min_amplitude='pmt_commissioning_initial',
+                           per_pmt_truth=True,
+                          ))
         st.set_config(dict(nchunk=1, event_rate=1, chunk_size=2,))
 
         if config is not None:
@@ -134,6 +138,10 @@ def test_sim_nt_advanced(
         p = st.get_array(run_id, 'peaks')
         _sanity_check(rr, p)
         log.info(f'All done')
+
+        truth = st.get_array(run_id, 'truth')
+        for field in 'n_pe n_photon raw_area'.split():
+            assert np.all(np.isclose(truth[field], np.sum(truth[field + '_per_pmt'], axis=1)))
 
 
 @skipIf(not straxen.utilix_is_configured(), 'utilix is not configured')

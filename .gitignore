@@ -61,3 +61,6 @@ docs/tutorials/*
 
 # coverage
 .coverage
+
+# testing stuff
+test.root
