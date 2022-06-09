@@ -1,3 +1,15 @@
+v1.0.0 / 2022-06-09
+===================
+* Start per pmt truth info (#369)
+* S1 pulse shape debug (#381)
+* Save Geant4 primary position in truth (#379)
+* XY-dependent SE gain and extraction efficiency (#363)
+* Fix broken tests (#375)
+* Added scaling of S2 AFT according to value from config (#370)
+* Off by one in noise (#364)
+* Update requirements-tests.txt (#368)
+* Fix zenodo badge 
+
 v0.6.1 / 2022-04-12
 ===================
 * Change default compressor (#361)
