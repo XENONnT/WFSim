@@ -166,8 +166,7 @@ class S2(Pulse):
         """
         drift_velocity_liquid = S2.get_avg_drift_velocity(z_int, xy_int, config, resource)
         if config['enable_field_dependencies']['diffusion_longitudinal_map']:
-            diffusion_constant_longitudinal = resource.field_dependencies_map(z_int, xy_int, map_name='diffusion_longitudinal_map')  # cm²/s
-            diffusion_constant_longitudinal *= 1e-9  # cm²/ns
+            diffusion_constant_longitudinal = resource.diffusion_longitudinal_map(z_int, xy_int)  # cm²/ns
         else:
             diffusion_constant_longitudinal = config['diffusion_constant_longitudinal']
 

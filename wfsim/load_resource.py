@@ -100,6 +100,7 @@ class Resource:
                 'noise_file': 'x1t_noise_170203_0850_00_small.npz',
                 'fdc_3d': 'XnT_3D_FDC_xyt_dummy_all_zeros_v0.1.json.gz',
                 'field_dependencies_map': '',
+                "diffusion_longitudinal_map": '',
                 's1_time_spline': 'XENONnT_s1_proponly_va43fa9b_wires_20200625.json.gz',
                 's2_time_spline': '',
              })
@@ -336,6 +337,16 @@ class Resource:
                     r = np.sqrt(xy[:, 0]**2 + xy[:, 1]**2)
                     return field_dependencies_map(np.array([r, z]).T, **kwargs)
                 self.field_dependencies_map = rz_map
+
+            # Data-driven longitudinal diffusion map
+            if config['enable_field_dependencies']["diffusion_longitudinal_map"]:
+                print(files["diffusion_longitudinal_map"])
+                diffusion_longitudinal_map = make_map(files['diffusion_longitudinal_map'], fmt='json.gz',
+                                                  method='WeightedNearestNeighbors')
+                def _rz_map(z, xy, **kwargs):
+                    r = np.sqrt(xy[:, 0]**2 + xy[:, 1]**2)
+                    return diffusion_longitudinal_map(np.array([r, z]).T, **kwargs)
+                self.diffusion_longitudinal_map = _rz_map
 
             # Photon After Pulses
             if config.get('enable_pmt_afterpulses', False):
