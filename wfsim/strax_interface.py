@@ -856,8 +856,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             m = (self.instructions_epix['z'] < - self.config['tpc_length']) & (self.instructions_epix['type'] == 2)
             self.instructions_epix = self.instructions_epix[~m]
 
-            r_instr = np.sqrt(self.instructions['x']**2 + self.instructions['y']**2)
-
+            r_instr = np.sqrt(self.instructions_epix['x']**2 + self.instructions_epix['y']**2)
             assert np.all((r_instr<self.config['tpc_radius'])|np.isclose(r_instr,self.config['tpc_radius'])), \
                 "Interaction is outside the TPC (radius)"
             assert np.all(self.instructions_epix['z'] < 0.25), \
