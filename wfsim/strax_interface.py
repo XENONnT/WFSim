@@ -677,8 +677,9 @@ class RawRecordsFromFaxNT(SimulatorPlugin):
         # Let below cathode S1 instructions pass but remove S2 instructions
         m = (self.instructions['z'] < - self.config['tpc_length']) & (self.instructions['type'] == 2)
         self.instructions = self.instructions[~m]
+        r_instr = np.sqrt(self.instructions['x']**2 + self.instructions['y']**2)
 
-        assert np.all(self.instructions['x']**2 + self.instructions['y']**2 < self.config['tpc_radius']**2), \
+        assert np.all((r_instr<self.config['tpc_radius'])|np.isclose(r_instr,self.config['tpc_radius'])), \
             "Interaction is outside the TPC (radius)"
         assert np.all(self.instructions['z'] < 0.25), \
             "Interaction is outside the TPC (in Z)"
@@ -855,8 +856,8 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             m = (self.instructions_epix['z'] < - self.config['tpc_length']) & (self.instructions_epix['type'] == 2)
             self.instructions_epix = self.instructions_epix[~m]
 
-            assert np.all(self.instructions_epix['x']**2 + self.instructions_epix['y']**2 <
-                          self.config['tpc_radius']**2), \
+            r_instr = np.sqrt(self.instructions_epix['x']**2 + self.instructions_epix['y']**2)
+            assert np.all((r_instr<self.config['tpc_radius'])|np.isclose(r_instr,self.config['tpc_radius'])), \
                 "Interaction is outside the TPC (radius)"
             assert np.all(self.instructions_epix['z'] < 0.25), \
                 "Interaction is outside the TPC (in Z)"
