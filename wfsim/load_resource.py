@@ -339,8 +339,8 @@ class Resource:
                 self.field_dependencies_map = rz_map
 
             # Data-driven longitudinal diffusion map
+            # TODO: Change to the best way to accommodate simulation/data-driven map
             if config['enable_field_dependencies']["diffusion_longitudinal_map"]:
-                print(files["diffusion_longitudinal_map"])
                 diffusion_longitudinal_map = make_map(files['diffusion_longitudinal_map'], fmt='json.gz',
                                                   method='WeightedNearestNeighbors')
                 def _rz_map(z, xy, **kwargs):
