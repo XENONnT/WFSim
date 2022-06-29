@@ -1,3 +1,8 @@
+v1.0.1 / 2022-06-29
+===================
+* Default to data-driven diffusion map (#387)
+* Fix R outside TPC due to float32 rounding (#386)
+
 v1.0.0 / 2022-06-09
 ===================
 * Start per pmt truth info (#369)
