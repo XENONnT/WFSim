@@ -1,4 +1,4 @@
 strax==1.2.3
-straxen==1.7.1
+straxen==1.8.1
 epix==0.3.1
 git+https://github.com/XENONnT/ax_env
