@@ -1,4 +1,4 @@
 strax==1.2.3
 straxen==1.8.3
-epix==0.3.0
+git+https://github.com/JoranAngevaare/epix@disable-numba-for-clustering
 git+https://github.com/XENONnT/ax_env
