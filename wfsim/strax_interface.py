@@ -745,14 +745,16 @@ class RawRecordsFromFaxOpticalNT(RawRecordsFromFaxNT):
     strax.Option('fax_config_nveto', default=None, track=True, infer_type=False,),
     strax.Option('fax_config_override_nveto', default=None, track=True, infer_type=False,
                  help='Dictionary with configuration option overrides'),
-    strax.Option('gain_model_nv', track=True, infer_type=False,
-                 help='nveto gain model, provided by context'),
     strax.Option('targets', default=('tpc',), track=False, infer_type=False,
                  help='tuple with what data to simulate (tpc, nveto or both)')
 )
 class RawRecordsFromMcChain(SimulatorPlugin):
     provides = ('raw_records', 'raw_records_he', 'raw_records_aqmon', 'raw_records_nv', 'truth', 'truth_nv')
     data_kind = immutabledict(zip(provides, provides))
+
+    gain_model_nv=straxen.URLConfig(
+        track=True, infer_type=False,
+        help='nveto gain model, provided by context'),
 
     def set_config(self,):
         super().set_config()
@@ -766,8 +768,8 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             if overrides is not None:
                 self.config_nveto.update(overrides)
 
-            self.to_pe_nveto = straxen.get_correction_from_cmt(self.run_id,
-                               self.config['gain_model_nv'])
+            to_pe_nv = self.gain_model_nv
+            self.to_pe_nveto = straxen.get_correction_from_cmt(self.run_id, to_pe_nv)
 
             self.config_nveto['gains'] = np.divide((2e-9 * 2 / 2**14) / (1.6e-19 * 1 * 50),
                                                    self.to_pe_nveto,
