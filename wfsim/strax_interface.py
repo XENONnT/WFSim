@@ -769,7 +769,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                 self.config_nveto.update(overrides)
 
             to_pe_nv = self.gain_model_nv
-            self.to_pe_nveto = straxen.get_correction_from_cmt(self.run_id, to_pe_nv)
+            self.to_pe_nveto = to_pe_nv
 
             self.config_nveto['gains'] = np.divide((2e-9 * 2 / 2**14) / (1.6e-19 * 1 * 50),
                                                    self.to_pe_nveto,
