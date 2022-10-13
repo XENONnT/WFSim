@@ -572,8 +572,8 @@ class SimulatorPlugin(strax.Plugin):
             self.config.update({'field_distortion_model': "inverse_fdc" if self.config['field_distortion_on'] else "none"})
 
         # Update gains to the nT defaults
-        self.to_pe = straxen.get_correction_from_cmt(self.run_id,
-                               self.config['gain_model_mc'])
+        to_pe = self.gain_model_mc
+        self.to_pe = to_pe
 
         adc_2_current = (self.config['digitizer_voltage_range']
                          / 2 ** (self.config['digitizer_bits'])
