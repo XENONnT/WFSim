@@ -50,7 +50,7 @@ jobs:
       - name: Install requirements for tests and latest strax
         run: |
           pip install -r extra_requirements/requirements-tests.txt
-          pip uninstall straxen
+          yes | pip uninstall straxen
           pip install git+https://github.com/XENONnT/straxen.git
       # Secrets and required files
       - name: patch utilix file
