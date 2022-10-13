@@ -76,7 +76,7 @@ def test_sim_nt_basics():
         conf['gain_model'] = "cmt://to_pe_model?version=ONLINE&run_id=plugin.run_id"
         conf['gain_model_mc'] = "cmt://to_pe_model?version=ONLINE&run_id=plugin.run_id"
         conf['hev_gain_model'] = 'legacy-to-pe://1T_to_pe_placeholder'
-        conf['hit_min_amplitude'] = 'pmt_commissioning_initial'
+        conf['hit_min_amplitude'] = 'legacy-thresholds://pmt_commissioning_initial'
 
         # The SPE table in this package is for a single channel
         # We generate the full SPE file for testing here
