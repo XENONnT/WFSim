@@ -33,9 +33,9 @@ def test_sim_1T():
         log.debug(f'Working in {tempdir}')
         _, conf_1t = test_load_1t()
         testing_config_1t = dict(
-            hev_gain_model=("1T_to_pe_placeholder", True),
-            gain_model=("1T_to_pe_placeholder", True),
-            gain_model_mc=("1T_to_pe_placeholder", True),
+            hev_gain_model='legacy-to-pe://1T_to_pe_placeholder',
+            gain_model='legacy-to-pe://1T_to_pe_placeholder',
+            gain_model_mc='legacy-to-pe://1T_to_pe_placeholder',
         )
 
         st = strax.Context(
@@ -50,8 +50,8 @@ def test_sim_1T():
                               "/a5b92102505d6d0bfcdb563b6117bd4040a93435/sim_files/"),
                     **conf_1t,
                 ),
-                **straxen.contexts.x1t_common_config),
-            **straxen.contexts.x1t_context_config,
+                **straxen.legacy.x1t_common_config),
+            **straxen.legacy.contexts_1t.get_x1t_context_config(),
         )
         st.register(wfsim.RawRecordsFromFax1T)
         log.debug(f'Setting testing config {testing_config_1t}')
@@ -73,9 +73,9 @@ def test_sim_nt_basics():
         log.debug(f'Working in {tempdir}')
         conf = copy.deepcopy(straxen.contexts.xnt_common_config)
         resource, conf_override = test_load_nt()
-        conf['gain_model'] = ("to_pe_placeholder", True)
-        conf['gain_model_mc'] = ("to_pe_placeholder", True)
-        conf['hev_gain_model'] = ("to_pe_placeholder", True)
+        conf['gain_model'] = "cmt://to_pe_model?version=ONLINE&run_id=plugin.run_id"
+        conf['gain_model_mc'] = "cmt://to_pe_model?version=ONLINE&run_id=plugin.run_id"
+        conf['hev_gain_model'] = 'legacy-to-pe://1T_to_pe_placeholder'
         conf['hit_min_amplitude'] = 'pmt_commissioning_initial'
 
         # The SPE table in this package is for a single channel
@@ -122,9 +122,7 @@ def test_sim_nt_advanced(
                                                  cmt_version='global_ONLINE',
                                                  fax_config='fax_config_nt_sr0_v0.json',
                                                  _config_overlap={},)
-        st.set_config(dict(gain_model_mc=("to_pe_placeholder", True),
-                           gain_model=("to_pe_placeholder", True),
-                           hit_min_amplitude='pmt_commissioning_initial',
+        st.set_config(dict(hit_min_amplitude='legacy-thresholds://pmt_commissioning_initial',
                            per_pmt_truth=True,
                           ))
         st.set_config(dict(nchunk=1, event_rate=1, chunk_size=2,))

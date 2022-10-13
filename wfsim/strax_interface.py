@@ -687,7 +687,7 @@ class RawRecordsFromFaxNT(SimulatorPlugin):
             "Interaction is outside the TPC (radius)"
         assert np.all(self.instructions['z'] < 0.25), \
             "Interaction is outside the TPC (in Z)"
-        assert np.all(self.instructions['amp'] > 0), \
+        assert np.all(self.instructions['amp'] >= 0), \
             "Interaction has zero size"
 
     def infer_dtype(self):
@@ -865,7 +865,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                 "Interaction is outside the TPC (radius)"
             assert np.all(self.instructions_epix['z'] < 0.25), \
                 "Interaction is outside the TPC (in Z)"
-            assert np.all(self.instructions_epix['amp'] > 0), \
+            assert np.all(self.instructions_epix['amp'] >= 0), \
                 "Interaction has zero size"
             assert all(self.instructions_epix['g4id'] >= self.config['entry_start'])
             assert all(self.instructions_epix['g4id'] < self.config['entry_stop'])
