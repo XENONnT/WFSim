@@ -754,7 +754,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
 
     gain_model_nv=straxen.URLConfig(
         track=True, infer_type=False,
-        help='nveto gain model, provided by context'),
+        help='nveto gain model, provided by context')
 
     def set_config(self,):
         super().set_config()
