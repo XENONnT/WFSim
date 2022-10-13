@@ -202,7 +202,7 @@ def test_sim_mc_chain():
         st = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000',
                                                  cmt_version='global_ONLINE',
                                                  _config_overlap={},)
-        st.set_config(dict(gain_model_nv=("adc_nv", True),
+        st.set_config(dict(gain_model_nv="legacy-to-pe://adc_nv",
                           ))
 
         epix_config = {'cut_by_eventid': True, 'debug': True, 'source_rate': 0, 'micro_separation_time': 10.,
