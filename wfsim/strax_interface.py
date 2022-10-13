@@ -519,8 +519,6 @@ class ChunkRawRecords(object):
     strax.Option('fax_config_override_from_cmt', default=None, infer_type=False,
                  help="Dictionary of fax parameter names (key) mapped to CMT config names (value)"
                       "where the fax parameter values will be replaced by CMT"),
-    strax.Option('gain_model_mc', default=('to_pe_per_run', 'to_pe_nt.npy'), infer_type=False,
-                 help='PMT gain model. Specify as (model_type, model_config).'),
     strax.Option('channel_map', track=False, type=immutabledict,
                  help="immutabledict mapping subdetector to (min, max) "
                       "channel number. Provided by context"),
@@ -534,6 +532,7 @@ class ChunkRawRecords(object):
                       "generation of the instructions"),
 )
 class SimulatorPlugin(strax.Plugin):
+
     compressor = 'zstd'
     depends_on = tuple()
 
@@ -550,6 +549,11 @@ class SimulatorPlugin(strax.Plugin):
 
     # A very very long input timeout, our simulator takes time
     input_timeout = 3600  # as an hour
+
+    gain_model_mc = straxen.URLConfig(
+         default="cmt://to_pe_model?version=ONLINE&run_id=plugin.run_id",
+         infer_type=False,
+         help='PMT gain model. Specify as (model_type, model_config).')
 
     def setup(self):
         self.set_config()
