@@ -1,3 +1,10 @@
+v1.0.2 / 2022-10-17
+===================
+* fix numpy by @JoranAngevaare in https://github.com/XENONnT/WFSim/pull/393
+* Url config minimal patch by @JoranAngevaare in https://github.com/XENONnT/WFSim/pull/399
+
+**Full Changelog**: https://github.com/XENONnT/WFSim/compare/v1.0.1...v1.0.2
+
 v1.0.1 / 2022-06-29
 ===================
 * Default to data-driven diffusion map (#387)
