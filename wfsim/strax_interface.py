@@ -519,8 +519,6 @@ class ChunkRawRecords(object):
     strax.Option('fax_config_override_from_cmt', default=None, infer_type=False,
                  help="Dictionary of fax parameter names (key) mapped to CMT config names (value)"
                       "where the fax parameter values will be replaced by CMT"),
-    strax.Option('gain_model_mc', default=('to_pe_per_run', 'to_pe_nt.npy'), infer_type=False,
-                 help='PMT gain model. Specify as (model_type, model_config).'),
     strax.Option('channel_map', track=False, type=immutabledict,
                  help="immutabledict mapping subdetector to (min, max) "
                       "channel number. Provided by context"),
@@ -534,6 +532,7 @@ class ChunkRawRecords(object):
                       "generation of the instructions"),
 )
 class SimulatorPlugin(strax.Plugin):
+
     compressor = 'zstd'
     depends_on = tuple()
 
@@ -550,6 +549,11 @@ class SimulatorPlugin(strax.Plugin):
 
     # A very very long input timeout, our simulator takes time
     input_timeout = 3600  # as an hour
+
+    gain_model_mc = straxen.URLConfig(
+         default="cmt://to_pe_model?version=ONLINE&run_id=plugin.run_id",
+         infer_type=False,
+         help='PMT gain model. Specify as (model_type, model_config).')
 
     def setup(self):
         self.set_config()
@@ -568,8 +572,8 @@ class SimulatorPlugin(strax.Plugin):
             self.config.update({'field_distortion_model': "inverse_fdc" if self.config['field_distortion_on'] else "none"})
 
         # Update gains to the nT defaults
-        self.to_pe = straxen.get_correction_from_cmt(self.run_id,
-                               self.config['gain_model_mc'])
+        to_pe = self.gain_model_mc
+        self.to_pe = to_pe
 
         adc_2_current = (self.config['digitizer_voltage_range']
                          / 2 ** (self.config['digitizer_bits'])
@@ -741,14 +745,16 @@ class RawRecordsFromFaxOpticalNT(RawRecordsFromFaxNT):
     strax.Option('fax_config_nveto', default=None, track=True, infer_type=False,),
     strax.Option('fax_config_override_nveto', default=None, track=True, infer_type=False,
                  help='Dictionary with configuration option overrides'),
-    strax.Option('gain_model_nv', track=True, infer_type=False,
-                 help='nveto gain model, provided by context'),
     strax.Option('targets', default=('tpc',), track=False, infer_type=False,
                  help='tuple with what data to simulate (tpc, nveto or both)')
 )
 class RawRecordsFromMcChain(SimulatorPlugin):
     provides = ('raw_records', 'raw_records_he', 'raw_records_aqmon', 'raw_records_nv', 'truth', 'truth_nv')
     data_kind = immutabledict(zip(provides, provides))
+
+    gain_model_nv=straxen.URLConfig(
+        track=True, infer_type=False,
+        help='nveto gain model, provided by context')
 
     def set_config(self,):
         super().set_config()
@@ -762,8 +768,8 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             if overrides is not None:
                 self.config_nveto.update(overrides)
 
-            self.to_pe_nveto = straxen.get_correction_from_cmt(self.run_id,
-                               self.config['gain_model_nv'])
+            to_pe_nv = self.gain_model_nv
+            self.to_pe_nveto = to_pe_nv
 
             self.config_nveto['gains'] = np.divide((2e-9 * 2 / 2**14) / (1.6e-19 * 1 * 50),
                                                    self.to_pe_nveto,
