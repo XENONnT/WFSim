@@ -105,7 +105,7 @@ jobs:
           HAVE_ACCESS_TO_SECTETS: ${{ secrets.RUNDB_API_URL }}
         if: matrix.test == 'notebooks' && env.HAVE_ACCESS_TO_SECTETS != null
         run: |
-          pytest --cov wfsim -v --nbmake notebooks/* --durations 0 --nb-coverage --nbmake-timeout=3600
+          pytest --cov wfsim -v --nbmake notebooks/*.ipynb --durations 0 --nb-coverage --nbmake-timeout=3600
           # pytest --cov --cov-append wfsim -v --nbmake notebooks/Advanced_tricks.ipynb --durations 0 --nb-coverage --nbmake-timeout=3600
           # pytest --cov --cov-append wfsim -v --nbmake notebooks/* --durations 0 --nb-coverage --nbmake-timeout=3600
           coveralls --service=github
