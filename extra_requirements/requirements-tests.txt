@@ -6,3 +6,12 @@ git+https://github.com/XENONnT/ax_env
 # For testing running notebooks
 nbmake
 pytest-xdist
+pytest==7.2.0; python_version>'3.7'
+pytest-cov==4.0.0; python_version>'3.7'
+pytest-forked==1.4.0; python_version>'3.7'
+pytest-runner==6.0.0; python_version>'3.7'
+pytest-xdist==3.0.2; python_version>'3.7'
+pytest_notebook==0.8.1; python_version>'3.7'
+nbconvert==7.2.3; python_version>'3.7'
+nbmake==1.2.1; python_version>'3.7'
+jupyter==1.0.0; python_version<='3.7'
