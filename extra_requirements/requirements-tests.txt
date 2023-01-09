@@ -1,6 +1,6 @@
-strax==1.2.2
-straxen==1.7.1
-epix==0.3.0
+strax==1.4.0
+straxen==2.0.2
+epix==0.3.2
 git+https://github.com/XENONnT/ax_env
 
 # For testing running notebooks

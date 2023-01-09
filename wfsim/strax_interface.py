@@ -34,7 +34,10 @@ instruction_dtype = [(('Waveform simulator event number.', 'event_number'), np.i
                      (('Volume id giving the detector subvolume', 'vol_id'), np.int32),
                      (('Local field [ V / cm ]', 'local_field'), np.float64),
                      (('Number of excitons', 'n_excitons'), np.int32),
-]
+                     (('X position of the primary particle [cm]', 'x_pri'), np.float32),
+                     (('Y position of the primary particle [cm]', 'y_pri'), np.float32),
+                     (('Z position of the primary particle [cm]', 'z_pri'), np.float32),
+                    ]
 
 
 optical_extra_dtype = [(('first optical input index', '_first'), np.int32),
@@ -66,6 +69,49 @@ truth_extra_dtype = [
     (('Arrival time of the last electron [ns]', 't_last_electron'), np.float64),
     (('Mean time of the electrons [ns]', 't_mean_electron'), np.float64),
     (('Standard deviation of electron arrival times [ns]', 't_sigma_electron'), np.float64),]
+
+
+@export
+def extra_truth_dtype_per_pmt(n_pmt: ty.Union[bool, int]) -> ty.List[tuple]:
+    """
+    Generate the extra - truth dtype output
+
+    Return total/bottom seperation from truth_extra_dtype if n_pmt is False
+
+    :param n_pmt: Number of PMTs, when false (no PMTs, use total/bottom separation)
+    :return: dtype list
+    """
+    if not n_pmt:
+        return truth_extra_dtype
+    return [
+        (('End time of the interaction [ns]', 'endtime'), np.int64),
+        (('Number of simulated electrons', 'n_electron'), np.int32),
+        # Per PMT fields
+        (('Number of photons reaching PMT', 'n_photon_per_pmt'), (np.int32, n_pmt)),
+        (('Number of photons + dpe passing', 'n_pe_per_pmt'), (np.int32, n_pmt)),
+        (('Number of photons passing trigger', 'n_photon_trigger_per_pmt'), (np.int32, n_pmt)),
+        (('Number of photons + dpe passing trigger', 'n_pe_trigger_per_pmt'), (np.int32, n_pmt)),
+        (('Raw area in pe', 'raw_area_per_pmt'), (np.float64, n_pmt)),
+        (('Raw area in pe passing trigger', 'raw_area_trigger_per_pmt'), (np.float64, n_pmt)),
+        # Aggregate (total) fields
+        (('Number of photons reaching PMT (total)', 'n_photon'), np.int32),
+        (('Number of photons + dpe passing (total)', 'n_pe'), np.int32),
+        (('Number of photons passing trigger (total)', 'n_photon_trigger'), np.int32),
+        (('Number of photons + dpe passing trigger (total)', 'n_pe_trigger'), np.int32),
+        (('Raw area in pe (total)', 'raw_area'), np.float64),
+        (('Raw area in pe passing trigger (total)', 'raw_area_trigger'), np.float64),
+        # General fields
+        (('Arrival time of the first photon [ns]', 't_first_photon'), np.float64),
+        (('Arrival time of the last photon [ns]', 't_last_photon'), np.float64),
+        (('Mean time of the photons [ns]', 't_mean_photon'), np.float64),
+        (('Standard deviation of photon arrival times [ns]', 't_sigma_photon'), np.float64),
+        (('X field-distorted mean position of the electrons [cm]', 'x_mean_electron'), np.float32),
+        (('Y field-distorted mean position of the electrons [cm]', 'y_mean_electron'), np.float32),
+        (('Arrival time of the first electron [ns]', 't_first_electron'), np.float64),
+        (('Arrival time of the last electron [ns]', 't_last_electron'), np.float64),
+        (('Mean time of the electrons [ns]', 't_mean_electron'), np.float64),
+        (('Standard deviation of electron arrival times [ns]', 't_sigma_electron'), np.float64),
+    ]
 
 
 def rand_instructions(c):
@@ -138,6 +184,10 @@ def _rand_instructions(
     inst['y'] = np.repeat(r * np.sin(t), 2)
     inst['z'] = np.repeat(np.random.uniform(-tpc_length, 0, n_events), 2)
 
+    inst['x_pri'] = inst['x']
+    inst['y_pri'] = inst['y']
+    inst['z_pri'] = inst['z']
+
     # Here we'll define our XENON-like detector
     nest_calc = nestpy.NESTcalc(nestpy.VDetector())
     nucleus_A = 131.293
@@ -185,7 +235,7 @@ def _read_optical_nveto(config, events, mask):
     :params events: g4 root file
     :params mask: 1d bool array to select events
     
-    returns two flatterned nested arrays of channels and timings, 
+    returns two flatterned nested arrays of channels and timings,
     """
     channels = np.hstack(events["pmthitID"].array(library="np")[mask])
     timings = np.hstack(events["pmthitTime"].array(library="np")[mask] * 1e9).astype(np.int64)
@@ -265,6 +315,9 @@ def read_optical(config):
     ins['x'] = events["xp_pri"].array(library="np").flatten()[mask] / 10.
     ins['y'] = events["yp_pri"].array(library="np").flatten()[mask] / 10.
     ins['z'] = events["zp_pri"].array(library="np").flatten()[mask] / 10.
+    ins['x_pri'] = np.zeros(n_events, np.int64)
+    ins['y_pri'] = np.zeros(n_events, np.int64)
+    ins['z_pri'] = np.zeros(n_events, np.int64)
     ins['time'] = np.zeros(n_events, np.int64)
     ins['event_number'] = np.arange(n_events)
     ins['g4id'] = events['eventid'].array(library="np")[mask]
@@ -304,7 +357,9 @@ class ChunkRawRecords(object):
         self.rawdata = rawdata_generator(self.config, **kwargs)
         self.record_buffer = np.zeros(5000000,
                                       dtype=strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH))
-        self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + truth_extra_dtype + [('fill', bool)])
+        truth_per_n_pmts = self._n_channels if config.get('per_pmt_truth') else False
+        self.truth_dtype = extra_truth_dtype_per_pmt(truth_per_n_pmts)
+        self.truth_buffer = np.zeros(10000, dtype=instruction_dtype + self.truth_dtype + [('fill', bool)])
 
         self.blevel = 0  # buffer_filled_level
 
@@ -418,7 +473,7 @@ class ChunkRawRecords(object):
 
         truth.sort(order='time')
         # Return truth without 'fill' field
-        _truth = np.zeros(len(truth), dtype=instruction_dtype + truth_extra_dtype)
+        _truth = np.zeros(len(truth), dtype=instruction_dtype + self.truth_dtype)
         for name in _truth.dtype.names:
             _truth[name] = truth[name]
         _truth['time'][~np.isnan(_truth['t_first_photon'])] = \
@@ -442,6 +497,9 @@ class ChunkRawRecords(object):
     def source_finished(self):
         return self.rawdata.source_finished
 
+    @property
+    def _n_channels(self):
+        return len(self.config.get('gains', np.arange(straxen.n_tpc_pmts)))
 
 @strax.takes_config(
     strax.Option('detector', default='XENONnT', track=True, infer_type=False),
@@ -451,6 +509,8 @@ class ChunkRawRecords(object):
                  help="Duration of each chunk in seconds"),
     strax.Option('n_chunk', default=10, track=False, infer_type=False,
                  help="Number of chunks to simulate"),
+    strax.Option('per_pmt_truth', default=False, track=True, type=bool,
+                 help="Store the info per channel in the truth file"),
     strax.Option('fax_file', default=None, track=False, infer_type=False,
                  help="Directory with fax instructions"), 
     strax.Option('fax_config', default='fax_config_nt_design.json'),
@@ -459,8 +519,6 @@ class ChunkRawRecords(object):
     strax.Option('fax_config_override_from_cmt', default=None, infer_type=False,
                  help="Dictionary of fax parameter names (key) mapped to CMT config names (value)"
                       "where the fax parameter values will be replaced by CMT"),
-    strax.Option('gain_model_mc', default=('to_pe_per_run', 'to_pe_nt.npy'), infer_type=False,
-                 help='PMT gain model. Specify as (model_type, model_config).'),
     strax.Option('channel_map', track=False, type=immutabledict,
                  help="immutabledict mapping subdetector to (min, max) "
                       "channel number. Provided by context"),
@@ -474,6 +532,7 @@ class ChunkRawRecords(object):
                       "generation of the instructions"),
 )
 class SimulatorPlugin(strax.Plugin):
+
     compressor = 'zstd'
     depends_on = tuple()
 
@@ -490,6 +549,11 @@ class SimulatorPlugin(strax.Plugin):
 
     # A very very long input timeout, our simulator takes time
     input_timeout = 3600  # as an hour
+
+    gain_model_mc = straxen.URLConfig(
+         default="cmt://to_pe_model?version=ONLINE&run_id=plugin.run_id",
+         infer_type=False,
+         help='PMT gain model. Specify as (model_type, model_config).')
 
     def setup(self):
         self.set_config()
@@ -508,8 +572,8 @@ class SimulatorPlugin(strax.Plugin):
             self.config.update({'field_distortion_model': "inverse_fdc" if self.config['field_distortion_on'] else "none"})
 
         # Update gains to the nT defaults
-        self.to_pe = straxen.get_correction_from_cmt(self.run_id,
-                               self.config['gain_model_mc'])
+        to_pe = self.gain_model_mc
+        self.to_pe = to_pe
 
         adc_2_current = (self.config['digitizer_voltage_range']
                          / 2 ** (self.config['digitizer_bits'])
@@ -587,6 +651,14 @@ class SimulatorPlugin(strax.Plugin):
         """Return whether all instructions has been used."""
         return self.sim.source_finished()
 
+    @property
+    def _n_channels(self):
+        return len(self.config.get('gains', np.arange(straxen.n_tpc_pmts)))
+
+    @property
+    def _truth_dtype(self):
+        truth_per_n_pmts = self._n_channels if self.config.get('per_pmt_truth') else False
+        return extra_truth_dtype_per_pmt(truth_per_n_pmts)
 
 @export
 class RawRecordsFromFaxNT(SimulatorPlugin):
@@ -609,18 +681,20 @@ class RawRecordsFromFaxNT(SimulatorPlugin):
         # Let below cathode S1 instructions pass but remove S2 instructions
         m = (self.instructions['z'] < - self.config['tpc_length']) & (self.instructions['type'] == 2)
         self.instructions = self.instructions[~m]
+        r_instr = np.sqrt(self.instructions['x']**2 + self.instructions['y']**2)
 
-        assert np.all(self.instructions['x']**2 + self.instructions['y']**2 < self.config['tpc_radius']**2), \
-            "Interation is outside the TPC"
+        assert np.all((r_instr<self.config['tpc_radius'])|np.isclose(r_instr,self.config['tpc_radius'])), \
+            "Interaction is outside the TPC (radius)"
         assert np.all(self.instructions['z'] < 0.25), \
-            "Interation is outside the TPC"
+            "Interaction is outside the TPC (in Z)"
         assert np.all(self.instructions['amp'] > 0), \
             "Interaction has zero size"
 
     def infer_dtype(self):
         dtype = {data_type: strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH)
                  for data_type in self.provides if data_type != 'truth'}
-        dtype['truth'] = instruction_dtype + truth_extra_dtype
+
+        dtype['truth'] = instruction_dtype + self._truth_dtype
         return dtype
 
     def compute(self):
@@ -652,7 +726,7 @@ class RawRecordsFromFaxOpticalNT(RawRecordsFromFaxNT):
                                    channels=self.channels,
                                    timings=self.timings,)
         self.sim.truth_buffer = np.zeros(10000, dtype=instruction_dtype + optical_extra_dtype
-                                                + truth_extra_dtype + [('fill', bool)])
+                                                + self._truth_dtype + [('fill', bool)])
         self.sim_iter = self.sim(self.instructions)
         
         
@@ -671,14 +745,16 @@ class RawRecordsFromFaxOpticalNT(RawRecordsFromFaxNT):
     strax.Option('fax_config_nveto', default=None, track=True, infer_type=False,),
     strax.Option('fax_config_override_nveto', default=None, track=True, infer_type=False,
                  help='Dictionary with configuration option overrides'),
-    strax.Option('gain_model_nv', track=True, infer_type=False,
-                 help='nveto gain model, provided by context'),
     strax.Option('targets', default=('tpc',), track=False, infer_type=False,
                  help='tuple with what data to simulate (tpc, nveto or both)')
 )
 class RawRecordsFromMcChain(SimulatorPlugin):
     provides = ('raw_records', 'raw_records_he', 'raw_records_aqmon', 'raw_records_nv', 'truth', 'truth_nv')
     data_kind = immutabledict(zip(provides, provides))
+
+    gain_model_nv=straxen.URLConfig(
+        track=True, infer_type=False,
+        help='nveto gain model, provided by context')
 
     def set_config(self,):
         super().set_config()
@@ -692,8 +768,8 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             if overrides is not None:
                 self.config_nveto.update(overrides)
 
-            self.to_pe_nveto = straxen.get_correction_from_cmt(self.run_id,
-                               self.config['gain_model_nv'])
+            to_pe_nv = self.gain_model_nv
+            self.to_pe_nveto = to_pe_nv
 
             self.config_nveto['gains'] = np.divide((2e-9 * 2 / 2**14) / (1.6e-19 * 1 * 50),
                                                    self.to_pe_nveto,
@@ -786,11 +862,11 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             m = (self.instructions_epix['z'] < - self.config['tpc_length']) & (self.instructions_epix['type'] == 2)
             self.instructions_epix = self.instructions_epix[~m]
 
-            assert np.all(self.instructions_epix['x']**2 + self.instructions_epix['y']**2 <
-                          self.config['tpc_radius']**2), \
-                "Interation is outside the TPC"
+            r_instr = np.sqrt(self.instructions_epix['x']**2 + self.instructions_epix['y']**2)
+            assert np.all((r_instr<self.config['tpc_radius'])|np.isclose(r_instr,self.config['tpc_radius'])), \
+                "Interaction is outside the TPC (radius)"
             assert np.all(self.instructions_epix['z'] < 0.25), \
-                "Interation is outside the TPC"
+                "Interaction is outside the TPC (in Z)"
             assert np.all(self.instructions_epix['amp'] > 0), \
                 "Interaction has zero size"
             assert all(self.instructions_epix['g4id'] >= self.config['entry_start'])
@@ -814,7 +890,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                                           channels=self.nveto_channels,
                                           timings=self.nveto_timings,)
             self.sim_nv.truth_buffer = np.zeros(10000, dtype=instruction_dtype + optical_extra_dtype
-                                                + truth_extra_dtype + [('fill', bool)])
+                                                + self._truth_dtype + [('fill', bool)])
 
             assert '_first' in self.instructions_nveto.dtype.names, 'Require indexing info in optical ' \
                                                                     'instruction see optical extra dtype'
@@ -826,7 +902,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                 progress_bar=True)
 
     def infer_dtype(self):
-        dtype = dict([(data_type, instruction_dtype + truth_extra_dtype) if 'truth' in data_type
+        dtype = dict([(data_type, instruction_dtype + self._truth_dtype) if 'truth' in data_type
                       else (data_type, strax.raw_record_dtype(samples_per_record=strax.DEFAULT_RECORD_LENGTH))
                       for data_type in self.provides])
         return dtype
@@ -883,7 +959,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                 # If nv is not one of the targets just return an empty chunk
                 # If there is TPC event, set TPC time for the start and end
                 else:
-                    dummy_dtype = wfsim.truth_extra_dtype if 'truth' in data_type else strax.raw_record_dtype()
+                    dummy_dtype = self._truth_dtype if 'truth' in data_type else strax.raw_record_dtype()
                     if exist_tpc_result:
                         chunk[data_type] = self.chunk(start=self.sim.chunk_time_pre,
                                                 end=self.sim.chunk_time,
@@ -899,7 +975,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                                               data=result[data_type],
                                               data_type=data_type)
                 else:
-                    dummy_dtype = wfsim.truth_extra_dtype if 'truth' in data_type else strax.raw_record_dtype()
+                    dummy_dtype = self._truth_dtype if 'truth' in data_type else strax.raw_record_dtype()
                     if exist_nveto_result:
                         chunk[data_type] = self.chunk(start=self.sim_nv.chunk_time_pre,
                                                       end=self.sim_nv.chunk_time,

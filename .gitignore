@@ -21,6 +21,9 @@ custom_data
 test_input_data
 *.zip
 last_bootstrax_exception.txt
+.xenon_config
+test.root
+pytestdebug.log
 
 # cProfile output
 *.prof
@@ -59,3 +62,5 @@ docs/tutorials/*
 # coverage
 .coverage
 
+# testing stuff
+test.root
