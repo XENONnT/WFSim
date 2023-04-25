@@ -5,7 +5,8 @@ import os.path as osp
 import strax
 from strax import exporter
 import straxen
-
+import pandas as pd
+import math
 
 NT_AUX_INSTALLED = False
 STRAX_AUX_INSTALLED = False
@@ -236,7 +237,17 @@ class Resource:
         elif config.get('detector', 'XENONnT') == 'XENONnT':
             pmt_mask = np.array(config['gains']) > 0  # Converted from to pe (from cmt by default)
             self.s1_pattern_map = make_patternmap(files['s1_pattern_map'], fmt='pkl', pmt_mask=pmt_mask)
-            self.s2_pattern_map = make_patternmap(files['s2_pattern_map'], fmt='pkl', pmt_mask=pmt_mask)
+            if '.pkl' in files['s2_pattern_map'] :
+                self.s2_pattern_map = make_patternmap(files['s2_pattern_map'], fmt='pkl', pmt_mask=pmt_mask)
+            elif '.csv' in files['s2_pattern_map'] :
+                map_file = files['s2_pattern_map']
+                colnames=list(range(494))
+                map_data = np.array(pd.read_csv(map_file,sep=';',names=colnames, comment='#',index_col=False))
+                print('Read csv file ',map_file,' length = ',len(map_data))
+                IMx1D = InterpolatingMap_xrot1D(map_data)
+#                self.s2_pattern_map = make_patternmap(files['s2_pattern_map'], fmt='csv', pmt_mask=pmt_mask)
+                self.s2_pattern_map = IMx1D.LCE_PMT_array
+                
             self.se_gain_map = make_map(files['se_gain_map'])
 #             self.s2_correction_map = make_map(files['s2_correction_map'], fmt = 'json')
 
@@ -256,16 +267,41 @@ class Resource:
                     if isinstance(files['s2_pattern_map'], list):
                         log.warning(f'Scaling of S2 AFT with dummy map, this will have no effect!')
                     else:
-                        s2map=deepcopy(self.s2_pattern_map)
-                        s2map_topeff_=s2map.data['map'][...,0:config['n_top_pmts']].sum(axis=2)
-                        s2map_toteff_=s2map.data['map'].sum(axis=2)
-                        orig_aft_=np.mean((s2map_topeff_/s2map_toteff_)[s2map_toteff_>0.0])
-                        # getting scales for top/bottom separately to preserve total efficiency
-                        scale_top_=avg_s2aft_/orig_aft_
-                        scale_bot_=(1 - avg_s2aft_)/(1 - orig_aft_)
-                        s2map.data['map'][:,:,0:config['n_top_pmts']]*=scale_top_
-                        s2map.data['map'][:,:,config['n_top_pmts']:config['n_tpc_pmts']]*=scale_bot_
-                        self.s2_pattern_map.__init__(s2map.data)
+                        if '.pkl' in files['s2_pattern_map'] :
+                            s2map=deepcopy(self.s2_pattern_map)
+#                            print(' s2 map type is ',type(s2map))
+#                            print(' s2 map.data[map] type is ',type(s2map.data['map']))
+                            s2map_topeff_=s2map.data['map'][...,0:config['n_top_pmts']].sum(axis=2)
+#                            print(' s2map_topeff_ type is ',type(s2map_topeff_))
+                            s2map_toteff_=s2map.data['map'].sum(axis=2)
+                            orig_aft_=np.mean((s2map_topeff_/s2map_toteff_)[s2map_toteff_>0.0])
+                            # getting scales for top/bottom separately to preserve total efficiency
+                            scale_top_=avg_s2aft_/orig_aft_
+                            scale_bot_=(1 - avg_s2aft_)/(1 - orig_aft_)
+                            s2map.data['map'][:,:,0:config['n_top_pmts']]*=scale_top_
+                            s2map.data['map'][:,:,config['n_top_pmts']:config['n_tpc_pmts']]*=scale_bot_
+                            self.s2_pattern_map.__init__(s2map.data)
+                        elif '.csv' in files['s2_pattern_map'] :
+                            # print(' n_top_pmts = ',config['n_top_pmts'],' n_tpc_pmts = ',config['n_tpc_pmts'])
+                            s2map_topeff_=map_data[:,0:config['n_top_pmts']].sum(axis=1)/100.
+                            s2map_toteff_=map_data.sum(axis=1)/100.
+                            # print(' s2map_topeff_ = ',s2map_topeff_,' s2map_toteff_ = ',s2map_toteff_)
+                            orig_aft_=np.mean(s2map_topeff_/s2map_toteff_)
+                            # getting scales for top/bottom separately to preserve total efficiency
+                            # print(' orig_aft_ = ',orig_aft_,' avg_s2aft_ = ',avg_s2aft_)
+                            scale_top_=avg_s2aft_/orig_aft_
+                            if orig_aft_ < 1. :
+                                scale_bot_= (1 - avg_s2aft_)/(1 - orig_aft_)
+                            else :
+                                scale_bot_ = 1.
+                                
+                            #print(' scale_top_ = ',scale_top_,' scale_bot_ = ',scale_bot_)
+                            map_data[:,0:config['n_top_pmts']]*=scale_top_
+                            map_data[:,config['n_top_pmts']:config['n_tpc_pmts']]*=scale_bot_
+                            # self.s2_pattern_map.__init__(s2map.data)
+                            # IMx1D = InterpolatingMap_xrot1D(map_data)
+                            IMx1D.update(map_data)
+                            self.s2_pattern_map = IMx1D.LCE_PMT_array
 
             # if there is a (data driven!) map, load it. If not make it  from the pattern map
             if files['s2_correction_map']:
@@ -401,6 +437,7 @@ def make_map(map_file, fmt=None, method='WeightedNearestNeighbors'):
 
     else:
         raise TypeError("Can't handle map_file except a string or a list")
+
 @export
 def make_patternmap(map_file, fmt=None, method='WeightedNearestNeighbors', pmt_mask=None):
     """ This is special interpretation of the of previous make_map(), but designed
@@ -416,22 +453,26 @@ def make_patternmap(map_file, fmt=None, method='WeightedNearestNeighbors', pmt_m
     elif isinstance(map_file, str):
         if fmt is None:
             fmt = parse_extension(map_file)
-        map_data = deepcopy(straxen.get_resource(map_file, fmt=fmt))
-        # XXX: straxed deals with pointers and caches resources, it means that resources are global
-        # what is bad, so we make own copy here and modify it locally
-        if 'compressed' in map_data:
-            compressor, dtype, shape = map_data['compressed']
-            map_data['map'] = np.frombuffer(
-                strax.io.COMPRESSORS[compressor]['decompress'](map_data['map']),
-                dtype=dtype).reshape(*shape)
-            del map_data['compressed']
-        if 'quantized' in map_data:
-            map_data['map'] = map_data['quantized']*map_data['map'].astype(np.float32)
-            del map_data['quantized']
-        if not (pmt_mask is None):
-            assert (map_data['map'].shape[-1]==pmt_mask.shape[0]), "Error! Pattern map and PMT gains must have same dimensions!"
-            map_data['map'][..., ~pmt_mask]=0.0
-        return straxen.InterpolatingMap(map_data, method=method)
+#        if fmt == 'csv':
+#            IMx1D = self.IMx1D
+#            return IMx1D.LCE_PMT_array
+        else:
+            map_data = deepcopy(straxen.get_resource(map_file, fmt=fmt))
+            # XXX: straxed deals with pointers and caches resources, it means that resources are global
+            # what is bad, so we make own copy here and modify it locally
+            if 'compressed' in map_data:
+                compressor, dtype, shape = map_data['compressed']
+                map_data['map'] = np.frombuffer(
+                    strax.io.COMPRESSORS[compressor]['decompress'](map_data['map']),
+                    dtype=dtype).reshape(*shape)
+                del map_data['compressed']
+                if 'quantized' in map_data:
+                    map_data['map'] = map_data['quantized']*map_data['map'].astype(np.float32)
+                    del map_data['quantized']
+                if not (pmt_mask is None):
+                    assert (map_data['map'].shape[-1]==pmt_mask.shape[0]), "Error! Pattern map and PMT gains must have same dimensions!"
+                    map_data['map'][..., ~pmt_mask]=0.0
+            return straxen.InterpolatingMap(map_data, method=method)
     else:
         raise TypeError("Can't handle map_file except a string or a list")
 
@@ -472,3 +513,154 @@ def parse_extension(name):
         fmt = split_name[-1]
     log.warning(f'Using {fmt} for unspecified {name}')
     return fmt
+
+
+@export
+class InterpolatingMap_xrot1D:
+    """Correction map that computes values using simple linear 1D (along x in rotated
+    coordinates = along anode wires) interpolation.
+    The interpolators are called with
+        'positions' :  [[x1, y1], [x2, y2], [x3, y3], [x4, y4], ...]
+        'map_name'  :  key to switch to map interpolator other than the default 'map'
+    """
+
+    def __init__(self, data, method='Linear', **kwargs):
+        self.map_data = data
+        self.n_tpc_pmts = 494
+        colnames=list(range(self.n_tpc_pmts))
+        # TPC dimensions and map binning in mm
+        Rtpc=664.
+        Reff=664.
+        delta_x=10.
+        delta_y=5.
+        imax = int(np.ceil(Rtpc/delta_x))
+        jmax = int(np.ceil((Rtpc/delta_y)-(1./2.)))
+        self.Rtpc=Rtpc
+        self.Reff=Reff
+        self.delta_x=delta_x
+        self.delta_y=delta_y
+        self.imax = imax
+        self.jmax = jmax
+
+        #        kmap = self.return_kmap()
+        self.kmap = self.return_kmap()
+        #self.kmap = kmap
+        #        print('kmap = ',kmap[1])
+
+    def update(self,data):
+        self.map_data = data
+        
+    def return_kmap(self):
+
+        imax = self.imax
+        jmax = self.jmax
+        delta_x = self.delta_x
+        delta_y = self.delta_y
+        Rtpc = self.Rtpc
+        xp,yp=[],[]
+        kmap = [[-1 for y in range(2*jmax+1)] for x in range(2*imax)]
+        print(" Maximum number of cells along x = 2*imax with imax = ",imax)
+        print(" Maximum number of cells along y = 2*jmax + 1 with jmax = ",jmax)
+        k=0
+        for i in range(-imax,imax):
+            x_c = (i + 1./2.) * delta_x
+            for j in range(-jmax,jmax+1):
+                y_c = j * delta_y
+                if x_c*x_c + y_c*y_c < Rtpc*Rtpc:
+                    kmap[i + imax][j + jmax] = k
+                    k+=1
+                    
+        kmax=k           
+        print(" There are ", kmax , " cells of size delta_x = " , delta_x)
+        print(" mm  x  delta_y = ",delta_y," mm  ");
+        print(" whose center lies in a circle of radius ",Rtpc ," mm " )
+    
+        return kmap
+
+    def LCE_PMT_array(self, positions, method='Linear') :
+
+        if method == 'Linear':
+            lp = len(positions)
+            s = (lp,self.n_tpc_pmts)
+            pattern = np.zeros(s)
+#            print(' LCE_PMT_array called with positions of length ',lp)
+            for i in range(0,lp) :
+#                pattern[i] = self.LCE_PMT(positions[i])
+#                pattern[i] = self.LCE_PMT(positions[i][0],positions[i][1])
+#                print(' positions i = ',i,' : ',positions[i])
+#                print(' positions i = ',i,' : X = ',positions[i][0],' - Y = ',positions[i][1])
+#                print(' positions i = ',i,' : X = ',positions[i,0],' - Y = ',positions[i,1])
+                pattern[i] = self.LCE_PMT(positions[i,0],positions[i,1])
+#                pattern[i] = self.LCE_PMT(-10.,10.)
+
+            return pattern
+
+        else:
+            raise ValueError(f'Interpolation method {method} is not supported')
+        
+        
+    def LCE_PMT(self,X,Y) :
+
+        A= self.map_data
+        kmap = self.kmap
+        imax = self.imax
+        jmax = self.jmax
+        delta_x = self.delta_x
+        delta_y = self.delta_y
+        Rtpc = self.Rtpc
+        Reff = self.Reff
+        # standard XENONnT coordinates X,Y in cm -> rotated map coordinates x,y in mm
+
+        x = 10. * (X * math.sqrt(3.)/2. - Y/2.)
+        i = int(np.floor(x/delta_x))
+        
+        y = 10. * (Y * math.sqrt(3.)/2. + X/2.)
+        j = int(np.floor(y/delta_y + 1./2.))
+
+        k = -4
+
+        if x*x + y*y > Rtpc*Rtpc :
+            print("  x = ",x," y = ",y,"  i = ",i," j = ",j,"  out of TPC range ")
+            k = -3
+    
+        else :
+            x_c = (i + 1./2.) * delta_x
+            y_c = j * delta_y
+            
+            if x_c*x_c + y_c*y_c > Reff*Reff :
+                print("  x_c = ",x_c ," y_c = ",y_c,  \
+                      "  cell center out of TPC --> position not included in map, use adjacent cell ")
+                k = -2
+                
+            else :     
+                k = kmap[i + imax][j + jmax];
+                kn = k
+                
+                if k == -1 :
+                    print("  x = ",x," y = ",y,"  x_rot = ",x_rot," y_rot = ",y_rot)
+                    print("  i = ",i," j = ",j," k = -1 ","  out of range ??? " )
+                    
+                if x < x_c :
+                    if i + imax > 0 :
+                        kn = kmap[i + imax - 1][j + jmax]
+                        
+                else :
+                    if i < imax - 1 :
+                        kn = kmap[i + imax + 1][j + jmax]
+                    
+        if k < 0 or kn == -1 :
+            kn = k
+        
+        cell = k    
+        neighbour = kn
+        weight = 1 - (abs(x - x_c)/delta_x)
+
+        #        pPMT = [0 for i in range(n_tpc_pmts)]
+
+        pPMT = np.zeros(self.n_tpc_pmts)
+
+        for i in range(0,self.n_tpc_pmts):
+            pPMT[i] = ((weight * A[cell][i]) + ((1. - weight) * A[neighbour][i]))/100.
+
+        return pPMT
+
