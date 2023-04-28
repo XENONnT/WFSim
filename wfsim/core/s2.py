@@ -599,7 +599,7 @@ class S2(Pulse):
         if isinstance(resource.s2_pattern_map, DummyMap):
             output_dim = resource.s2_pattern_map.shape[-1]
         else:
-            output_dim = resource.s2_pattern_map.data['map'].shape[-1]
+            output_dim = config['n_tpc_pmts']
         pattern = np.zeros((len(n_electron), output_dim))
         n0 = 0
         # Average over electrons for each s2
