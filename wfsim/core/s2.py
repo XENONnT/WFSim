@@ -88,8 +88,9 @@ class S2(Pulse):
             z_obs, positions = z, np.array([x, y]).T
 
         n_electron = self.get_electron_yield(n_electron=n_electron,
-                                             xy_int= np.array([x, y]).T, # maps are in R_true, so orginal position should be here
-                                             z_int=z, # maps are in Z_true, so orginal position should be here
+                                             xy_int= np.array([x, y]).T, # Survival probability maps are in R_true, so orginal position should be here
+                                             z_int=z, # Survival probability maps are in Z_true, so orginal position should be here
+                                             positions = poisitions, # S2 correction maps are the observed positions, which is needed for the extraction efficiency
                                              config=self.config,
                                              resource=self.resource)
 
@@ -208,12 +209,13 @@ class S2(Pulse):
         return sc_gain
 
     @staticmethod
-    def get_electron_yield(n_electron, xy_int, z_int, config, resource):
+    def get_electron_yield(n_electron, xy_int, z_int, positions, config, resource):
         """Drift electrons up to the gas interface and absorb them
 
         :param n_electron: 1d array with ints as number of electrons
-        :param xy_int: 2d array of xy interaction positions (floats)
-        :param z_int: 1d array of floats with the z interaction positions (floats)
+        :param xy_int: 2d array of xy interaction positions (floats) (used for survival probability map)
+        :param z_int: 1d array of floats with the z interaction positions (floats) (used for survival probability map)
+        :param positions: 2d array of observed positions (floats) (used for S2(x,y) correction map)
         :param config: dict with wfsim config
         :param resource: instance of the resource class
 
@@ -224,12 +226,12 @@ class S2(Pulse):
         # extraction efficiency in LXe/GXe interface
         if config.get('ext_eff_from_map', False):
             # Extraction efficiency is g2(x,y)/SE_gain(x,y)
-            rel_s2_cor=resource.s2_correction_map(xy_int)
+            rel_s2_cor=resource.s2_correction_map(positions)
             #doesn't always need to be flattened, but if s2_correction_map = False, then map is made from MC
             rel_s2_cor = rel_s2_cor.flatten()
 
             if config.get('se_gain_from_map', False):
-                se_gains=resource.se_gain_map(xy_int)
+                se_gains=resource.se_gain_map(positions)
             else:
                 # is in get_s2_light_yield map is scaled according to relative s2 correction
                 # we also need to do it here to have consistent g2
