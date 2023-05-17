@@ -96,7 +96,6 @@ class Resource:
                 "s2_luminescence_gg": "garfield_timing_map_gas_gap_sr0.npy",
                 'gas_gap_map': 'gas_gap_warping_map_January_2021.pkl',
                 'garfield_gas_gap_map': 'garfield_gas_gap_map_sr0.json',
-                'ele_ap_pdfs': 'x1t_se_afterpulse_delaytime.pkl.gz',
                 'noise_file': 'x1t_noise_170203_0850_00_small.npz',
                 'fdc_3d': 'XnT_3D_FDC_xyt_dummy_all_zeros_v0.1.json.gz',
                 'field_dependencies_map': '',
@@ -359,7 +358,8 @@ class Resource:
 
             # Electron After Pulses
             if config.get('enable_electron_afterpulses', False):
-                self.uniform_to_ele_ap = straxen.get_resource(files['ele_ap_pdfs'], fmt='pkl.gz')
+                print(config.get('ele_ap_pdfs', ''))
+                self.uniform_to_ele_ap = straxen.get_resource(config.get('ele_ap_pdfs', ''), fmt='dill')
 
             # S2 photons timing optical propagation delays
             if config.get('s2_time_spline', False):

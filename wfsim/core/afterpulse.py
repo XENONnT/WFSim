@@ -34,7 +34,7 @@ class PhotoIonization_Electron(S2):
 
         # To save calculation we first find out how many photon will give rise ap
         n_electron = np.random.poisson(delaytime_pmf_hist.n
-                                       * len(signal_pulse._photon_timings)
+                                       * len(signal_pulse._photon_timings) # Number of "detected" photons
                                        * self.config['photoionization_modifier'])
 
         ap_delay = delaytime_pmf_hist.get_random(n_electron)
