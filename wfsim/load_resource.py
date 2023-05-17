@@ -358,7 +358,6 @@ class Resource:
 
             # Electron After Pulses
             if config.get('enable_electron_afterpulses', False):
-                print(config.get('ele_ap_pdfs', ''))
                 self.uniform_to_ele_ap = straxen.get_resource(config.get('ele_ap_pdfs', ''), fmt='dill')
 
             # S2 photons timing optical propagation delays
