@@ -90,7 +90,7 @@ class S2(Pulse):
         n_electron = self.get_electron_yield(n_electron=n_electron,
                                              xy_int= np.array([x, y]).T, # Survival probability maps are in R_true, so orginal position should be here
                                              z_int=z, # Survival probability maps are in Z_true, so orginal position should be here
-                                             positions = poisitions, # S2 correction maps are the observed positions, which is needed for the extraction efficiency
+                                             positions = positions, # S2 correction maps are the observed positions, which is needed for the extraction efficiency
                                              config=self.config,
                                              resource=self.resource)
 
