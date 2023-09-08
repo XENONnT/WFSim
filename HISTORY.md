@@ -1,3 +1,15 @@
+v1.1.0 / 2023-09-08
+===================
+* Change photoionization file format to avoid pkl (#411)
+* Observed interaction position fix (#412)
+* Update example notebooks (#414)
+* New maintainer (#405) (#418)
+
+v1.0.2 / 2022-10-17
+===================
+* Fix numpy (#393)
+* URL config minimal patch (#399)
+
 v1.0.1 / 2022-06-29
 ===================
 * Default to data-driven diffusion map (#387)
