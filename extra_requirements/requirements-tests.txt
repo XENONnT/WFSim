@@ -1,4 +1,4 @@
 strax==1.5.3
 straxen==2.1.2
-epix==0.3.4
+epix==0.3.5
 git+https://github.com/XENONnT/ax_env
