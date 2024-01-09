@@ -30,6 +30,7 @@ instruction_dtype = [(('Waveform simulator event number.', 'event_number'), np.i
                      (('Number of quanta', 'amp'), np.int32),
                      (('Recoil type of interaction.', 'recoil'), np.int8),
                      (('Energy deposit of interaction', 'e_dep'), np.float32),
+                     (('Total energy deposit in the sensitive volume', 'tot_e'), np.float32),
                      (('Eventid like in geant4 output rootfile', 'g4id'), np.int32),
                      (('Volume id giving the detector subvolume', 'vol_id'), np.int32),
                      (('Local field [ V / cm ]', 'local_field'), np.float64),
