@@ -51,7 +51,7 @@ def test_sim_1T():
                     **conf_1t,
                 ),
                 **straxen.legacy.x1t_common_config),
-            **straxen.legacy.contexts_1t.get_x1t_context_config(),
+            **straxen.legacy.get_x1t_context_config(),
         )
         st.register(wfsim.RawRecordsFromFax1T)
         log.debug(f'Setting testing config {testing_config_1t}')

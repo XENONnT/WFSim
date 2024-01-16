@@ -78,7 +78,7 @@ class TestSimContextNT(TestCase):
 
 
 def test_sim_context():
-    straxen.contexts.xenon1t_simulation()
+    wfsim.contexts.xenon1t_simulation()
 
 
 @skipIf(not straxen.utilix_is_configured(), "No db access, cannot test!")

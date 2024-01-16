@@ -2,6 +2,7 @@ from typing import Optional
 from immutabledict import immutabledict
 import strax
 import straxen
+import wfsim
 from .strax_interface import RawRecordsFromFax1T
 
 
@@ -280,8 +281,11 @@ def xenonnt_simulation(
 def xenon1t_simulation(output_folder="./strax_data"):
     st = strax.Context(
         storage=strax.DataDirectory(output_folder),
-        config=dict(fax_config="fax_config_1t.json", detector="XENON1T", **straxen.contexts.x1t_common_config),
-        **straxen.contexts.get_x1t_context_config(),
+        config=dict(
+            fax_config="fax_config_1t.json", detector="XENON1T",
+            **straxen.legacy.x1t_common_config,
+        ),
+        **straxen.legacy.get_x1t_context_config(),
     )
     st.register(RawRecordsFromFax1T)
     st.deregister_plugins_with_missing_dependencies()
