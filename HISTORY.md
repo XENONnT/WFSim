@@ -1,3 +1,8 @@
+v1.2.0 / 2024-01-16
+===================
+* Update readthedocs configuration (#426)
+* Move all simulation contexts to WFSim (#430)
+
 v1.1.0 / 2023-09-08
 ===================
 * Change photoionization file format to avoid pkl (#411)
