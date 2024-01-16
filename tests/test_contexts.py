@@ -31,10 +31,6 @@ def test_nt_context(register=None, context=None):
 # Simulation contexts are only tested when special flags are set
 
 
-@skipIf(
-    "ALLOW_WFSIM_TEST" not in os.environ,
-    "if you want test wfsim context do `export 'ALLOW_WFSIM_TEST'=1`",
-)
 class TestSimContextNT(TestCase):
     @staticmethod
     def context(*args, **kwargs):
@@ -81,19 +77,11 @@ class TestSimContextNT(TestCase):
             )
 
 
-@skipIf(
-    "ALLOW_WFSIM_TEST" not in os.environ,
-    "if you want test wfsim context do `export 'ALLOW_WFSIM_TEST'=1`",
-)
 def test_sim_context():
     straxen.contexts.xenon1t_simulation()
 
 
 @skipIf(not straxen.utilix_is_configured(), "No db access, cannot test!")
-@skipIf(
-    "ALLOW_WFSIM_TEST" not in os.environ,
-    "if you want test wfsim context do `export 'ALLOW_WFSIM_TEST'=1`",
-)
 def test_sim_offline_context():
     wfsim.contexts.xenonnt_simulation_offline(
         run_id="026000",
