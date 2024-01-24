@@ -51,7 +51,7 @@ def test_sim_1T():
                     **conf_1t,
                 ),
                 **straxen.legacy.x1t_common_config),
-            **straxen.legacy.contexts_1t.get_x1t_context_config(),
+            **straxen.legacy.get_x1t_context_config(),
         )
         st.register(wfsim.RawRecordsFromFax1T)
         log.debug(f'Setting testing config {testing_config_1t}')
@@ -118,7 +118,7 @@ def test_sim_nt_advanced(
     with tempfile.TemporaryDirectory() as tempdir:
         log.debug(f'Working in {tempdir}')
 
-        st = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000',
+        st = wfsim.contexts.xenonnt_simulation(cmt_run_id_sim='010000',
                                                  cmt_version='global_ONLINE',
                                                  fax_config='fax_config_nt_sr0_v0.json',
                                                  _config_overlap={},)
@@ -199,7 +199,7 @@ def test_sim_mc_chain():
         url_data = requests.get(test_g4).content
         with open('test.root', mode='wb') as f:
             f.write(url_data)
-        st = straxen.contexts.xenonnt_simulation(cmt_run_id_sim='010000',
+        st = wfsim.contexts.xenonnt_simulation(cmt_run_id_sim='010000',
                                                  cmt_version='global_ONLINE',
                                                  _config_overlap={},)
         st.set_config(dict(gain_model_nv="legacy-to-pe://adc_nv",

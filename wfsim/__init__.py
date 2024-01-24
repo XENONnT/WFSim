@@ -1,4 +1,4 @@
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 from .core.afterpulse import *
 from .core.pulse import *
@@ -11,3 +11,5 @@ from .strax_interface import *
 
 from .load_resource import *
 from .utils import *
+
+from .contexts import *
