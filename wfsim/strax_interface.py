@@ -1,5 +1,6 @@
 from copy import deepcopy
 from immutabledict import immutabledict
+import sys
 import logging
 import numpy as np
 import pandas as pd
@@ -799,6 +800,10 @@ class RawRecordsFromMcChain(SimulatorPlugin):
             self.instructions_epix = epix.run_epix.main(
                 epix.run_epix.setup(epix_config),
                 return_wfsim_instructions=True)
+
+            if len(self.instructions_epix)==0 and not 'nveto' in self.config['targets']:
+                print("the instruction is empty for TPC")
+                sys.exit(0)
 
             self.g4id.append(self.instructions_epix['g4id'])
             log.debug("Epix produced %d instructions in tpc" % (len(self.instructions_epix)))
