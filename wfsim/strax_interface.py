@@ -1,5 +1,6 @@
 from copy import deepcopy
 from immutabledict import immutabledict
+import sys
 import logging
 import numpy as np
 import pandas as pd
@@ -30,6 +31,7 @@ instruction_dtype = [(('Waveform simulator event number.', 'event_number'), np.i
                      (('Number of quanta', 'amp'), np.int32),
                      (('Recoil type of interaction.', 'recoil'), np.int8),
                      (('Energy deposit of interaction', 'e_dep'), np.float32),
+                     (('Total energy deposit in the sensitive volume', 'tot_e'), np.float32),
                      (('Eventid like in geant4 output rootfile', 'g4id'), np.int32),
                      (('Volume id giving the detector subvolume', 'vol_id'), np.int32),
                      (('Local field [ V / cm ]', 'local_field'), np.float64),
@@ -799,8 +801,12 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                 epix.run_epix.setup(epix_config),
                 return_wfsim_instructions=True)
 
+            if len(self.instructions_epix)==0 and not 'nveto' in self.config['targets']:
+                print("The instructions are empty for TPC interactions")
+                sys.exit(0)
+
             self.g4id.append(self.instructions_epix['g4id'])
-            log.debug("Epix produced %d instructions in tpc" % (len(self.instructions_epix)))
+            log.debug("Epix produced %d instructions in TPC" % (len(self.instructions_epix)))
 
         if 'nveto' in self.config['targets']:
             self.instructions_nveto, self.nveto_channels, self.nveto_timings =\
@@ -810,7 +816,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
 
             self.instructions_nveto = self.instructions_nveto[nv_inst_to_keep]
             self.g4id.append(self.instructions_nveto['g4id'])
-            log.debug("%d instructions were produced in nv" % (len(self.instructions_nveto)))
+            log.debug("%d instructions were produced in nVeto" % (len(self.instructions_nveto)))
 
         self.g4id = np.unique(np.concatenate(self.g4id))
         self.set_timing()
