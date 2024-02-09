@@ -802,11 +802,11 @@ class RawRecordsFromMcChain(SimulatorPlugin):
                 return_wfsim_instructions=True)
 
             if len(self.instructions_epix)==0 and not 'nveto' in self.config['targets']:
-                print("the instruction is empty for TPC")
+                print("The instructions are empty for TPC interactions")
                 sys.exit(0)
 
             self.g4id.append(self.instructions_epix['g4id'])
-            log.debug("Epix produced %d instructions in tpc" % (len(self.instructions_epix)))
+            log.debug("Epix produced %d instructions in TPC" % (len(self.instructions_epix)))
 
         if 'nveto' in self.config['targets']:
             self.instructions_nveto, self.nveto_channels, self.nveto_timings =\
@@ -816,7 +816,7 @@ class RawRecordsFromMcChain(SimulatorPlugin):
 
             self.instructions_nveto = self.instructions_nveto[nv_inst_to_keep]
             self.g4id.append(self.instructions_nveto['g4id'])
-            log.debug("%d instructions were produced in nv" % (len(self.instructions_nveto)))
+            log.debug("%d instructions were produced in nVeto" % (len(self.instructions_nveto)))
 
         self.g4id = np.unique(np.concatenate(self.g4id))
         self.set_timing()
