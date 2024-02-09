@@ -1,3 +1,7 @@
+v1.2.1 / 2024-02-09
+===================
+* Total e_dep in sensitive volume propagated to truth (#429)
+
 v1.2.0 / 2024-01-16
 ===================
 * Update readthedocs configuration (#426)
