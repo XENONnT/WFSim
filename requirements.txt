@@ -1,6 +1,7 @@
-strax>=1.1.2
+strax>=1.6.0
 utilix>=0.5.3
-straxen>=0.19.1
+straxen>=2.2.0
 uproot>=4.0.0
-epix
+epix>=0.3.7
 nestpy
+
