@@ -554,7 +554,7 @@ class S2(Pulse):
         # repeat for n photons per electron # Should this be before adding delays?
         _photon_timings += np.repeat(_electron_timings, n_photons_per_ele)
 
-        return _photon_timings
+        return _photon_timings.astype(np.int64)
 
     @staticmethod
     def s2_pattern_map_diffuse(n_electron, z, xy, config, resource):
