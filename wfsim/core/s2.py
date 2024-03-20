@@ -518,7 +518,7 @@ class S2(Pulse):
         if config['s2_luminescence_model']=='simple':
             _photon_timings = S2.luminescence_timings_simple(positions, n_photons_per_xy,
                                                              config=config,
-                                                             resource=resource)
+                                                             resource=resource).astype(np.int64)
         elif config['s2_luminescence_model']=='garfield':
             confine_position=None
             if 's2_garfield_confine_position' in config:
@@ -527,16 +527,16 @@ class S2(Pulse):
             _photon_timings = S2.luminescence_timings_garfield(positions, n_photons_per_xy,
                                                                config=config,
                                                                resource=resource,
-                                                               confine_position=confine_position)
+                                                               confine_position=confine_position).astype(np.int64)
             
         elif config['s2_luminescence_model']=='garfield_gas_gap':
             _photon_timings = S2.luminescence_timings_garfield_gasgap(positions, n_photons_per_xy,
-                                                                      resource=resource)
+                                                                      resource=resource).astype(np.int64)
         else:
             raise KeyError(f"{config['s2_luminescence_model']} is not valid! Use 'simple' or 'garfield' or 'garfield_gas_gap'")
 
         # Emission Delay
-        _photon_timings += Pulse.singlet_triplet_delays(len(_photon_timings), config['singlet_fraction_gas'], config, phase)
+        _photon_timings += Pulse.singlet_triplet_delays(len(_photon_timings), config['singlet_fraction_gas'], config, phase).astype(np.int64)
 
         # Optical Propagation Delay
         if "optical_propagation" in config['s2_time_model']:
