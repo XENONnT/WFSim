@@ -541,7 +541,7 @@ class S2(Pulse):
         # Optical Propagation Delay
         if "optical_propagation" in config['s2_time_model']:
             # optical propagation splitting top and bottom
-            _photon_timings += S2.optical_propagation(_photon_channels, config, resource.s2_optical_propagation_spline)
+            _photon_timings += S2.optical_propagation(_photon_channels, config, resource.s2_optical_propagation_spline).astype(np.int64)
         elif "zero_delay" in config['s2_time_model']:
             # no optical propagation delay
             _photon_timings += np.zeros_like(_photon_timings, dtype=np.int64)
