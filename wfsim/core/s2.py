@@ -518,7 +518,7 @@ class S2(Pulse):
         if config['s2_luminescence_model']=='simple':
             _photon_timings = S2.luminescence_timings_simple(positions, n_photons_per_xy,
                                                              config=config,
-                                                             resource=resource)
+                                                             resource=resource).astype(np.int64)
         elif config['s2_luminescence_model']=='garfield':
             confine_position=None
             if 's2_garfield_confine_position' in config:
@@ -527,21 +527,21 @@ class S2(Pulse):
             _photon_timings = S2.luminescence_timings_garfield(positions, n_photons_per_xy,
                                                                config=config,
                                                                resource=resource,
-                                                               confine_position=confine_position)
+                                                               confine_position=confine_position).astype(np.int64)
             
         elif config['s2_luminescence_model']=='garfield_gas_gap':
             _photon_timings = S2.luminescence_timings_garfield_gasgap(positions, n_photons_per_xy,
-                                                                      resource=resource)
+                                                                      resource=resource).astype(np.int64)
         else:
             raise KeyError(f"{config['s2_luminescence_model']} is not valid! Use 'simple' or 'garfield' or 'garfield_gas_gap'")
 
         # Emission Delay
-        _photon_timings += Pulse.singlet_triplet_delays(len(_photon_timings), config['singlet_fraction_gas'], config, phase)
+        _photon_timings += Pulse.singlet_triplet_delays(len(_photon_timings), config['singlet_fraction_gas'], config, phase).astype(np.int64)
 
         # Optical Propagation Delay
         if "optical_propagation" in config['s2_time_model']:
             # optical propagation splitting top and bottom
-            _photon_timings += S2.optical_propagation(_photon_channels, config, resource.s2_optical_propagation_spline)
+            _photon_timings += S2.optical_propagation(_photon_channels, config, resource.s2_optical_propagation_spline).astype(np.int64)
         elif "zero_delay" in config['s2_time_model']:
             # no optical propagation delay
             _photon_timings += np.zeros_like(_photon_timings, dtype=np.int64)
@@ -554,7 +554,7 @@ class S2(Pulse):
         # repeat for n photons per electron # Should this be before adding delays?
         _photon_timings += np.repeat(_electron_timings, n_photons_per_ele)
 
-        return _photon_timings
+        return _photon_timings.astype(np.int64)
 
     @staticmethod
     def s2_pattern_map_diffuse(n_electron, z, xy, config, resource):
