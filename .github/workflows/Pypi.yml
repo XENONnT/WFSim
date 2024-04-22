@@ -22,9 +22,4 @@ jobs:
         run: python setup.py sdist bdist_wheel
       # Do the publish
       - name: Publish a Python distribution to PyPI
-        # Might want to add but does not work on workflow_dispatch :
-        # if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
-        uses: pypa/gh-action-pypi-publish@master
-        with:
-          user:  __token__
-          password: ${{ secrets.PIPY_TOKEN }}
+        uses: pypa/gh-action-pypi-publish@release/v1
