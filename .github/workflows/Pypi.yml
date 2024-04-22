@@ -8,18 +8,23 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
       # Setup steps
       - name: Setup python
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
+
       - name: Checkout repo
         uses: actions/checkout@v3
+
       - name: Install dependencies
         run: pip install wheel
+
       - name: Build package
         run: python setup.py sdist bdist_wheel
-      # Do the publish
+
       - name: Publish a Python distribution to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
