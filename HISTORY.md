@@ -1,3 +1,8 @@
+v1.2.2 / 2024-04-21
+===================
+* Bump epix version for automatic tests (#433)
+* Fix s2 photon timing bug (#434)
+
 v1.2.1 / 2024-02-09
 ===================
 * Total e_dep in sensitive volume propagated to truth (#429)
