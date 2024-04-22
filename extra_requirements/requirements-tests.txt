@@ -1,4 +1,4 @@
 strax>=1.6.0
 straxen>=2.2.0
-epix>=0.3.6
+epix>=0.3.8
 git+https://github.com/XENONnT/base_environment
